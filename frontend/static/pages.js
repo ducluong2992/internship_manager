@@ -20,6 +20,7 @@ function pad2(n) { return String(n).padStart(2, '0'); }
 function toDateStr(y, m, d) { return `${y}-${pad2(m)}-${pad2(d)}`; }
 function badgeStatus(s) {
   if (s === 'Working') return `<span class="custom-badge badge-working"><i class="bi bi-circle-fill" style="font-size:7px"></i> Đang làm</span>`;
+  if (s === 'Lên chính thức') return `<span class="custom-badge" style="background:rgba(156,39,176,.15);color:#9c27b0;border:1px solid rgba(156,39,176,.3)"><i class="bi bi-star-fill" style="font-size:9px"></i> Lên chính thức</span>`;
   return `<span class="custom-badge badge-resigned"><i class="bi bi-circle-fill" style="font-size:7px"></i> Đã nghỉ</span>`;
 }
 function badgePeriod(s) {
@@ -34,15 +35,19 @@ function badgePeriod(s) {
 async function renderPage(page, area) {
   try {
     switch (page) {
-      case 'dashboard':         await renderDashboard(area); break;
-      case 'manage-users':      await renderManageUsers(area); break;
-      case 'manage-periods':    await renderManagePeriods(area); break;
-      case 'manage-accounts':   await renderManageAccounts(area); break;
-      case 'admin-schedule':    await renderAdminSchedule(area); break;
-      case 'profile':           await renderProfile(area); break;
+      case 'dashboard': await renderDashboard(area); break;
+      case 'manage-users': await renderManageUsers(area); break;
+      case 'manage-employees': await renderManageEmployees(area); break;
+      case 'manage-periods': await renderManagePeriods(area); break;
+      case 'manage-accounts': await renderManageAccounts(area, 'intern'); break;
+      case 'manage-emp-accounts': await renderManageAccounts(area, 'employee'); break;
+      case 'admin-schedule': await renderAdminSchedule(area); break;
+      case 'profile': await renderProfile(area); break;
       case 'register-schedule': await renderRegisterSchedule(area); break;
-      case 'view-schedule':     await renderViewSchedule(area); break;
-      case 'change-password':   renderChangePassword(area); break;
+      case 'view-schedule': await renderViewSchedule(area); break;
+      case 'change-password': renderChangePassword(area); break;
+      case 'documents': await renderDocuments(area); break;
+      case 'ai-config': await renderAIConfig(area); break;
       default: area.innerHTML = '<div class="empty-state"><i class="bi bi-compass"></i><p>Trang không tồn tại</p></div>';
     }
   } catch (err) {
@@ -59,112 +64,193 @@ async function renderDashboard(area) {
     api('GET', '/admin/periods'),
     api('GET', '/admin/stats'),
   ]);
-  const interns = users.filter(u => u.role === 'intern');
   const now = new Date();
-  const thisPeriod = periods.find(p => p.month === now.getMonth()+1 && p.year === now.getFullYear());
 
   area.innerHTML = `
-<div class="row g-4 mb-4">
-  <div class="col-6 col-lg-3">
-    <div class="stat-card">
-      <div class="stat-icon red"><i class="bi bi-people-fill"></i></div>
-      <div><div class="stat-value">${stats.total_interns}</div><div class="stat-label">Tổng thực tập sinh</div></div>
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="fw-bold mb-0 text-danger">Tổng quan Hệ thống</h4>
+  <span class="badge bg-danger px-3 py-2">Tháng ${now.getMonth() + 1}/${now.getFullYear()}</span>
+</div>
+
+<!-- 1. KEY METRICS -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="glass-card p-3 d-flex align-items-center gap-3 h-100 border-start border-danger border-4">
+      <div class="stat-icon" style="width:48px;height:48px;font-size:1.2rem;background:rgba(229,57,53,0.1);color:#e53935;"><i class="bi bi-people-fill"></i></div>
+      <div>
+        <div class="text-muted small fw-semibold text-uppercase">Tổng Nhân Sự</div>
+        <div class="fs-4 fw-bold lh-1">${stats.total_interns + stats.total_employees}</div>
+        <div class="small text-muted mt-1">${stats.total_employees} NV | ${stats.total_interns} TTS</div>
+      </div>
     </div>
   </div>
-  <div class="col-6 col-lg-3">
-    <div class="stat-card">
-      <div class="stat-icon green"><i class="bi bi-person-check-fill"></i></div>
-      <div><div class="stat-value">${stats.working}</div><div class="stat-label">Đang làm việc</div></div>
+  <div class="col-6 col-md-3">
+    <div class="glass-card p-3 d-flex align-items-center gap-3 h-100 border-start border-danger border-4">
+      <div class="stat-icon" style="width:48px;height:48px;font-size:1.2rem;background:rgba(229,57,53,0.1);color:#e53935;"><i class="bi bi-briefcase-fill"></i></div>
+      <div>
+        <div class="text-muted small fw-semibold text-uppercase">Loại Nhân Viên</div>
+        <div class="fs-4 fw-bold lh-1">${stats.emp_trung_tam} <span class="fs-6 text-muted fw-normal">NS TTâm</span></div>
+        <div class="small text-muted mt-1">${stats.emp_cho_muon} Cho mượn | ${stats.emp_onsite} Onsite</div>
+      </div>
     </div>
   </div>
-  <div class="col-6 col-lg-3">
-    <div class="stat-card">
-      <div class="stat-icon blue"><i class="bi bi-person-badge-fill"></i></div>
-      <div><div class="stat-value">${stats.intern_count}</div><div class="stat-label">Thực tập</div></div>
+  <div class="col-6 col-md-3">
+    <div class="glass-card p-3 d-flex align-items-center gap-3 h-100 border-start border-danger border-4">
+      <div class="stat-icon" style="width:48px;height:48px;font-size:1.2rem;background:rgba(229,57,53,0.1);color:#e53935;"><i class="bi bi-person-badge-fill"></i></div>
+      <div>
+        <div class="text-muted small fw-semibold text-uppercase">Nguồn TTS</div>
+        <div class="fs-4 fw-bold lh-1">${stats.intern_count} <span class="fs-6 text-muted fw-normal">Thực tập</span></div>
+        <div class="small text-muted mt-1">${stats.borrowed_count} Đi mượn</div>
+      </div>
     </div>
   </div>
-  <div class="col-6 col-lg-3">
-    <div class="stat-card">
-      <div class="stat-icon yellow"><i class="bi bi-arrow-left-right"></i></div>
-      <div><div class="stat-value">${stats.borrowed_count}</div><div class="stat-label">Đi mượn</div></div>
+  <div class="col-6 col-md-3">
+    <div class="glass-card p-3 d-flex align-items-center gap-3 h-100 border-start border-danger border-4">
+      <div class="stat-icon" style="width:48px;height:48px;font-size:1.2rem;background:rgba(229,57,53,0.1);color:#e53935;"><i class="bi bi-person-check-fill"></i></div>
+      <div>
+        <div class="text-muted small fw-semibold text-uppercase">TTS Đang Làm</div>
+        <div class="fs-4 fw-bold lh-1">${stats.working}</div>
+        <div class="small text-muted mt-1 text-danger"><i class="bi bi-arrow-down-right"></i> ${stats.resigned} đã nghỉ</div>
+      </div>
     </div>
   </div>
 </div>
 
-<div class="row g-4">
-  <div class="col-lg-8">
-    <div class="glass-card p-4">
-      <div class="section-header">
-        <div class="section-title"><i class="bi bi-people-fill text-danger"></i> Thực tập sinh gần đây</div>
-        <button class="btn btn-sm btn-primary" onclick="navigate('manage-users')"><i class="bi bi-arrow-right me-1"></i>Xem tất cả</button>
+<!-- 2. CHARTS -->
+<div class="row g-4 mb-4">
+  <div class="col-md-4">
+    <div class="glass-card p-4 h-100 d-flex flex-column">
+      <h6 class="fw-bold mb-3"><i class="bi bi-pie-chart-fill text-danger me-2"></i>Cơ cấu Nhân sự</h6>
+      <div class="flex-grow-1 position-relative" style="min-height:220px;">
+        <canvas id="chart-users"></canvas>
       </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="glass-card p-4 h-100 d-flex flex-column">
+      <h6 class="fw-bold mb-3"><i class="bi bi-bar-chart-fill text-danger me-2"></i>Phân loại Nhân viên</h6>
+      <div class="flex-grow-1 position-relative" style="min-height:220px;">
+        <canvas id="chart-emp-type"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="glass-card p-4 h-100 d-flex flex-column">
+      <h6 class="fw-bold mb-3"><i class="bi bi-bar-chart-steps text-danger me-2"></i>Phân loại Thực tập sinh</h6>
+      <div class="flex-grow-1 position-relative" style="min-height:220px;">
+        <canvas id="chart-intern-type"></canvas>
+      </div>
+    </div>
+</div>
+
+<!-- 3. TODAY WORKERS -->
+<div class="row mb-4">
+  <div class="col-12">
+    <div class="glass-card p-4">
+      <h6 class="fw-bold mb-3"><i class="bi bi-calendar-check-fill text-success me-2"></i>TTS đi làm hôm nay</h6>
       <div class="table-responsive">
-        <table class="table table-hover">
-          <thead><tr><th>Mã NV</th><th>Họ tên</th><th>Dự án</th><th>Loại nhân sự</th><th>Trạng thái</th></tr></thead>
-          <tbody>
-            ${interns.slice(0,8).map(u=>`
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
             <tr>
-              <td><code>${u.employee_code}</code></td>
-              <td><strong>${u.full_name}</strong></td>
-              <td>${u.project||'—'}</td>
-              <td><span class="badge ${(u.employee_type||'').toLowerCase()==='borrowed' ? 'bg-warning text-dark' : 'bg-info text-dark'}">${(u.employee_type||'').toLowerCase()==='borrowed' ? 'Đi mượn' : 'Thực tập'}</span></td>
-              <td>${badgeStatus(u.working_status)}</td>
-            </tr>`).join('')}
+              <th>Mã NV</th>
+              <th>Họ và tên</th>
+              <th>Ca làm việc</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${stats.today_workers && stats.today_workers.length > 0 ? stats.today_workers.map(w => `
+              <tr>
+                <td><span class="badge bg-secondary">${w.employee_code}</span></td>
+                <td class="fw-medium">${w.full_name}</td>
+                <td>
+                  ${w.shift === 'S' ? '<span class="badge bg-info text-dark">Sáng</span>' : ''}
+                  ${w.shift === 'C' ? '<span class="badge bg-warning text-dark">Chiều</span>' : ''}
+                  ${w.shift === 'SC' ? '<span class="badge bg-success">Cả ngày</span>' : ''}
+                </td>
+              </tr>
+            `).join('') : '<tr><td colspan="3" class="text-center text-muted py-3">Không có ai đăng ký lịch làm hôm nay.</td></tr>'}
           </tbody>
         </table>
       </div>
     </div>
   </div>
-  <div class="col-lg-4">
-    <div class="glass-card p-4 mb-4">
-      <div class="section-title mb-3"><i class="bi bi-pie-chart-fill text-info"></i> Phân bổ nhân sự</div>
-      <div class="d-flex flex-column gap-2">
-        <div class="d-flex justify-content-between align-items-center">
-          <span class="small text-muted">Thực tập</span>
-          <div class="d-flex align-items-center gap-2">
-            <div style="width:100px;height:8px;background:var(--border);border-radius:4px;overflow:hidden">
-              <div style="width:${stats.total_interns?Math.round(stats.intern_count/stats.total_interns*100):0}%;height:100%;background:var(--info);border-radius:4px"></div>
-            </div>
-            <strong class="small">${stats.intern_count}</strong>
-          </div>
-        </div>
-        <div class="d-flex justify-content-between align-items-center">
-          <span class="small text-muted">Đi mượn</span>
-          <div class="d-flex align-items-center gap-2">
-            <div style="width:100px;height:8px;background:var(--border);border-radius:4px;overflow:hidden">
-              <div style="width:${stats.total_interns?Math.round(stats.borrowed_count/stats.total_interns*100):0}%;height:100%;background:var(--warning);border-radius:4px"></div>
-            </div>
-            <strong class="small">${stats.borrowed_count}</strong>
-          </div>
-        </div>
-        <div class="d-flex justify-content-between align-items-center">
-          <span class="small text-muted">Đã nghỉ</span>
-          <div class="d-flex align-items-center gap-2">
-            <div style="width:100px;height:8px;background:var(--border);border-radius:4px;overflow:hidden">
-              <div style="width:${stats.total_interns?Math.round(stats.resigned/stats.total_interns*100):0}%;height:100%;background:var(--danger);border-radius:4px"></div>
-            </div>
-            <strong class="small">${stats.resigned}</strong>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="glass-card p-4">
-      <div class="section-title mb-3"><i class="bi bi-calendar-check text-success"></i> Kỳ tháng ${now.getMonth()+1}/${now.getFullYear()}</div>
-      ${thisPeriod ? `
-        <div class="mb-3">${badgePeriod(thisPeriod.status)}</div>
-        <div class="mb-2 small text-muted"><i class="bi bi-calendar-event me-2"></i>Mở: ${fmtDateTime(thisPeriod.open_date)}</div>
-        <div class="mb-3 small text-muted"><i class="bi bi-calendar-x me-2"></i>Đóng: ${fmtDateTime(thisPeriod.close_date)}</div>
-        <button class="btn btn-sm btn-primary w-100" onclick="navigate('admin-schedule')">
-          <i class="bi bi-table me-1"></i>Xem bảng lịch
-        </button>
-      ` : `
-        <div class="empty-state py-3">
-          <i class="bi bi-calendar-plus" style="font-size:2rem"></i>
-          <p>Chưa có kỳ đăng ký</p>
-          <button class="btn btn-sm btn-primary mt-2" onclick="navigate('manage-periods')">Tạo ngay</button>
-        </div>
-      `}
-    </div>
-  </div>
 </div>`;
+
+  // Colors: Modern Palette
+  const c1 = '#4F46E5';
+  const c2 = '#06B6D4';
+  const c3 = '#EC4899';
+  const c4 = '#8B5CF6';
+  const c5 = '#10B981';
+  const c6 = '#F59E0B';
+
+  // Draw Charts
+  const cUsers = document.getElementById('chart-users');
+  if (cUsers) {
+    new Chart(cUsers, {
+      type: 'pie',
+      data: {
+        labels: ['Nhân viên', 'Thực tập sinh'],
+        datasets: [{
+          data: [stats.total_employees, stats.total_interns],
+          backgroundColor: [c1, c2],
+          borderWidth: 0,
+          hoverOffset: 4
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8 } } }
+      }
+    });
+  }
+
+  const cEmp = document.getElementById('chart-emp-type');
+  if (cEmp) {
+    new Chart(cEmp, {
+      type: 'bar',
+      data: {
+        labels: ['NS Trung tâm', 'Cho mượn', 'Onsite'],
+        datasets: [{
+          label: 'Số lượng',
+          data: [stats.emp_trung_tam, stats.emp_cho_muon, stats.emp_onsite],
+          backgroundColor: [c1, c3, c4],
+          borderRadius: 4
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false } },
+          y: { beginAtZero: true, border: { display: false }, ticks: { precision: 0, stepSize: 1 } }
+        }
+      }
+    });
+  }
+
+  const cIntern = document.getElementById('chart-intern-type');
+  if (cIntern) {
+    new Chart(cIntern, {
+      type: 'bar',
+      data: {
+        labels: ['Thực tập', 'Đi mượn'],
+        datasets: [{
+          label: 'Số lượng',
+          data: [stats.intern_count, stats.borrowed_count],
+          backgroundColor: [c5, c6],
+          borderRadius: 4
+        }]
+      },
+      options: {
+        indexAxis: 'y', // Horizontal bar
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { beginAtZero: true, border: { display: false }, ticks: { precision: 0, stepSize: 1 } },
+          y: { grid: { display: false } }
+        }
+      }
+    });
+  }
 }

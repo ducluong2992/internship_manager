@@ -1,17 +1,26 @@
 /* ═══════════════════════════════════════════════
-   VIETTEL INTERN MANAGEMENT — FRONTEND APP
+   VIETTEL INTERN & EMPLOYEE MANAGEMENT — FRONTEND
    ═══════════════════════════════════════════════ */
 
 const API = 'http://localhost:8000';
-let STATE = { token: null, role: null, userId: null, fullName: null };
+let STATE = { token: null, role: null, user_type: null, userId: null, fullName: null };
 
 // ── Persist session ──
 function saveSession(data) {
-  STATE = { token: data.access_token, role: data.role, userId: data.user_id, fullName: data.full_name };
+  STATE = {
+    token: data.access_token,
+    role: data.role,
+    user_type: data.user_type || 'intern',
+    userId: data.user_id,
+    fullName: data.full_name,
+  };
   localStorage.setItem('intern_session', JSON.stringify(STATE));
 }
 function loadSession() {
-  try { const s = JSON.parse(localStorage.getItem('intern_session')); if (s?.token) { STATE = s; return true; } } catch { }
+  try {
+    const s = JSON.parse(localStorage.getItem('intern_session'));
+    if (s?.token) { STATE = s; return true; }
+  } catch { }
   return false;
 }
 function clearSession() { STATE = {}; localStorage.removeItem('intern_session'); }
@@ -59,10 +68,18 @@ function startClock() {
 
 // ── Page routing ──
 const PAGE_TITLES = {
-  dashboard: 'Dashboard', 'manage-users': 'Quản lý Thực tập sinh',
-  'manage-periods': 'Quản lý Kỳ đăng ký', 'manage-accounts': 'Tài khoản đăng nhập', 'admin-schedule': 'Bảng lịch theo tháng',
-  profile: 'Hồ sơ cá nhân', 'register-schedule': 'Đăng ký lịch thực tập',
-  'view-schedule': 'Xem lịch của tôi', 'change-password': 'Đổi mật khẩu',
+  dashboard: 'Dashboard',
+  'manage-users': 'Quản lý Thực tập sinh',
+  'manage-employees': 'Quản lý Nhân sự',
+  'manage-periods': 'Quản lý Kỳ đăng ký',
+  'manage-accounts': 'Tài khoản đăng nhập',
+  'admin-schedule': 'Bảng lịch theo tháng',
+  profile: 'Hồ sơ cá nhân',
+  'register-schedule': 'Đăng ký lịch thực tập',
+  'view-schedule': 'Xem lịch của tôi',
+  'change-password': 'Đổi mật khẩu',
+  'documents': 'Quản lý tài liệu',
+  'ai-config': 'Cấu hình AI',
 };
 
 function navigate(page) {
@@ -125,6 +142,7 @@ document.getElementById('form-login').addEventListener('submit', async e => {
 // ── Logout ──
 document.getElementById('nav-logout').addEventListener('click', e => {
   e.preventDefault();
+  if (typeof destroyChat === 'function') destroyChat();
   clearSession();
   document.getElementById('page-app').classList.remove('active');
   document.getElementById('page-login').classList.add('active');
@@ -136,12 +154,28 @@ function showApp() {
   const appEl = document.getElementById('page-app');
   appEl.classList.add('active');
   document.getElementById('sidebar-name').textContent = STATE.fullName;
-  document.getElementById('sidebar-role').textContent = STATE.role === 'admin' ? ' Admin' : ' Thực tập sinh';
-  document.getElementById('admin-menu').classList.toggle('d-none', STATE.role !== 'admin');
-  document.getElementById('intern-menu').classList.toggle('d-none', STATE.role !== 'intern');
+
+  const isAdmin = STATE.role === 'admin';
+  const isEmployee = STATE.user_type === 'employee';
+  const isIntern = !isAdmin && !isEmployee;
+
+  // Role label
+  let roleLabel = 'Thực tập sinh';
+  if (isAdmin) roleLabel = 'Admin';
+  else if (isEmployee) roleLabel = 'Nhân viên';
+  document.getElementById('sidebar-role').textContent = roleLabel;
+
+  // Menus visibility
+  document.getElementById('admin-menu').classList.toggle('d-none', !isAdmin);
+  document.getElementById('ai-menu').classList.toggle('d-none', !isAdmin);
+  document.getElementById('intern-menu').classList.toggle('d-none', !isIntern);
+  document.getElementById('employee-menu').classList.toggle('d-none', !isEmployee);
+
   setupSidebar();
   startClock();
-  if (STATE.role === 'admin') navigate('dashboard');
+  if (typeof initChat === 'function') initChat();
+
+  if (isAdmin) navigate('dashboard');
   else navigate('profile');
 }
 

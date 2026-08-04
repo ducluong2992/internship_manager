@@ -4,16 +4,16 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Quản lý Thực tập sinh | Viettel</title>
+  <title>Quản lý Nhân sự | Viettel</title>
   <meta name="description"
-    content="Hệ thống quản lý thực tập sinh nội bộ Viettel – đăng ký lịch, quản lý hồ sơ và theo dõi tiến độ thực tập." />
+    content="Hệ thống quản lý thực tập sinh và nhân sự nội bộ Viettel – quản lý hồ sơ, đăng ký lịch và theo dõi nhân sự." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
     rel="stylesheet" />
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" />
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
-  <link href="static/style.css?v=1.5" rel="stylesheet" />
+  <link href="static/style.css?v=4.0" rel="stylesheet" />
 </head>
 
 <body>
@@ -28,10 +28,10 @@
       </div>
       <div class="login-card glass-card">
         <div class="login-logo">
-          <div class="logo-icon"><i class="bi bi-building-fill-gear"></i></div>
+          <!-- <div class="logo-icon"><i class="bi bi-building-fill-gear"></i></div> -->
           <div>
-            <h1 class="login-title">Viettel Intern</h1>
-            <p class="login-subtitle">Hệ thống quản lý thực tập sinh</p>
+            <img src="static/images/logo-1-2x-1.png" alt="Viettel HRM" class="login-logo-img">
+            <p class="login-subtitle">Hệ thống quản lý nhân sự</p>
           </div>
         </div>
         <form id="form-login" autocomplete="off">
@@ -69,8 +69,7 @@
     <aside id="sidebar" class="sidebar">
       <div class="sidebar-header">
         <div class="sidebar-logo">
-          <i class="bi bi-building-fill-gear"></i>
-          <span class="sidebar-brand">Viettel Intern</span>
+          <img src="static/images/logo-1-2x-1.png" alt="Viettel HRM" class="sidebar-logo-img">
         </div>
         <button class="sidebar-toggle-btn" id="sidebar-toggle"><i class="bi bi-list"></i></button>
       </div>
@@ -90,24 +89,61 @@
           <a href="#" class="nav-item" data-page="dashboard" id="nav-dashboard">
             <i class="bi bi-speedometer2"></i><span>Dashboard</span>
           </a>
-          <a href="#" class="nav-item" data-page="manage-users" id="nav-manage-users">
-            <i class="bi bi-people-fill"></i><span>Thực tập sinh</span>
+
+          <!-- Group Thực tập sinh -->
+          <a href="#menu-tts" class="nav-item" data-bs-toggle="collapse" role="button" aria-expanded="false"
+            aria-controls="menu-tts">
+            <i class="bi bi-mortarboard-fill"></i><span class="flex-grow-1">Quản lý thực tập sinh</span>
+            <i class="bi bi-chevron-down" style="font-size: 0.8rem;"></i>
           </a>
-          <a href="#" class="nav-item" data-page="manage-periods" id="nav-manage-periods">
-            <i class="bi bi-calendar3"></i><span>Kỳ đăng ký</span>
+          <div class="collapse" id="menu-tts">
+            <div class="ms-3 border-start ps-2">
+              <a href="#" class="nav-item py-2" data-page="manage-users" id="nav-manage-users">
+                <i class="bi bi-people-fill"></i><span>Danh sách TTS</span>
+              </a>
+              <a href="#" class="nav-item py-2" data-page="manage-periods" id="nav-manage-periods">
+                <i class="bi bi-calendar3"></i><span>Kỳ đăng ký</span>
+              </a>
+              <a href="#" class="nav-item py-2" data-page="manage-accounts" id="nav-manage-accounts">
+                <i class="bi bi-person-lines-fill"></i><span>Tài khoản đăng nhập</span>
+              </a>
+              <a href="#" class="nav-item py-2" data-page="admin-schedule" id="nav-admin-schedule">
+                <i class="bi bi-table"></i><span>Bảng lịch</span>
+              </a>
+            </div>
+          </div>
+
+          <!-- Group Nhân sự -->
+          <a href="#menu-ns" class="nav-item" data-bs-toggle="collapse" role="button" aria-expanded="false"
+            aria-controls="menu-ns">
+            <i class="bi bi-briefcase-fill"></i><span class="flex-grow-1">Quản lý nhân sự</span>
+            <i class="bi bi-chevron-down" style="font-size: 0.8rem;"></i>
           </a>
-          <a href="#" class="nav-item" data-page="manage-accounts" id="nav-manage-accounts">
-            <i class="bi bi-person-lines-fill"></i><span>Tài khoản đăng nhập</span>
+          <div class="collapse" id="menu-ns">
+            <div class="ms-3 border-start ps-2">
+              <a href="#" class="nav-item py-2" data-page="manage-employees" id="nav-manage-employees">
+                <i class="bi bi-person-badge-fill"></i><span>Danh sách nhân viên</span>
+              </a>
+              <a href="#" class="nav-item py-2" data-page="manage-emp-accounts" id="nav-manage-emp-accounts">
+                <i class="bi bi-person-lines-fill"></i><span>Tài khoản đăng nhập</span>
+              </a>
+            </div>
+          </div>
+        </div>
+        <div id="ai-menu" class="d-none">
+          <div class="nav-section-label">Tài liệu</div>
+          <a href="#" class="nav-item" data-page="documents" id="nav-documents">
+            <i class="bi bi-file-earmark-text-fill"></i><span>Quản lý tài liệu</span>
           </a>
-          <a href="#" class="nav-item" data-page="admin-schedule" id="nav-admin-schedule">
-            <i class="bi bi-table"></i><span>Bảng lịch</span>
+          <a href="#" class="nav-item" data-page="ai-config" id="nav-ai-config">
+            <i class="bi bi-gear-fill"></i><span>Cấu hình AI</span>
           </a>
         </div>
 
         <!-- Intern menu -->
         <div id="intern-menu" class="d-none">
           <div class="nav-section-label">Cá nhân</div>
-          <a href="#" class="nav-item" data-page="profile" id="nav-profile">
+          <a href="#" class="nav-item" data-page="profile" id="nav-profile-intern">
             <i class="bi bi-person-badge-fill"></i><span>Hồ sơ cá nhân</span>
           </a>
           <a href="#" class="nav-item" data-page="register-schedule" id="nav-register-schedule">
@@ -115,6 +151,14 @@
           </a>
           <a href="#" class="nav-item" data-page="view-schedule" id="nav-view-schedule">
             <i class="bi bi-calendar-week-fill"></i><span>Xem lịch</span>
+          </a>
+        </div>
+
+        <!-- Employee menu -->
+        <div id="employee-menu" class="d-none">
+          <div class="nav-section-label">Cá nhân</div>
+          <a href="#" class="nav-item" data-page="profile" id="nav-profile-emp">
+            <i class="bi bi-person-badge-fill"></i><span>Hồ sơ cá nhân</span>
           </a>
         </div>
 
@@ -147,7 +191,7 @@
 
   <!-- ═══════════════════════ MODALS ═══════════════════════ -->
 
-  <!-- User Modal -->
+  <!-- User Modal (TTS) -->
   <div class="modal fade" id="modal-user" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
       <div class="modal-content glass-modal">
@@ -174,7 +218,7 @@
               <div class="col-md-6">
                 <label class="form-label">Vai trò</label>
                 <select id="u-role" class="form-select">
-                  <option value="intern">Thực tập sinh</option>
+                  <option value="user">Thực tập sinh</option>
                   <option value="admin">Admin</option>
                 </select>
               </div>
@@ -223,15 +267,26 @@
                 <label class="form-label">Dự án</label>
                 <input id="u-project" class="form-control" />
               </div>
-              <div class="col-md-3">
-                <label class="form-label">Trợ cấp (VNĐ)</label>
-                <input id="u-allowance" type="number" class="form-control" value="0" />
+              <div class="col-md-6">
+                <label class="form-label">Vị trí (BA/Dev/...)</label>
+                <input id="u-position" class="form-control" />
               </div>
-              <div class="col-md-3">
+              <div class="col-md-4">
+                <label class="form-label">Ngày vào làm</label>
+                <input id="u-join-date" type="date" class="form-control" />
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Trợ cấp</label>
+                <select id="u-allowance" class="form-select">
+                  <option value="Có">Có</option>
+                  <option value="Không">Không</option>
+                </select>
+              </div>
+              <div class="col-md-4">
                 <label class="form-label">Loại nhân sự</label>
                 <select id="u-emp-type" class="form-select">
-                  <option value="Intern">Thực tập</option>
-                  <option value="Borrowed">Đi mượn</option>
+                  <option value="TTS Trung tâm">TTS Trung tâm</option>
+                  <option value="Đi mượn">Đi mượn</option>
                 </select>
               </div>
               <div class="col-md-4">
@@ -239,6 +294,7 @@
                 <select id="u-work-status" class="form-select">
                   <option value="Working">Đang làm</option>
                   <option value="Resigned">Đã nghỉ</option>
+                  <option value="Lên chính thức">Lên chính thức</option>
                 </select>
               </div>
               <div class="col-md-4">
@@ -254,6 +310,195 @@
         <div class="modal-footer">
           <button class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
           <button class="btn btn-primary" id="btn-save-user"><i class="bi bi-check-lg me-1"></i>Lưu</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Employee Modal -->
+  <div class="modal fade" id="modal-employee" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+      <div class="modal-content glass-modal">
+        <div class="modal-header">
+          <h5 class="modal-title" id="modal-employee-title">Thêm nhân viên</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="form-employee">
+            <input type="hidden" id="emp-id" />
+
+            <!-- Thông tin cơ bản -->
+            <div class="mb-3">
+              <div class="fw-semibold text-muted small mb-2 text-uppercase letter-spacing-1">
+                <i class="bi bi-person-fill me-1 text-danger"></i>Thông tin cơ bản
+              </div>
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label">Họ và tên *</label>
+                  <input id="emp-name" class="form-control" required />
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Mã nhân viên *</label>
+                  <input id="emp-code" class="form-control" required />
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Vị trí</label>
+                  <select id="emp-position-id" class="form-select">
+                    <option value="">-- Chọn vị trí --</option>
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Dự án</label>
+                  <input id="emp-project" class="form-control" />
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Quản lý trực tiếp</label>
+                  <select id="emp-manager" class="form-select">
+                    <option value="">-- Chọn quản lý --</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <hr class="my-3 opacity-25" />
+
+            <!-- Thông tin cá nhân -->
+            <div class="mb-3">
+              <div class="fw-semibold text-muted small mb-2 text-uppercase letter-spacing-1">
+                <i class="bi bi-person-lines-fill me-1 text-info"></i>Thông tin cá nhân
+              </div>
+              <div class="row g-3">
+                <div class="col-md-4">
+                  <label class="form-label">Giới tính</label>
+                  <select id="emp-gender" class="form-select">
+                    <option value="">-- Chọn --</option>
+                    <option>Nam</option>
+                    <option>Nữ</option>
+                    <option>Khác</option>
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Dân tộc</label>
+                  <input id="emp-ethnicity" class="form-control" placeholder="Kinh, Tày..." />
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Email Viettel</label>
+                  <input id="emp-email" type="email" class="form-control" placeholder="abc@viettel.com.vn" />
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Ngày sinh</label>
+                  <input id="emp-birthday" type="date" class="form-control" />
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Quê quán</label>
+                  <input id="emp-hometown" class="form-control" />
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Số điện thoại</label>
+                  <input id="emp-phone" class="form-control" />
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">CCCD</label>
+                  <input id="emp-cccd" class="form-control" />
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Seri máy tính</label>
+                  <input id="emp-serial" class="form-control" placeholder="Laptop Latitude 3420: 8GQBFG3 Ram 8G..." />
+                </div>
+              </div>
+            </div>
+
+            <hr class="my-3 opacity-25" />
+
+            <!-- Tài chính -->
+            <div class="mb-3">
+              <div class="fw-semibold text-muted small mb-2 text-uppercase letter-spacing-1">
+                <i class="bi bi-bank2 me-1 text-success"></i>Tài khoản ngân hàng
+              </div>
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label">Số tài khoản</label>
+                  <input id="emp-bank-account" class="form-control" />
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Ngân hàng</label>
+                  <input id="emp-bank-name" class="form-control" value="Viettel Money" />
+                </div>
+              </div>
+            </div>
+
+            <hr class="my-3 opacity-25" />
+
+            <!-- Công việc -->
+            <div class="mb-3">
+              <div class="fw-semibold text-muted small mb-2 text-uppercase letter-spacing-1">
+                <i class="bi bi-building-gear me-1 text-warning"></i>Thông tin công việc
+              </div>
+              <div class="row g-3">
+                <div class="col-md-4">
+                  <label class="form-label">Tình trạng</label>
+                  <select id="emp-emp-status" class="form-select">
+                    <option value="Thử việc">Thử việc</option>
+                    <option value="Chính thức">Chính thức</option>
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Dùng Mac công ty</label>
+                  <select id="emp-mac" class="form-select">
+                    <option value="Không">Không</option>
+                    <option value="Có">Có</option>
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Vị trí ngồi</label>
+                  <input id="emp-seat" class="form-control" placeholder="Tầng 5, Bàn A3..." />
+                </div>
+                <div class="col-md-12">
+                  <label class="form-label">Loại nhân sự</label>
+                  <select id="emp-staff-cat" class="form-select" onchange="handleStaffCategoryChange()">
+                    <option value="NS trung tâm">NS trung tâm</option>
+                    <option value="Onsite">Onsite</option>
+                    <option value="Cho mượn">Cho mượn</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Cho mượn fields -->
+            <div id="borrow-fields" class="d-none">
+              <hr class="my-3 opacity-25" />
+              <div class="mb-3">
+                <div class="fw-semibold text-muted small mb-2 text-uppercase letter-spacing-1">
+                  <i class="bi bi-arrow-left-right me-1 text-danger"></i>Thông tin cho mượn
+                </div>
+                <div class="row g-3">
+                  <div class="col-md-6">
+                    <label class="form-label">Thời hạn mượn</label>
+                    <input id="emp-borrow-end" type="date" class="form-control" />
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Dự án mượn</label>
+                    <input id="emp-borrow-project" class="form-control" />
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">PM phụ trách dự án mượn</label>
+                    <select id="emp-borrow-pm" class="form-select">
+                      <option value="">-- Chọn PM --</option>
+                    </select>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Trung tâm cho mượn</label>
+                    <input id="emp-borrow-center" class="form-control" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+          <button class="btn btn-primary" id="btn-save-employee"><i class="bi bi-check-lg me-1"></i>Lưu</button>
         </div>
       </div>
     </div>
@@ -328,15 +573,47 @@
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="static/pages.js?v=1.5"></script>
-  <script src="static/page_users.js?v=1.5"></script>
-  <script src="static/page_periods.js?v=1.5"></script>
-  <script src="static/page_admin_schedule.js?v=1.5"></script>
-  <script src="static/page_profile.js?v=1.5"></script>
-  <script src="static/page_schedule.js?v=1.5"></script>
-  <script src="static/page_accounts.js?v=1.5"></script>
-  <script src="static/app.js?v=1.5"></script>
+  <!-- Chat Assistant Widget -->
+  <div id="chat-widget" class="chat-widget-container d-none">
+    <button id="chat-toggle-btn" class="chat-toggle-btn">
+      <i class="bi bi-robot"></i>
+    </button>
+    <div id="chat-window" class="chat-window d-none glass-modal">
+      <div class="chat-header">
+        <div class="d-flex align-items-center">
+          <i class="bi bi-robot me-2 text-primary fs-5"></i>
+          <span class="fw-bold">Trợ lý AI</span>
+        </div>
+        <button id="chat-close-btn" class="btn-close"></button>
+      </div>
+      <div class="chat-body" id="chat-body">
+        <div class="chat-message ai-message">
+          <div class="message-content">Xin chào! Tôi có thể giúp gì cho bạn?</div>
+        </div>
+      </div>
+      <div class="chat-footer">
+        <form id="form-chat" class="d-flex gap-2 w-100">
+          <input type="text" id="chat-input" class="form-control" placeholder="Nhập câu hỏi..." autocomplete="off">
+          <button type="submit" class="btn btn-primary" id="chat-send-btn"><i class="bi bi-send"></i></button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="static/pages.js?v=4.0"></script>
+  <script src="static/page_users.js?v=4.0"></script>
+  <script src="static/page_periods.js?v=4.0"></script>
+  <script src="static/page_admin_schedule.js?v=4.0"></script>
+  <script src="static/page_profile.js?v=4.0"></script>
+  <script src="static/page_schedule.js?v=4.0"></script>
+  <script src="static/page_accounts.js?v=4.0"></script>
+  <script src="static/page_employees.js?v=4.0"></script>
+  <script src="static/page_documents.js?v=4.0"></script>
+  <script src="static/page_ai_config.js?v=4.0"></script>
+  <script src="static/chat.js?v=4.0"></script>
+  <script src="static/app.js?v=4.0"></script>
 </body>
 
 </html>

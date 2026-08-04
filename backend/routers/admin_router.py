@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -7,6 +7,9 @@ import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 import calendar
 from datetime import date
+from pydantic import BaseModel
+import urllib.request
+import re
 
 from database import get_db
 import models, schemas, auth
@@ -32,7 +35,10 @@ def list_users(
     db: Session = Depends(get_db),
     _: models.User = Depends(auth.require_admin),
 ):
-    return db.query(models.User).order_by(models.User.created_at.desc()).all()
+    # Only return interns (user_type=intern) for the TTS management page
+    return db.query(models.User).filter(
+        models.User.user_type == "intern"
+    ).order_by(models.User.created_at.desc()).all()
 
 
 @router.post("/users", response_model=schemas.UserResponse)
@@ -45,12 +51,17 @@ def create_user(
     if existing:
         raise HTTPException(status_code=400, detail="Mã nhân viên đã tồn tại")
     
+    # Force user_type=intern for this endpoint
+    user_data = data.model_dump()
+    user_data["user_type"] = "intern"
+    user_data["role"] = "user" if data.role not in ("admin",) else data.role
+
     # 1. Create User
-    user = models.User(**data.model_dump())
+    user = models.User(**user_data)
     db.add(user)
     db.flush()
 
-    # 2. Generate Username
+    # 2. Generate Username (prefix tts_)
     name_clean = remove_accents(data.full_name).lower()
     parts = name_clean.split()
     if len(parts) == 0:
@@ -127,9 +138,10 @@ def download_import_template(
     
     headers = [
         "MÃ NHÂN VIÊN (*)", "HỌ VÀ TÊN (*)", "GIỚI TÍNH", "NGÀY SINH (YYYY-MM-DD)",
-        "DÂN TỘC", "CCCD", "SĐT", "EMAIL VIETTEL", "QUÊ QUÁN",
-        "NGÂN HÀNG", "SỐ TÀI KHOẢN", "DỰ ÁN", "TRỢ CẤP",
-        "LOẠI NHÂN SỰ (THỰC TẬP/ĐI MƯỢN)", "LOẠI HÌNH (FULLTIME/PARTTIME)"
+        "DÂN TỘC", "CCCD", "SĐT", "QUÊ QUÁN",
+        "NGÂN HÀNG", "SỐ TÀI KHOẢN", 
+        "LOẠI NHÂN SỰ (TTS TRUNG TÂM/ĐI MƯỢN)", "LOẠI HÌNH (FULLTIME/PARTTIME)",
+        "VAI TRÒ (ADMIN/INTERN)", "NGÀY VÀO LÀM (YYYY-MM-DD)", "VỊ TRÍ (BA/DEV/...)"
     ]
     
     header_font = Font(bold=True)
@@ -169,6 +181,35 @@ def import_users(
     except Exception:
         raise HTTPException(status_code=400, detail="Không thể đọc file Excel")
         
+    return process_import_users(ws, db)
+
+class ImportLinkRequest(BaseModel):
+    url: str
+
+@router.post("/users/import-link")
+def import_users_from_link(
+    data: ImportLinkRequest,
+    db: Session = Depends(get_db),
+    _: models.User = Depends(auth.require_admin),
+):
+    match = re.search(r'/d/([a-zA-Z0-9-_]+)', data.url)
+    if not match:
+        raise HTTPException(status_code=400, detail="Đường dẫn Google Sheets không hợp lệ")
+    sheet_id = match.group(1)
+    export_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=xlsx"
+    
+    try:
+        req = urllib.request.Request(export_url)
+        with urllib.request.urlopen(req) as response:
+            content = response.read()
+            wb = openpyxl.load_workbook(filename=BytesIO(content), data_only=True)
+            ws = wb.active
+    except Exception:
+        raise HTTPException(status_code=400, detail="Không thể tải hoặc đọc dữ liệu từ link. Hãy chắc chắn link đã được chia sẻ công khai 'Bất kỳ ai có liên kết'.")
+        
+    return process_import_users(ws, db)
+
+def process_import_users(ws, db: Session):
     # Mapping Excel columns to User fields
     # 0: Mã nhân viên, 1: Họ tên, 2: Giới tính, 3: Ngày sinh, 4: Dân tộc, 5: CCCD
     # 6: SĐT, 7: Email, 8: Quê quán, 9: Ngân hàng, 10: Số TK, 11: Dự án
@@ -202,30 +243,52 @@ def import_users(
                 except ValueError:
                     pass
                     
+        # Parse join_date
+        join_date = None
+        if len(row) > 13 and row[13]:
+            if isinstance(row[13], datetime):
+                join_date = row[13].date()
+            elif isinstance(row[13], date):
+                join_date = row[13]
+            elif isinstance(row[13], str):
+                try:
+                    join_date = datetime.strptime(row[13].strip(), "%Y-%m-%d").date()
+                except ValueError:
+                    pass
+                    
         # Parse integers/strings safely
         allowance = 0
-        try:
-            allowance = int(row[12]) if row[12] else 0
-        except ValueError:
-            pass
+        project = None
+        evaluation = None
+                
+        role = "intern"
+        if len(row) > 12 and row[12]:
+            r_str = str(row[12]).strip().lower()
+            if r_str in ["admin", "quản trị viên", "quản trị"]:
+                role = "admin"
+                
+        position = str(row[14]).strip() if len(row) > 14 and row[14] else None
             
         user_data = {
             "employee_code": emp_code,
             "full_name": full_name,
             "gender": str(row[2]).strip() if row[2] else None,
             "birthday": birthday,
-            "ethnicity": str(row[4]).strip() if row[4] else None,
-            "cccd": str(row[5]).strip() if row[5] else None,
-            "phone": str(row[6]).strip() if row[6] else None,
-            "viettel_email": str(row[7]).strip() if row[7] else None,
-            "hometown": str(row[8]).strip() if row[8] else None,
-            "bank_name": str(row[9]).strip() if row[9] else None,
-            "bank_account": str(row[10]).strip() if row[10] else None,
-            "project": str(row[11]).strip() if row[11] else None,
+            "ethnicity": str(row[4]).strip() if len(row) > 4 and row[4] else None,
+            "cccd": str(row[5]).strip() if len(row) > 5 and row[5] else None,
+            "phone": str(row[6]).strip() if len(row) > 6 and row[6] else None,
+            "viettel_email": None,
+            "hometown": str(row[7]).strip() if len(row) > 7 and row[7] else None,
+            "bank_name": str(row[8]).strip() if len(row) > 8 and row[8] else None,
+            "bank_account": str(row[9]).strip() if len(row) > 9 and row[9] else None,
+            "project": project,
+            "position": position,
+            "join_date": join_date,
+            "evaluation": evaluation,
             "allowance": allowance,
-            "employee_type": str(row[13]).strip() if row[13] else "Intern",
-            "employment_type": str(row[14]).strip() if row[14] else "Fulltime",
-            "role": "intern",
+            "employee_type": str(row[10]).strip() if len(row) > 10 and row[10] else "TTS Trung tâm",
+            "employment_type": str(row[11]).strip() if len(row) > 11 and row[11] else "Fulltime",
+            "role": role,
             "working_status": "Working",
             "account_status": 1
         }
@@ -296,10 +359,11 @@ def reset_password(
 
 @router.get("/accounts", response_model=List[schemas.AdminAccountRow])
 def list_accounts(
+    user_type: str = Query("intern"),
     db: Session = Depends(get_db),
     _: models.User = Depends(auth.require_admin),
 ):
-    users = db.query(models.User).order_by(models.User.created_at.desc()).all()
+    users = db.query(models.User).filter(models.User.user_type == user_type).order_by(models.User.created_at.desc()).all()
     results = []
     for u in users:
         results.append(schemas.AdminAccountRow(
@@ -314,10 +378,11 @@ def list_accounts(
 
 @router.get("/accounts/export")
 def export_accounts(
+    user_type: str = Query("intern"),
     db: Session = Depends(get_db),
     _: models.User = Depends(auth.require_admin),
 ):
-    users = db.query(models.User).order_by(models.User.full_name).all()
+    users = db.query(models.User).filter(models.User.user_type == user_type).order_by(models.User.full_name).all()
     
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -362,25 +427,48 @@ def get_stats(
 ):
     from datetime import datetime
     now = datetime.now()
-    users = db.query(models.User).filter(models.User.role == "intern").all()
+    interns = db.query(models.User).filter(models.User.user_type == "intern").all()
+    employees = db.query(models.User).filter(models.User.user_type == "employee").all()
     periods = db.query(models.SchedulePeriod).all()
     open_periods = [p for p in periods if p.status == "open"]
-    working = [u for u in users if (u.working_status or '').lower() == "working"]
-    resigned = [u for u in users if (u.working_status or '').lower() == "resigned"]
-    fulltime = [u for u in users if (u.employment_type or '').lower() == "fulltime"]
-    parttime = [u for u in users if (u.employment_type or '').lower() == "parttime"]
-    intern_count = [u for u in users if (u.employee_type or '').lower() == "thực tập"]
-    borrowed_count = [u for u in users if (u.employee_type or '').lower() == "đi mượn"]
+    working = [u for u in interns if (u.working_status or '').lower() == "working"]
+    resigned = [u for u in interns if (u.working_status or '').lower() == "resigned"]
+    fulltime = [u for u in interns if (u.employment_type or '').lower() == "fulltime"]
+    parttime = [u for u in interns if (u.employment_type or '').lower() == "parttime"]
+    intern_count = [u for u in interns if (u.employee_type or '').lower() in ["tts trung tâm", "intern", "thực tập"]]
+    borrowed_count = [u for u in interns if (u.employee_type or '').lower() in ["đi mượn", "borrowed"]]
+    
+    emp_trung_tam = [u for u in employees if (u.staff_category or '').lower() in ["ns trung tâm", "nhân sự trung tâm"]]
+    emp_cho_muon = [u for u in employees if (u.staff_category or '').lower() in ["cho mượn", "đi mượn"]]
+    emp_onsite = [u for u in employees if (u.staff_category or '').lower() in ["onsite"]]
+    
+    today_date = now.date()
+    today_schedules = (
+        db.query(models.Schedule, models.User)
+        .join(models.User, models.Schedule.user_id == models.User.id)
+        .filter(models.Schedule.work_day == today_date)
+        .all()
+    )
+    today_workers = [
+        {"employee_code": u.employee_code, "full_name": u.full_name, "shift": s.shift}
+        for s, u in today_schedules if s.shift in ("S", "C", "SC") and (u.working_status or '').lower() == "working"
+    ]
+    
     return {
-        "total_interns": len(users),
+        "total_interns": len(interns),
+        "total_employees": len(employees),
         "working": len(working),
         "resigned": len(resigned),
         "fulltime": len(fulltime),
         "parttime": len(parttime),
         "intern_count": len(intern_count),
         "borrowed_count": len(borrowed_count),
+        "emp_trung_tam": len(emp_trung_tam),
+        "emp_cho_muon": len(emp_cho_muon),
+        "emp_onsite": len(emp_onsite),
         "total_periods": len(periods),
         "open_periods": len(open_periods),
+        "today_workers": today_workers,
     }
 
 
@@ -463,7 +551,7 @@ def admin_view_schedule(
 
     # Get ALL active interns
     all_interns = db.query(models.User).filter(
-        models.User.role == "intern",
+        models.User.user_type == "intern",
         models.User.working_status == "Working",
     ).order_by(models.User.employee_code).all()
 
@@ -594,7 +682,7 @@ def export_schedule(
     schedules = db.query(models.Schedule).filter(models.Schedule.period_id == period.id).all()
     users = (
         db.query(models.User)
-        .filter(models.User.role == "intern", models.User.working_status == "Working")
+        .filter(models.User.user_type == "intern", models.User.working_status == "Working")
         .order_by(models.User.employee_code)
         .all()
     )

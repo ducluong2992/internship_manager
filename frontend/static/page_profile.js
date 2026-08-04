@@ -1,8 +1,19 @@
 // ═══════════════════════════════════════════
-// INTERN PROFILE
+// USER PROFILE (Intern & Employee)
 // ═══════════════════════════════════════════
 async function renderProfile(area) {
   const user = await api('GET', '/users/me');
+  const isEmployee = STATE.user_type === 'employee';
+
+  // Lấy tên vị trí nếu là employee
+  let positionLabel = user.position || '—';
+  if (isEmployee && user.position_id) {
+    try {
+      const positions = await api('GET', '/employees/positions');
+      const pos = positions.find(p => p.id === user.position_id);
+      if (pos) positionLabel = pos.name;
+    } catch (_) {}
+  }
 
   area.innerHTML = `
 <div class="section-header">
@@ -29,16 +40,26 @@ async function renderProfile(area) {
         ${user.viettel_email ? `<span class="ms-2">· ${user.viettel_email}</span>` : ''}
       </div>
       <div class="d-flex gap-2 flex-wrap">
-        ${badgeStatus(user.working_status)}
-        <span class="custom-badge" style="background:rgba(88,166,255,.15);color:var(--info);border:1px solid rgba(88,166,255,.3)">
-          <i class="bi bi-clock-fill" style="font-size:9px"></i> ${user.employment_type || 'Fulltime'}
-        </span>
-        ${user.project ? `<span class="custom-badge" style="background:rgba(210,153,34,.15);color:var(--warning);border:1px solid rgba(210,153,34,.3)">
-          <i class="bi bi-folder-fill" style="font-size:9px"></i> ${user.project}
-        </span>` : ''}
-        ${user.allowance ? `<span class="custom-badge" style="background:rgba(63,185,80,.15);color:var(--success);border:1px solid rgba(63,185,80,.3)">
-          <i class="bi bi-cash-coin" style="font-size:9px"></i> ${fmtNum(user.allowance)} ₫
-        </span>` : ''}
+        ${isEmployee
+          ? `<span class="custom-badge" style="background:rgba(88,166,255,.15);color:var(--info);border:1px solid rgba(88,166,255,.3)">
+              <i class="bi bi-briefcase-fill" style="font-size:9px"></i> Nhân viên
+             </span>
+             ${user.employment_status === 'Chính thức'
+               ? `<span class="custom-badge" style="background:rgba(63,185,80,.15);color:var(--success);border:1px solid rgba(63,185,80,.3)"><i class="bi bi-patch-check-fill" style="font-size:9px"></i> Chính thức</span>`
+               : `<span class="custom-badge" style="background:rgba(255,193,7,.15);color:#d39e00;border:1px solid rgba(255,193,7,.3)"><i class="bi bi-hourglass-split" style="font-size:9px"></i> Thử việc</span>`
+             }
+             ${positionLabel !== '—' ? `<span class="custom-badge" style="background:rgba(229,57,53,.1);color:var(--danger);border:1px solid rgba(229,57,53,.25)"><i class="bi bi-person-workspace" style="font-size:9px"></i> ${positionLabel}</span>` : ''}`
+          : `${badgeStatus(user.working_status)}
+             <span class="custom-badge" style="background:rgba(88,166,255,.15);color:var(--info);border:1px solid rgba(88,166,255,.3)">
+               <i class="bi bi-clock-fill" style="font-size:9px"></i> ${user.employment_type || 'Fulltime'}
+             </span>
+             ${user.project ? `<span class="custom-badge" style="background:rgba(210,153,34,.15);color:var(--warning);border:1px solid rgba(210,153,34,.3)">
+               <i class="bi bi-folder-fill" style="font-size:9px"></i> ${user.project}
+             </span>` : ''}
+             ${user.allowance === 'Có' ? `<span class="custom-badge" style="background:rgba(63,185,80,.15);color:var(--success);border:1px solid rgba(63,185,80,.3)">
+               <i class="bi bi-cash-coin" style="font-size:9px"></i> Có trợ cấp
+             </span>` : ''}`
+        }
       </div>
     </div>
   </div>
@@ -79,13 +100,14 @@ async function renderProfile(area) {
       <label class="form-label">Email Viettel</label>
       <input id="p-viettel-email" type="email" class="form-control" value="${user.viettel_email||''}" placeholder="abc@viettel.com.vn" />
     </div>
+    ${!isEmployee ? `
     <div class="col-md-6">
       <label class="form-label">Loại hình</label>
       <select id="p-employment-type" class="form-select">
         <option value="Fulltime" ${(user.employment_type||'').toLowerCase()==='fulltime'?'selected':''}>Fulltime</option>
         <option value="Parttime" ${(user.employment_type||'').toLowerCase()==='parttime'?'selected':''}>Parttime</option>
       </select>
-    </div>
+    </div>` : ''}
   </div>
 </div>
 
@@ -103,6 +125,36 @@ async function renderProfile(area) {
   </div>
 </div>
 
+${isEmployee ? `
+<div class="profile-section">
+  <div class="profile-section-title"><i class="bi bi-building-gear"></i> Thông tin công việc <small class="fw-normal">(chỉ đọc)</small></div>
+  <div class="row g-3">
+    <div class="col-md-4">
+      <label class="form-label">Vị trí</label>
+      <input class="form-control" value="${positionLabel}" disabled />
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Dự án</label>
+      <input class="form-control" value="${user.project||'—'}" disabled />
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Quản lý trực tiếp</label>
+      <input class="form-control" value="${user.direct_manager||'—'}" disabled />
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Tình trạng</label>
+      <input class="form-control" value="${user.employment_status||'Thử việc'}" disabled />
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Loại nhân sự</label>
+      <input class="form-control" value="${user.staff_category||'—'}" disabled />
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Vị trí ngồi</label>
+      <input class="form-control" value="${user.seat_position||'—'}" disabled />
+    </div>
+  </div>
+</div>` : `
 <div class="profile-section">
   <div class="profile-section-title"><i class="bi bi-building-gear"></i> Thông tin công việc <small class="fw-normal">(chỉ đọc)</small></div>
   <div class="row g-3">
@@ -116,24 +168,27 @@ async function renderProfile(area) {
     </div>
     <div class="col-md-4">
       <label class="form-label">Trợ cấp hàng tháng</label>
-      <input class="form-control" value="${fmtNum(user.allowance)} ₫" disabled />
+      <input class="form-control" value="${user.allowance ? 'Có' : 'Không'}" disabled />
     </div>
   </div>
-</div>`;
+</div>`}`;
 
   document.getElementById('btn-save-profile').onclick = async () => {
-    const getV = id => document.getElementById(id).value.trim() || null;
+    const getV = id => document.getElementById(id)?.value?.trim() || null;
     const btn = document.getElementById('btn-save-profile');
     btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Đang lưu...';
     try {
-      await api('PUT', '/users/me', {
+      const payload = {
         phone: getV('p-phone'), cccd: getV('p-cccd'),
         gender: getV('p-gender'), birthday: getV('p-birthday'),
         ethnicity: getV('p-ethnicity'), hometown: getV('p-hometown'),
         viettel_email: getV('p-viettel-email'),
         bank_name: getV('p-bank-name'), bank_account: getV('p-bank-account'),
-        employment_type: document.getElementById('p-employment-type').value,
-      });
+      };
+      if (!isEmployee) {
+        payload.employment_type = document.getElementById('p-employment-type')?.value || null;
+      }
+      await api('PUT', '/users/me', payload);
       toast('Cập nhật hồ sơ thành công', 'success');
     } catch (e) { toast(e.message, 'error'); }
     finally {

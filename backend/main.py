@@ -7,24 +7,69 @@ from database import engine, SessionLocal
 import auth
 import os
 
-# Create tables
+# Create tables (including new ones)
 models.Base.metadata.create_all(bind=engine)
 
-# Seed admin if not exists
+# ─── Positions seed data ──────────────────────────────────────────────────────
+POSITIONS = [
+    {"name": "Trợ lý dự án",  "is_manager": False},
+    {"name": "PM",             "is_manager": True},
+    {"name": "DU Lead",        "is_manager": True},
+    {"name": "GDTT",           "is_manager": True},
+    {"name": "PGDTT",          "is_manager": True},
+    {"name": "Dev",            "is_manager": False},
+    {"name": "Dev Lead",       "is_manager": True},
+    {"name": "Dev Mobile",     "is_manager": False},
+    {"name": "DevOps",         "is_manager": False},
+    {"name": "Tester",         "is_manager": False},
+    {"name": "Test Lead",      "is_manager": True},
+    {"name": "BA",             "is_manager": False},
+    {"name": "BA Lead",        "is_manager": True},
+    {"name": "QA",             "is_manager": False},
+    {"name": "DA",             "is_manager": False},
+    {"name": "AI",             "is_manager": False},
+]
+
+
+def seed_positions():
+    db = SessionLocal()
+    try:
+        for p in POSITIONS:
+            existing = db.query(models.Position).filter(models.Position.name == p["name"]).first()
+            if not existing:
+                db.add(models.Position(**p))
+        db.commit()
+        print("[OK] Positions seeded")
+    finally:
+        db.close()
+
+
 def seed_admin():
     db = SessionLocal()
     try:
+        # ── Migration: rename role 'intern' → 'user' ──
+        old_interns = db.query(models.User).filter(models.User.role == "intern").all()
+        for u in old_interns:
+            u.role = "user"
+            if not u.user_type:
+                u.user_type = "intern"
+        if old_interns:
+            db.commit()
+            print(f"[OK] Migrated {len(old_interns)} intern role(s) → user")
+
+        # ── Ensure admin account exists ──
         existing = db.query(models.User).filter(models.User.employee_code == "admin").first()
         if not existing:
             admin_user = models.User(
                 employee_code="admin",
                 full_name="Quản trị viên",
                 role="admin",
+                user_type="admin",
                 account_status=1,
             )
             db.add(admin_user)
             db.flush()
-            
+
             admin_acc = models.Account(
                 user_id=admin_user.id,
                 username="admin",
@@ -36,9 +81,11 @@ def seed_admin():
     finally:
         db.close()
 
+
+seed_positions()
 seed_admin()
 
-app = FastAPI(title="Intern Management API", version="1.0.0")
+app = FastAPI(title="Intern & Employee Management API", version="2.0.0")
 
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -64,10 +111,15 @@ app.add_middleware(
 
 # Routers
 from routers import auth_router, user_router, admin_router, schedule_router
+from routers import employee_router, documents_router, ai_config_router, chat_router
 app.include_router(auth_router.router)
 app.include_router(user_router.router)
 app.include_router(admin_router.router)
 app.include_router(schedule_router.router)
+app.include_router(employee_router.router)
+app.include_router(documents_router.router)
+app.include_router(ai_config_router.router)
+app.include_router(chat_router.router)
 
 # Serve frontend
 frontend_dir = os.path.join(os.path.dirname(__file__), "..", "frontend")

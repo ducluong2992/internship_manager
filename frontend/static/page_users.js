@@ -7,7 +7,7 @@ async function renderManageUsers(area) {
   let filterStatus = '';
 
   function filtered() {
-    return users.filter(u => u.role === 'intern' &&
+    return users.filter(u => u.user_type === 'intern' &&
       (!filterStatus || u.working_status === filterStatus) &&
       (u.full_name.toLowerCase().includes(filter) ||
         u.employee_code.toLowerCase().includes(filter) ||
@@ -15,14 +15,27 @@ async function renderManageUsers(area) {
   }
 
   function render() {
+    const searchEl = document.getElementById('user-search');
+    const isFocused = document.activeElement && document.activeElement.id === 'user-search';
+    const cursorStart = isFocused ? searchEl.selectionStart : null;
+    const cursorEnd = isFocused ? searchEl.selectionEnd : null;
+
     const list = filtered();
-    const working = users.filter(u => u.role === 'intern' && u.working_status === 'Working').length;
+    const working = users.filter(u => u.user_type === 'intern' && u.working_status === 'Working').length;
     area.innerHTML = `
 <div class="section-header">
   <div class="section-title"><i class="bi bi-people-fill text-danger"></i> Danh sách thực tập sinh</div>
   <div>
     <button class="btn btn-outline-success btn-sm me-2" onclick="downloadImportTemplate()"><i class="bi bi-download me-1"></i>Tải mẫu Excel</button>
-    <button class="btn btn-success btn-sm me-2" onclick="document.getElementById('import-file-input').click()"><i class="bi bi-upload me-1"></i>Nhập từ Excel</button>
+    <div class="dropdown d-inline-block me-2">
+      <button class="btn btn-success btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+        <i class="bi bi-upload me-1"></i>Nhập dữ liệu
+      </button>
+      <ul class="dropdown-menu shadow">
+        <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); document.getElementById('import-file-input').click()"><i class="bi bi-file-earmark-excel me-2 text-success"></i>Nhập từ Excel</a></li>
+        <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); promptImportLink()"><i class="bi bi-link-45deg me-2 text-primary"></i>Nhập từ link sheet</a></li>
+      </ul>
+    </div>
     <input type="file" id="import-file-input" class="d-none" accept=".xlsx" onchange="handleImportExcel(event)" />
     <button class="btn btn-primary btn-sm" id="btn-add-user"><i class="bi bi-person-plus-fill me-1"></i>Thêm mới</button>
   </div>
@@ -42,8 +55,8 @@ async function renderManageUsers(area) {
   <div class="table-responsive">
     <table class="table table-hover">
       <thead><tr>
-        <th>Mã NV</th><th>Họ tên</th><th>Dự án</th><th>Loại nhân sự</th>
-        <th>Trợ cấp</th><th>Trạng thái</th><th>Tài khoản</th><th style="width:145px">Thao tác</th>
+        <th>Mã NV</th><th>Họ tên</th><th>Dự án</th><th>Số ngày đã làm</th><th>Loại nhân sự</th>
+        <th>Trợ cấp</th><th>Trạng thái</th><th>Vị trí</th><th style="width:100px">Thao tác</th>
       </tr></thead>
       <tbody>
         ${list.length ? list.map(u => `
@@ -51,24 +64,20 @@ async function renderManageUsers(area) {
           <td><code>${u.employee_code}</code></td>
           <td>
             <strong>${u.full_name}</strong><br>
-            <small class="text-muted">${u.viettel_email || '—'}</small>
+            <small class="text-muted">${u.position || '—'} · ${u.viettel_email || '—'}</small>
           </td>
           <td>${u.project || '—'}</td>
-          <td><span class="badge ${(u.employee_type||'').toLowerCase()==='borrowed' ? 'bg-warning text-dark' : 'bg-info text-dark'}">${(u.employee_type||'').toLowerCase()==='borrowed' ? 'Đi mượn' : 'Thực tập'}</span></td>
-          <td>${fmtNum(u.allowance)} ₫</td>
+          <td>${(() => {
+            if (!u.join_date) return '—';
+            const diff = new Date() - new Date(u.join_date);
+            return Math.max(0, Math.floor(diff / (1000*60*60*24))) + ' ngày';
+          })()}</td>
+          <td><span class="badge ${(u.employee_type || '').toLowerCase() === 'đi mượn' ? 'bg-warning text-dark' : 'bg-info text-dark'}">${(u.employee_type || '').toLowerCase() === 'đi mượn' ? 'Đi mượn' : 'TTS Trung tâm'}</span></td>
+          <td>${u.allowance || 'Không'}</td>
           <td>${badgeStatus(u.working_status)}</td>
-          <td>${u.account_status
-        ? '<span class="custom-badge" style="background:rgba(63,185,80,.15);color:#3fb950;border:1px solid rgba(63,185,80,.3)"><i class="bi bi-unlock-fill"></i> Mở</span>'
-        : '<span class="custom-badge badge-locked"><i class="bi bi-lock-fill"></i> Khóa</span>'}</td>
+          <td>${u.position || '—'}</td>
           <td>
             <button class="btn-icon edit me-1" title="Sửa" onclick="openEditUser(${u.id})"><i class="bi bi-pencil-fill"></i></button>
-            <button class="btn-icon ${u.account_status ? 'lock' : 'unlock'} me-1"
-              title="${u.account_status ? 'Khóa' : 'Mở khóa'}" onclick="toggleLock(${u.id})">
-              <i class="bi bi-${u.account_status ? 'lock-fill' : 'unlock-fill'}"></i>
-            </button>
-            <button class="btn-icon reset me-1" title="Đặt lại mật khẩu" onclick="resetPwd(${u.id},'${u.full_name}')">
-              <i class="bi bi-arrow-counterclockwise"></i>
-            </button>
             <button class="btn-icon" style="background:rgba(248,81,73,.1);color:var(--danger)" title="Xóa" onclick="deleteUser(${u.id},'${u.full_name}')">
               <i class="bi bi-trash-fill"></i>
             </button>
@@ -82,6 +91,12 @@ async function renderManageUsers(area) {
     document.getElementById('btn-add-user').onclick = () => openUserModal(null);
     document.getElementById('user-search').addEventListener('input', e => { filter = e.target.value.toLowerCase(); render(); });
     document.getElementById('filter-status').addEventListener('change', e => { filterStatus = e.target.value; render(); });
+
+    if (isFocused) {
+      const newSearchEl = document.getElementById('user-search');
+      newSearchEl.focus();
+      newSearchEl.setSelectionRange(cursorStart, cursorEnd);
+    }
   }
   render();
 }
@@ -89,20 +104,6 @@ async function renderManageUsers(area) {
 window.openEditUser = async (id) => {
   const users = await api('GET', '/admin/users');
   openUserModal(users.find(u => u.id === id));
-};
-
-window.toggleLock = async (id) => {
-  try {
-    const r = await api('PATCH', `/admin/users/${id}/lock`);
-    toast(r.message, 'info');
-    navigate('manage-users');
-  } catch (e) { toast(e.message, 'error'); }
-};
-
-window.resetPwd = async (id, name) => {
-  if (!confirm(`Đặt lại mật khẩu về "123456" cho ${name}?`)) return;
-  try { const r = await api('PATCH', `/admin/users/${id}/reset-password`); toast(r.message); }
-  catch (e) { toast(e.message, 'error'); }
 };
 
 window.deleteUser = async (id, name) => {
@@ -132,8 +133,10 @@ function openUserModal(user) {
   setV('u-bank-name', user?.bank_name || '');
   setV('u-bank-account', user?.bank_account || '');
   setV('u-project', user?.project || '');
-  setV('u-allowance', user?.allowance ?? 0);
-  setV('u-emp-type', user?.employee_type || 'Intern');
+  setV('u-position', user?.position || '');
+  setV('u-join-date', user?.join_date || '');
+  setV('u-allowance', user?.allowance || 'Không');
+  setV('u-emp-type', user?.employee_type || 'TTS Trung tâm');
   setV('u-work-status', user?.working_status || 'Working');
   setV('u-emp-kind', user?.employment_type || 'Fulltime');
   bootstrap.Modal.getOrCreateInstance(document.getElementById('modal-user')).show();
@@ -155,7 +158,9 @@ document.getElementById('btn-save-user').addEventListener('click', async () => {
     bank_name: getV('u-bank-name'),
     bank_account: getV('u-bank-account'),
     project: getV('u-project'),
-    allowance: parseInt(document.getElementById('u-allowance').value) || 0,
+    position: getV('u-position'),
+    join_date: getV('u-join-date'),
+    allowance: getV('u-allowance') || 'Không',
     employee_type: getV('u-emp-type'),
     working_status: getV('u-work-status'),
     employment_type: getV('u-emp-kind'),
@@ -221,6 +226,24 @@ window.handleImportExcel = async function (event) {
 
     toast(data.message, data.success > 0 ? 'success' : 'info');
     navigate('manage-users'); // Reload table
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+};
+
+window.promptImportLink = async function () {
+  const url = prompt("Nhập đường dẫn Google Sheets\\n(Lưu ý: File Google Sheets cần được chia sẻ ở chế độ 'Bất kỳ ai có đường liên kết đều có thể xem'):");
+  if (!url) return;
+  if (!url.includes('docs.google.com/spreadsheets')) {
+    toast('Đường dẫn không hợp lệ', 'error');
+    return;
+  }
+
+  toast('Đang xử lý dữ liệu từ link...', 'info');
+  try {
+    const res = await api('POST', '/admin/users/import-link', { url: url });
+    toast(res.message, res.success > 0 ? 'success' : 'info');
+    navigate('manage-users');
   } catch (err) {
     toast(err.message, 'error');
   }

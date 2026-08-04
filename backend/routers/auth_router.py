@@ -19,6 +19,7 @@ def login(req: schemas.LoginRequest, db: Session = Depends(get_db)):
         access_token=token,
         token_type="bearer",
         role=user.role,
+        user_type=user.user_type or "intern",
         full_name=user.full_name,
         user_id=user.id,
     )
