@@ -21,8 +21,24 @@ function toDateStr(y, m, d) { return `${y}-${pad2(m)}-${pad2(d)}`; }
 function badgeStatus(s) {
   if (s === 'Working') return `<span class="custom-badge badge-working"><i class="bi bi-circle-fill" style="font-size:7px"></i> Đang làm</span>`;
   if (s === 'Lên chính thức') return `<span class="custom-badge" style="background:rgba(156,39,176,.15);color:#9c27b0;border:1px solid rgba(156,39,176,.3)"><i class="bi bi-star-fill" style="font-size:9px"></i> Lên chính thức</span>`;
+  if (s === 'Chuyển trung tâm') return `<span class="custom-badge" style="background:rgba(33,150,243,.15);color:#1565c0;border:1px solid rgba(33,150,243,.35)"><i class="bi bi-arrow-right-circle-fill" style="font-size:9px"></i> Chuyển TT</span>`;
   return `<span class="custom-badge badge-resigned"><i class="bi bi-circle-fill" style="font-size:7px"></i> Đã nghỉ</span>`;
 }
+function badgeShift(s) {
+  if (s === 'SC') return `<span class="custom-badge" style="background:rgba(63,185,80,.18);color:#276221;border:1px solid rgba(63,185,80,.35);font-weight:700">SC</span>`;
+  if (s === 'S')  return `<span class="custom-badge" style="background:rgba(255,193,7,.2);color:#9c5700;border:1px solid rgba(255,193,7,.4);font-weight:700">S</span>`;
+  if (s === 'C')  return `<span class="custom-badge" style="background:rgba(88,166,255,.2);color:#0d47a1;border:1px solid rgba(88,166,255,.4);font-weight:700">C</span>`;
+  return `<span style="opacity:.3">—</span>`;
+}
+function badgeEmpType(t) {
+  if ((t||'').toLowerCase().includes('mượn')) return `<span class="custom-badge" style="background:rgba(255,152,0,.15);color:#e65100;border:1px solid rgba(255,152,0,.3)"><i class="bi bi-arrow-left-right" style="font-size:9px"></i> Đi mượn</span>`;
+  return `<span class="custom-badge" style="background:rgba(88,166,255,.12);color:#0d47a1;border:1px solid rgba(88,166,255,.25)"><i class="bi bi-building" style="font-size:9px"></i> TTS Trung tâm</span>`;
+}
+function badgeEmpKind(k) {
+  if ((k||'').toLowerCase() === 'parttime') return `<span class="custom-badge" style="background:rgba(255,193,7,.15);color:#9c5700;border:1px solid rgba(255,193,7,.3)">Part-time</span>`;
+  return `<span class="custom-badge" style="background:rgba(63,185,80,.12);color:#276221;border:1px solid rgba(63,185,80,.28)">Full-time</span>`;
+}
+
 function badgePeriod(s) {
   return s === 'open'
     ? `<span class="custom-badge badge-open"><i class="bi bi-unlock-fill" style="font-size:9px"></i> Mở</span>`
