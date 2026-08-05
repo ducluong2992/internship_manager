@@ -1181,3 +1181,155 @@ body {
   width: 0.5rem;
   height: 0.5rem;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   OVERTIME (OT) MANAGEMENT STYLES
+   ═══════════════════════════════════════════════════════════ */
+
+/* OT Calendar Header & Grid */
+.ot-cal-header {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.ot-cal-header div {
+  padding: 6px 0;
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: 6px;
+}
+.ot-cal-header .ot-cal-we {
+  color: var(--primary);
+  background: rgba(229, 57, 53, 0.08);
+}
+
+.ot-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+
+.ot-cal-cell {
+  aspect-ratio: 1.2;
+  min-height: 60px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: stretch;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+.ot-cal-center-hours {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--primary);
+  text-align: center;
+  margin: auto 0;
+  line-height: 1;
+}
+.ot-cal-cell:hover {
+  border-color: var(--primary);
+  box-shadow: 0 4px 12px rgba(229, 57, 53, 0.15);
+  transform: translateY(-2px);
+}
+.ot-cal-empty {
+  background: transparent;
+  border: none;
+  cursor: default;
+  pointer-events: none;
+}
+.ot-cal-weekend {
+  background: rgba(229, 57, 53, 0.02);
+}
+.ot-cal-day {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.ot-cal-weekend .ot-cal-day {
+  color: var(--primary);
+}
+
+/* Dots in calendar cell */
+.ot-cal-dots {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.ot-cal-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.ot-dot-approved {
+  background-color: #2e7d32;
+  box-shadow: 0 0 4px rgba(46, 125, 50, 0.5);
+}
+.ot-dot-pending {
+  background-color: #ed6c02;
+  box-shadow: 0 0 4px rgba(237, 108, 2, 0.5);
+}
+.ot-dot-rejected {
+  background-color: #d32f2f;
+  box-shadow: 0 0 4px rgba(211, 47, 47, 0.5);
+}
+
+/* Factor Info Icon & Tooltip */
+.ot-factor-info-icon {
+  color: var(--info);
+  cursor: pointer;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  font-size: 1rem;
+}
+.ot-factor-info-icon:hover {
+  color: var(--primary);
+}
+
+.ot-factor-tooltip {
+  display: none;
+  background: #2b3035;
+  color: #ffffff;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  margin-bottom: 10px;
+  animation: fadeIn 0.2s ease-in-out;
+}
+.ot-factor-tooltip.show {
+  display: block;
+}
+.ot-factor-tooltip-title {
+  font-weight: 700;
+  font-size: 0.88rem;
+  margin-bottom: 6px;
+  color: #ffc107;
+}
+.ot-factor-tooltip ul {
+  padding-left: 16px;
+  margin-bottom: 8px;
+}
+.ot-factor-tooltip ul li {
+  margin-bottom: 4px;
+  line-height: 1.4;
+}
+.ot-factor-tooltip-note {
+  font-style: italic;
+  color: #adb5bd;
+  font-size: 0.78rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  padding-top: 6px;
+}
