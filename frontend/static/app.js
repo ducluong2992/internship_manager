@@ -168,7 +168,6 @@ function showApp() {
   // Menus visibility
   document.getElementById('admin-menu').classList.toggle('d-none', !isAdmin);
   document.getElementById('ai-menu').classList.toggle('d-none', !isAdmin);
-  document.getElementById('intern-menu').classList.toggle('d-none', !isIntern);
   document.getElementById('employee-menu').classList.toggle('d-none', !isEmployee);
 
   setupSidebar();

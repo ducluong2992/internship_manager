@@ -86,18 +86,34 @@ async function renderAdminSchedule(area) {
       ${[2024,2025,2026,2027].map(y=>`<option ${y===selYear?'selected':''}>${y}</option>`).join('')}
     </select>
     <button class="btn btn-sm btn-primary" id="btn-load-sched"><i class="bi bi-search me-1"></i>Xem</button>
-    <button class="btn btn-sm btn-outline-success" id="btn-export">
+    <button class="btn btn-sm btn-outline-success" id="btn-export" ${!data.period?'disabled':''}>
       <i class="bi bi-file-earmark-excel-fill me-1"></i>Xuất Excel
     </button>
+    <button class="btn btn-sm btn-outline-secondary" id="btn-download-tpl" ${!data.period?'disabled':''}>
+      <i class="bi bi-download me-1"></i>Tải file mẫu
+    </button>
+    <div class="dropdown">
+      <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" ${!data.period?'disabled':''}>
+        <i class="bi bi-upload me-1"></i>Import Lịch
+      </button>
+      <ul class="dropdown-menu">
+        <li><a class="dropdown-item" href="#" onclick="document.getElementById('import-sched-file').click()"><i class="bi bi-file-excel me-2"></i>Từ file Excel</a></li>
+        <li><a class="dropdown-item" href="#" onclick="promptSchedImportLink()"><i class="bi bi-link-45deg me-2"></i>Từ Google Sheets</a></li>
+      </ul>
+    </div>
+    <input type="file" id="import-sched-file" accept=".xlsx" style="display:none" onchange="handleSchedImportExcel(event)">
+    ${!data.period ? `<button class="btn btn-sm btn-danger" id="btn-create-period"><i class="bi bi-plus-circle me-1"></i>Tạo kỳ tháng này</button>` : ''}
   </div>
 </div>
 
 ${data.period ? `
 <div class="d-flex gap-3 mb-3 align-items-center flex-wrap">
   <span>${badgePeriod(data.period.status)}</span>
-  <span class="small text-muted">Mở: ${fmtDateTime(data.period.open_date)}</span>
-  <span class="small text-muted">Đóng: ${fmtDateTime(data.period.close_date)}</span>
-  <span class="small text-muted">Đăng ký: <strong class="text-info">${registeredCount}/${data.rows.length}</strong> thực tập sinh</span>
+  <span class="small text-muted">Tháng ${data.period.month}/${data.period.year}</span>
+  <span class="small text-muted">Đăng ký: <strong class="text-info">${registeredCount}/${data.rows.length}</strong> TTS</span>
+  <button class="btn btn-sm btn-outline-danger" onclick="deleteSchedPeriod(${data.period.id})">
+    <i class="bi bi-trash me-1"></i>Xóa kỳ
+  </button>
 </div>` : ''}
 
 <div class="schedule-grid-wrap">
@@ -118,21 +134,122 @@ ${data.period ? `
       await load();
     };
 
-    document.getElementById('btn-export').onclick = async () => {
-      try {
-        const res = await fetch(`${API}/admin/schedule/export?month=${selMonth}&year=${selYear}`, {
-          headers: { Authorization: 'Bearer ' + STATE.token }
-        });
-        if (!res.ok) { toast('Lỗi xuất file', 'error'); return; }
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = `lich_t${selMonth}_${selYear}.xlsx`;
-        document.body.appendChild(a); a.click();
-        document.body.removeChild(a); URL.revokeObjectURL(url);
-        toast('Xuất Excel thành công', 'success');
-      } catch { toast('Lỗi xuất file', 'error'); }
-    };
+    if (data.period) {
+      document.getElementById('btn-export').onclick = async () => {
+        try {
+          const res = await fetch(`${API}/admin/schedule/export?month=${selMonth}&year=${selYear}`, {
+            headers: { Authorization: 'Bearer ' + STATE.token }
+          });
+          if (!res.ok) { toast('Lỗi xuất file', 'error'); return; }
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url; a.download = `lich_t${selMonth}_${selYear}.xlsx`;
+          document.body.appendChild(a); a.click();
+          document.body.removeChild(a); URL.revokeObjectURL(url);
+          toast('Xuất Excel thành công', 'success');
+        } catch { toast('Lỗi xuất file', 'error'); }
+      };
+
+      document.getElementById('btn-download-tpl').onclick = () => {
+        const url = API + `/admin/schedule/import-template?period_id=${data.period.id}`;
+        fetch(url, { headers: { 'Authorization': 'Bearer ' + STATE.token } })
+          .then(res => res.blob())
+          .then(blob => {
+            const blobUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = `mau_import_lich_t${selMonth}_${selYear}.xlsx`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(blobUrl);
+          }).catch(() => toast('Lỗi khi tải mẫu', 'error'));
+      };
+
+      window.handleSchedImportExcel = async function (event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const formData = new FormData();
+        formData.append('file', file);
+        toast('Đang xử lý file...', 'info');
+        event.target.value = '';
+        try {
+          const res = await fetch(API + `/admin/schedule/import?period_id=${data.period.id}`, {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + STATE.token },
+            body: formData,
+          });
+          const resData = await res.json();
+          if (!res.ok) throw new Error(resData.detail || 'Lỗi khi nhập dữ liệu');
+          toast(resData.message, 'success');
+          load();
+        } catch (err) {
+          toast(err.message, 'error');
+        }
+      };
+
+      window.promptSchedImportLink = async function () {
+        const url = prompt('Nhập đường dẫn Google Sheets (phải được chia sẻ công khai "Bất kỳ ai có liên kết"):');
+        if (!url) return;
+        toast('Đang tải danh sách sheet...', 'info');
+        try {
+          const res = await api('POST', `/admin/schedule/import-link-sheets`, { url });
+          if (!res.sheets || res.sheets.length === 0) {
+            throw new Error('Không tìm thấy sheet nào trong file.');
+          }
+          
+          const select = document.getElementById('sheet-select');
+          select.innerHTML = '';
+          res.sheets.forEach(sheet => {
+            const opt = document.createElement('option');
+            opt.value = sheet;
+            opt.textContent = sheet;
+            select.appendChild(opt);
+          });
+          
+          const modal = new bootstrap.Modal(document.getElementById('modal-select-sheet'));
+          modal.show();
+          
+          const confirmBtn = document.getElementById('btn-confirm-sheet');
+          confirmBtn.onclick = async () => {
+            modal.hide();
+            const sheet_name = select.value;
+            toast('Đang xử lý dữ liệu import...', 'info');
+            try {
+              const importRes = await api('POST', `/admin/schedule/import-link?period_id=${data.period.id}`, { url, sheet_name });
+              toast(importRes.message, 'success');
+              load();
+            } catch (e) {
+              toast(e.message, 'error');
+            }
+          };
+        } catch (e) {
+          toast(e.message, 'error');
+        }
+      };
+
+      window.deleteSchedPeriod = async function (periodId) {
+        if (!confirm(`Xóa kỳ tháng ${selMonth}/${selYear}?\n\nToàn bộ lịch đã import sẽ bị xóa.`)) return;
+        try {
+          await api('DELETE', `/admin/periods/${periodId}`);
+          toast('Đã xóa kỳ đăng ký', 'success');
+          load();
+        } catch (e) { toast(e.message, 'error'); }
+      };
+
+    } else {
+      // Không có kỳ — nút Tạo kỳ tháng này
+      const btnCreate = document.getElementById('btn-create-period');
+      if (btnCreate) {
+        btnCreate.onclick = async () => {
+          try {
+            await api('POST', '/admin/periods', { month: selMonth, year: selYear, status: 'closed' });
+            toast(`Đã tạo kỳ tháng ${selMonth}/${selYear}`, 'success');
+            load();
+          } catch (e) { toast(e.message, 'error'); }
+        };
+      }
+    }
   }
 
   await load();

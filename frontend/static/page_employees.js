@@ -212,6 +212,9 @@ async function renderManageEmployees(area) {
 function badgeEmpStatus(s) {
   const text = s || 'Thử việc';
   const lower = text.toLowerCase();
+  if (lower.includes('chuyển trung tâm')) {
+    return `<span class="custom-badge" style="background:rgba(156,39,176,.15);color:#9c27b0;border:1px solid rgba(156,39,176,.3)"><i class="bi bi-arrow-right-circle-fill" style="font-size:9px"></i> ${text}</span>`;
+  }
   if (lower.includes('chính thức')) {
     return `<span class="custom-badge" style="background:rgba(63,185,80,.15);color:var(--success);border:1px solid rgba(63,185,80,.3)"><i class="bi bi-patch-check-fill" style="font-size:9px"></i> ${text}</span>`;
   }

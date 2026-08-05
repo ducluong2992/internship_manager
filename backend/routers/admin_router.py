@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from typing import List, Optional
 from io import BytesIO
 import openpyxl
@@ -27,7 +28,24 @@ def remove_accents(input_str):
     nfkd_form = unicodedata.normalize('NFKD', s)
     return u"".join([c for c in nfkd_form if not unicodedata.combining(c)])
 
-    return {"employee_code": employee_code, "password": password}
+
+def parse_excel_date(val):
+    if not val:
+        return None
+    if isinstance(val, datetime):
+        return val.date()
+    if isinstance(val, date):
+        return val
+    if isinstance(val, str):
+        val_str = val.strip()
+        if not val_str:
+            return None
+        for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%Y/%m/%d", "%d/%m/%y"):
+            try:
+                return datetime.strptime(val_str, fmt).date()
+            except ValueError:
+                pass
+    return None
 
 
 @router.get("/users", response_model=List[schemas.UserResponse])
@@ -60,32 +78,6 @@ def create_user(
     user = models.User(**user_data)
     db.add(user)
     db.flush()
-
-    # 2. Generate Username (prefix tts_)
-    name_clean = remove_accents(data.full_name).lower()
-    parts = name_clean.split()
-    if len(parts) == 0:
-        base_username = "tts_user"
-    elif len(parts) == 1:
-        base_username = f"tts_{parts[0]}"
-    else:
-        first_name = parts[-1]
-        initials = "".join([p[0] for p in parts[:-1]])
-        base_username = f"tts_{first_name}{initials}"
-    
-    username = base_username
-    suffix = 1
-    while db.query(models.Account).filter(models.Account.username == username).first():
-        username = f"{base_username}{suffix}"
-        suffix += 1
-
-    # 3. Create Account
-    account = models.Account(
-        user_id=user.id,
-        username=username,
-        password=auth.hash_password("123456")
-    )
-    db.add(account)
     db.commit()
     db.refresh(user)
     return user
@@ -127,7 +119,7 @@ def delete_user(
 
 
 from fastapi import UploadFile, File
-import pandas as pd # Actually openpyxl is already imported, we'll use openpyxl directly
+
 @router.get("/users/import-template")
 def download_import_template(
     _: models.User = Depends(auth.require_admin),
@@ -137,23 +129,68 @@ def download_import_template(
     ws.title = "Danh sách Thực tập sinh"
     
     headers = [
-        "MÃ NHÂN VIÊN (*)", "HỌ VÀ TÊN (*)", "GIỚI TÍNH", "NGÀY SINH (YYYY-MM-DD)",
-        "DÂN TỘC", "CCCD", "SĐT", "QUÊ QUÁN",
-        "NGÂN HÀNG", "SỐ TÀI KHOẢN", 
-        "LOẠI NHÂN SỰ (TTS TRUNG TÂM/ĐI MƯỢN)", "LOẠI HÌNH (FULLTIME/PARTTIME)",
-        "VAI TRÒ (ADMIN/INTERN)", "NGÀY VÀO LÀM (YYYY-MM-DD)", "VỊ TRÍ (BA/DEV/...)"
+        "HỌ VÀ TÊN (*)",
+        "MÃ NV (*)",
+        "ROLE (VD: Dev, Test, BA, PM, Admin)",
+        "GIỚI TÍNH",
+        "DÂN TỘC",
+        "EMAIL VIETTEL",
+        "NGÀY SINH (DD/MM/YYYY)",
+        "QUÊ QUÁN",
+        "SỐ ĐIỆN THOẠI",
+        "SỐ CCCD",
+        "NGÂN HÀNG",
+        "SỐ TÀI KHOẢN",
+        "DỰ ÁN THAM GIA",
+        "NGÀY VÀO LÀM (DD/MM/YYYY)",
+        "TRỢ CẤP (Có/Không)",
+        "LOẠI NHÂN SỰ (TTS Trung tâm/Đi mượn)",
+        "TÌNH TRẠNG (Đang làm/Đã nghỉ/Lên chính thức)"
     ]
     
-    header_font = Font(bold=True)
+    sample_rows = [
+        [
+            "Nguyễn Văn Hoàng", "480598", "Dev", "Nam", "Kinh",
+            "hoangnv48@viettel.com.vn", "22/01/2001", "Tuyên Quang",
+            "0987654321", "001201012345", "MB Bank", "999988887777",
+            "Dự án Quản lý TTS", "01/06/2024", "Có", "TTS Trung tâm", "Đang làm"
+        ],
+        [
+            "Trần Thị Mai", "480599", "Test", "Nữ", "Kinh",
+            "maitt49@viettel.com.vn", "15/05/2002", "Hà Nội",
+            "0912345678", "001202054321", "Vietcombank", "1012345678",
+            "Dự án Smart City", "15/06/2024", "Không", "Đi mượn", "Đang làm"
+        ]
+    ]
+    
+    header_font = Font(name="Calibri", size=11, bold=True, color="000000")
     header_fill = PatternFill("solid", fgColor="DDEEFF")
-    center = Alignment(horizontal="center", vertical="center")
+    center = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    left = Alignment(horizontal="left", vertical="center")
     
     for col_idx, header in enumerate(headers, start=1):
         c = ws.cell(1, col_idx, header)
         c.font = header_font
         c.fill = header_fill
         c.alignment = center
-        ws.column_dimensions[c.column_letter].width = 20
+        
+    for r_idx, s_row in enumerate(sample_rows, start=2):
+        for col_idx, val in enumerate(s_row, start=1):
+            c = ws.cell(r_idx, col_idx, val)
+            c.alignment = left
+            
+    ws.row_dimensions[1].height = 28
+    ws.row_dimensions[2].height = 20
+    ws.row_dimensions[3].height = 20
+    
+    for col in ws.columns:
+        max_len = 0
+        col_letter = openpyxl.utils.get_column_letter(col[0].column)
+        for cell in col:
+            val_str = str(cell.value or '')
+            if len(val_str) > max_len:
+                max_len = len(val_str)
+        ws.column_dimensions[col_letter].width = max(max_len + 4, 18)
         
     buf = BytesIO()
     wb.save(buf)
@@ -185,6 +222,289 @@ def import_users(
 
 class ImportLinkRequest(BaseModel):
     url: str
+    sheet_name: str | None = None
+
+def process_schedule_import_v2(ws, period_id, month, year, db: Session):
+    return process_schedule_import(ws, period_id, month, year, db)
+
+@router.post("/schedule/import-link-sheets")
+def get_schedule_link_sheets(
+    data: ImportLinkRequest,
+    _: models.User = Depends(auth.require_admin),
+):
+    match = re.search(r'/d/([a-zA-Z0-9-_]+)', data.url)
+    if not match:
+        raise HTTPException(status_code=400, detail="Đường dẫn Google Sheets không hợp lệ")
+    sheet_id = match.group(1)
+    export_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=xlsx"
+    
+    try:
+        req = urllib.request.Request(export_url)
+        with urllib.request.urlopen(req) as response:
+            content = response.read()
+            wb = openpyxl.load_workbook(filename=BytesIO(content), data_only=True, read_only=True)
+            return {"sheets": wb.sheetnames}
+    except Exception:
+        raise HTTPException(status_code=400, detail="Không thể tải file từ link để lấy danh sách sheet.")
+
+@router.get("/schedule/import-template")
+def download_schedule_import_template(
+    period_id: int,
+    db: Session = Depends(get_db),
+    _: models.User = Depends(auth.require_admin),
+):
+    period = db.query(models.SchedulePeriod).filter(models.SchedulePeriod.id == period_id).first()
+    if not period:
+        raise HTTPException(status_code=404, detail="Không tìm thấy kỳ đăng ký")
+    
+    month, year = period.month, period.year
+    num_days = calendar.monthrange(year, month)[1]
+    workdays = [date(year, month, d) for d in range(1, num_days + 1) if date(year, month, d).weekday() < 6]
+    
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = f"Import_Lich_t{month}_{year}"
+    
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill("solid", fgColor="4472C4")
+    center = Alignment(horizontal="center", vertical="center")
+    
+    ws.cell(1, 1, "MÃ NV (*)").font = header_font
+    ws.cell(1, 1).fill = header_fill
+    ws.cell(1, 1).alignment = center
+    ws.column_dimensions["A"].width = 15
+    
+    ws.cell(1, 2, "HỌ VÀ TÊN (*)").font = header_font
+    ws.cell(1, 2).fill = header_fill
+    ws.cell(1, 2).alignment = center
+    ws.column_dimensions["B"].width = 25
+    
+    for col_idx, d in enumerate(workdays, start=3):
+        c = ws.cell(1, col_idx, f"{d.day}/{d.month}")
+        c.font = header_font
+        c.fill = header_fill
+        c.alignment = center
+        ws.column_dimensions[c.column_letter].width = 10
+        
+    users = db.query(models.User).filter(models.User.user_type == "intern", models.User.working_status == "Working").order_by(models.User.employee_code).all()
+    for row_idx, user in enumerate(users, start=2):
+        ws.cell(row_idx, 1, user.employee_code).alignment = center
+        ws.cell(row_idx, 2, user.full_name)
+        
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename=mau_import_lich_t{month}_{year}.xlsx"},
+    )
+
+
+def process_schedule_import(ws, period_id: int, month: int, year: int, db: Session):
+    rows = list(ws.iter_rows(values_only=True))
+    if not rows:
+        return {"message": "File Excel không có dữ liệu", "success": 0, "skipped": 0}
+
+    num_days = calendar.monthrange(year, month)[1]
+    
+    # ── 1. Header & Column Detection ──
+    emp_code_col = None
+    name_col = None
+    day_col_map = {} # day number (1..31) -> column index (0-based)
+    day_header_row_idx = None
+
+    # Scan first 5 rows to detect header structure
+    for r_idx, row in enumerate(rows[:5]):
+        if not row:
+            continue
+            
+        row_str_lower = [str(c).replace('\xa0', ' ').strip().lower() if c is not None else "" for c in row]
+        
+        # Check for MÃ NV / Code header
+        for c_idx, val in enumerate(row_str_lower):
+            if ("mã" in val or "code" in val or "manv" in val) and emp_code_col is None:
+                emp_code_col = c_idx
+            elif ("họ" in val or "tên" in val or "full_name" in val) and name_col is None:
+                name_col = c_idx
+
+        # Check for day numbers in this row
+        current_day_map = {}
+        for c_idx, cell in enumerate(row):
+            if cell is None:
+                continue
+            val_str = str(cell).replace('\xa0', ' ').strip()
+            if not val_str:
+                continue
+            
+            # Case A: Integer / Float day number (1..31)
+            try:
+                d_num = int(float(val_str))
+                if 1 <= d_num <= num_days:
+                    current_day_map[d_num] = c_idx
+                    continue
+            except (ValueError, OverflowError):
+                pass
+                
+            # Case B: Format "D/M" or "D-M" or "D/M/Y"
+            match = re.match(r'^(\d{1,2})[/-]\d{1,2}(?:[/-]\d{2,4})?$', val_str)
+            if match:
+                try:
+                    d_num = int(match.group(1))
+                    if 1 <= d_num <= num_days:
+                        current_day_map[d_num] = c_idx
+                except ValueError:
+                    pass
+
+        # If row contains at least 3 day number columns, it is our Day Header Row!
+        if len(current_day_map) >= 3 and len(current_day_map) > len(day_col_map):
+            day_col_map = current_day_map
+            day_header_row_idx = r_idx
+
+    # Fallback default column indices if not detected:
+    if name_col is None and emp_code_col is None:
+        name_col = 0
+        emp_code_col = 1
+    elif name_col is None:
+        name_col = 0 if emp_code_col != 0 else 1
+    elif emp_code_col is None:
+        emp_code_col = 1 if name_col != 1 else 0
+
+    # Start data scanning after header row
+    start_row_idx = (day_header_row_idx + 1) if day_header_row_idx is not None else 1
+
+    success_count = 0
+    skip_count = 0
+
+    for r_idx in range(start_row_idx, len(rows)):
+        row = rows[r_idx]
+        if not row:
+            continue
+            
+        emp_code = str(row[emp_code_col]).replace('\xa0', ' ').strip() if emp_code_col < len(row) and row[emp_code_col] is not None else ""
+        full_name = str(row[name_col]).replace('\xa0', ' ').strip() if name_col < len(row) and row[name_col] is not None else ""
+
+        # Skip empty rows, header sub-rows, or formula error rows (#REF!, #N/A, #VALUE!, etc.)
+        combined = f"{emp_code} {full_name}".lower()
+        if not emp_code and not full_name:
+            continue
+        if "#" in combined or "ref!" in combined or "n/a" in combined or "value!" in combined or "error" in combined:
+            continue
+        if "thứ" in combined or "chủ nhật" in combined or "họ và tên" in combined or "mã nv" in combined:
+            continue
+
+        # ── 2. Match User (Priority: Employee Code -> Full Name) ──
+        user = None
+        if emp_code:
+            user = db.query(models.User).filter(
+                func.lower(models.User.employee_code) == emp_code.lower()
+            ).first()
+            
+        if not user and full_name:
+            user = db.query(models.User).filter(
+                func.lower(models.User.full_name) == full_name.lower()
+            ).first()
+
+        # Fallback: Zero-padded / stripped zero matching for employee_code (e.g., TTS01 vs TTS1)
+        if not user and emp_code:
+            clean_code = re.sub(r'0+(\d+)', r'\1', emp_code.upper())
+            all_users = db.query(models.User).all()
+            for u in all_users:
+                u_code = re.sub(r'0+(\d+)', r'\1', (u.employee_code or "").upper())
+                if u_code == clean_code:
+                    user = u
+                    break
+
+        if not user:
+            skip_count += 1
+            continue
+
+        # Delete previous schedules for this user in this period
+        db.query(models.Schedule).filter(
+            models.Schedule.period_id == period_id,
+            models.Schedule.user_id == user.id
+        ).delete()
+
+        # ── 3. Parse & Add Schedules ──
+        for d in range(1, num_days + 1):
+            if d in day_col_map:
+                col_idx = day_col_map[d]
+                if col_idx < len(row) and row[col_idx] is not None:
+                    raw_val = str(row[col_idx]).replace('\xa0', ' ').strip().upper()
+                    shift = None
+                    if raw_val in ("S", "C", "SC"):
+                        shift = raw_val
+
+                    if shift in ("S", "C", "SC"):
+                        db.add(models.Schedule(
+                            period_id=period_id,
+                            user_id=user.id,
+                            work_day=date(year, month, d),
+                            shift=shift
+                        ))
+
+        success_count += 1
+
+    db.commit()
+    msg = f"Đã nhập lịch cho {success_count} thực tập sinh."
+    if skip_count > 0:
+        msg += f" Bỏ qua {skip_count} dòng không khớp thông tin."
+    return {"message": msg, "success": success_count, "skipped": skip_count}
+
+
+@router.post("/schedule/import")
+def import_schedule_excel(
+    period_id: int = Query(...),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _: models.User = Depends(auth.require_admin),
+):
+    period = db.query(models.SchedulePeriod).filter(models.SchedulePeriod.id == period_id).first()
+    if not period:
+        raise HTTPException(status_code=404, detail="Không tìm thấy kỳ đăng ký")
+        
+    if not file.filename.endswith('.xlsx'):
+        raise HTTPException(status_code=400, detail="Chỉ hỗ trợ định dạng .xlsx")
+        
+    try:
+        content = file.file.read()
+        wb = openpyxl.load_workbook(filename=BytesIO(content), data_only=True)
+        ws = wb.active
+    except Exception:
+        raise HTTPException(status_code=400, detail="Không thể đọc file Excel")
+        
+    return process_schedule_import(ws, period_id, period.month, period.year, db)
+
+@router.post("/schedule/import-link")
+def import_schedule_link(
+    data: ImportLinkRequest,
+    period_id: int = Query(...),
+    db: Session = Depends(get_db),
+    _: models.User = Depends(auth.require_admin),
+):
+    period = db.query(models.SchedulePeriod).filter(models.SchedulePeriod.id == period_id).first()
+    if not period:
+        raise HTTPException(status_code=404, detail="Không tìm thấy kỳ đăng ký")
+        
+    match = re.search(r'/d/([a-zA-Z0-9-_]+)', data.url)
+    if not match:
+        raise HTTPException(status_code=400, detail="Đường dẫn Google Sheets không hợp lệ")
+    sheet_id = match.group(1)
+    export_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=xlsx"
+    
+    try:
+        req = urllib.request.Request(export_url)
+        with urllib.request.urlopen(req) as response:
+            content = response.read()
+            wb = openpyxl.load_workbook(filename=BytesIO(content), data_only=True)
+            if data.sheet_name and data.sheet_name in wb.sheetnames:
+                ws = wb[data.sheet_name]
+            else:
+                ws = wb.active
+    except Exception:
+        raise HTTPException(status_code=400, detail="Không thể tải hoặc đọc dữ liệu từ link. Hãy chắc chắn link đã được chia sẻ công khai 'Bất kỳ ai có liên kết'.")
+        
+    return process_schedule_import(ws, period_id, period.month, period.year, db)
 
 @router.post("/users/import-link")
 def import_users_from_link(
@@ -210,121 +530,187 @@ def import_users_from_link(
     return process_import_users(ws, db)
 
 def process_import_users(ws, db: Session):
-    # Mapping Excel columns to User fields
-    # 0: Mã nhân viên, 1: Họ tên, 2: Giới tính, 3: Ngày sinh, 4: Dân tộc, 5: CCCD
-    # 6: SĐT, 7: Email, 8: Quê quán, 9: Ngân hàng, 10: Số TK, 11: Dự án
-    # 12: Trợ cấp, 13: Loại nhân sự, 14: Loại hình
-    
-    success_count = 0
-    skip_count = 0
-    
-    for row in ws.iter_rows(min_row=2, values_only=True):
-        if not row or not row[0] or not row[1]:
-            continue # Skip empty rows or rows without mandatory fields
-            
-        emp_code = str(row[0]).strip()
-        full_name = str(row[1]).strip()
+    rows = list(ws.iter_rows(values_only=True))
+    if not rows:
+        return {"message": "File Excel không có dữ liệu", "success": 0, "created": 0, "updated": 0}
         
-        existing = db.query(models.User).filter(models.User.employee_code == emp_code).first()
-        if existing:
-            skip_count += 1
+    header_row = [str(cell).strip().lower() if cell is not None else "" for cell in rows[0]]
+    
+    # Dynamic header mapping
+    col_map = {}
+    for idx, h in enumerate(header_row):
+        if not h:
+            continue
+        if "họ" in h or "tên" in h or "full_name" in h:
+            col_map["full_name"] = idx
+        elif "mã" in h or "code" in h:
+            col_map["employee_code"] = idx
+        elif "role" in h or "vị trí" in h:
+            col_map["role"] = idx
+        elif "giới tính" in h or "gender" in h:
+            col_map["gender"] = idx
+        elif "dân tộc" in h or "ethnicity" in h:
+            col_map["ethnicity"] = idx
+        elif "email" in h:
+            col_map["viettel_email"] = idx
+        elif "ngày sinh" in h or "birthday" in h:
+            col_map["birthday"] = idx
+        elif "quê quán" in h or "hometown" in h:
+            col_map["hometown"] = idx
+        elif "điện thoại" in h or "sđt" in h or "phone" in h:
+            col_map["phone"] = idx
+        elif "cccd" in h or "cmnd" in h:
+            col_map["cccd"] = idx
+        elif "ngân hàng" in h or "bank_name" in h:
+            col_map["bank_name"] = idx
+        elif "tài khoản" in h or "stk" in h or "bank_account" in h:
+            col_map["bank_account"] = idx
+        elif "dự án" in h or "project" in h:
+            col_map["project"] = idx
+        elif "ngày vào" in h or "join" in h:
+            col_map["join_date"] = idx
+        elif "trợ cấp" in h or "allowance" in h:
+            col_map["allowance"] = idx
+        elif "loại nhân sự" in h or "employee_type" in h:
+            col_map["employee_type"] = idx
+        elif "tình trạng" in h or "trạng thái" in h or "working_status" in h:
+            col_map["working_status"] = idx
+
+    def get_str(row, key, fallback_idx):
+        idx = col_map.get(key, fallback_idx)
+        if idx is not None and idx < len(row) and row[idx] is not None:
+            v = str(row[idx]).strip()
+            return v if v != "" else None
+        return None
+
+    def get_raw(row, key, fallback_idx):
+        idx = col_map.get(key, fallback_idx)
+        if idx is not None and idx < len(row):
+            return row[idx]
+        return None
+
+    created_count = 0
+    updated_count = 0
+    
+    # Iterate data rows (starting from index 1)
+    for row in rows[1:]:
+        if not row:
             continue
             
-        # Parse date
-        birthday = None
-        if row[3]:
-            if isinstance(row[3], datetime):
-                birthday = row[3].date()
-            elif isinstance(row[3], date):
-                birthday = row[3]
-            elif isinstance(row[3], str):
-                try:
-                    birthday = datetime.strptime(row[3].strip(), "%Y-%m-%d").date()
-                except ValueError:
-                    pass
-                    
-        # Parse join_date
-        join_date = None
-        if len(row) > 13 and row[13]:
-            if isinstance(row[13], datetime):
-                join_date = row[13].date()
-            elif isinstance(row[13], date):
-                join_date = row[13]
-            elif isinstance(row[13], str):
-                try:
-                    join_date = datetime.strptime(row[13].strip(), "%Y-%m-%d").date()
-                except ValueError:
-                    pass
-                    
-        # Parse integers/strings safely
-        allowance = 0
-        project = None
-        evaluation = None
-                
-        role = "intern"
-        if len(row) > 12 and row[12]:
-            r_str = str(row[12]).strip().lower()
-            if r_str in ["admin", "quản trị viên", "quản trị"]:
-                role = "admin"
-                
-        position = str(row[14]).strip() if len(row) > 14 and row[14] else None
-            
-        user_data = {
-            "employee_code": emp_code,
-            "full_name": full_name,
-            "gender": str(row[2]).strip() if row[2] else None,
-            "birthday": birthday,
-            "ethnicity": str(row[4]).strip() if len(row) > 4 and row[4] else None,
-            "cccd": str(row[5]).strip() if len(row) > 5 and row[5] else None,
-            "phone": str(row[6]).strip() if len(row) > 6 and row[6] else None,
-            "viettel_email": None,
-            "hometown": str(row[7]).strip() if len(row) > 7 and row[7] else None,
-            "bank_name": str(row[8]).strip() if len(row) > 8 and row[8] else None,
-            "bank_account": str(row[9]).strip() if len(row) > 9 and row[9] else None,
-            "project": project,
-            "position": position,
-            "join_date": join_date,
-            "evaluation": evaluation,
-            "allowance": allowance,
-            "employee_type": str(row[10]).strip() if len(row) > 10 and row[10] else "TTS Trung tâm",
-            "employment_type": str(row[11]).strip() if len(row) > 11 and row[11] else "Fulltime",
-            "role": role,
-            "working_status": "Working",
-            "account_status": 1
-        }
+        full_name = get_str(row, "full_name", 0)
+        emp_code = get_str(row, "employee_code", 1)
         
-        user = models.User(**user_data)
-        db.add(user)
+        # Skip empty rows or rows missing required fields
+        if not full_name or not emp_code:
+            continue
+
+        raw_role = get_str(row, "role", 2)
+        role_str = "user"
+        position_str = raw_role
+        if raw_role:
+            r_lower = raw_role.lower()
+            if r_lower in ["admin", "quản trị viên", "quản trị"]:
+                role_str = "admin"
+                position_str = "Admin"
+
+        gender = get_str(row, "gender", 3)
+        ethnicity = get_str(row, "ethnicity", 4)
+        viettel_email = get_str(row, "viettel_email", 5)
+
+        raw_birthday = get_raw(row, "birthday", 6)
+        birthday = parse_excel_date(raw_birthday)
+
+        hometown = get_str(row, "hometown", 7)
+        phone = get_str(row, "phone", 8)
+        cccd = get_str(row, "cccd", 9)
+        bank_name = get_str(row, "bank_name", 10)
+        bank_account = get_str(row, "bank_account", 11)
+        project = get_str(row, "project", 12)
+
+        raw_join_date = get_raw(row, "join_date", 13)
+        join_date = parse_excel_date(raw_join_date)
+
+        raw_allowance = get_str(row, "allowance", 14)
+        allowance = "Không"
+        if raw_allowance:
+            if any(k in raw_allowance.lower() for k in ["có", "yes", "1", "co"]):
+                allowance = "Có"
+
+        raw_emp_type = get_str(row, "employee_type", 15)
+        employee_type = "TTS Trung tâm"
+        if raw_emp_type and "mượn" in raw_emp_type.lower():
+            employee_type = "Đi mượn"
+
+        raw_status = get_str(row, "working_status", 16)
+        working_status = "Working"
+        if raw_status:
+            st_lower = raw_status.lower()
+            if "nghỉ" in st_lower or "resigned" in st_lower:
+                working_status = "Resigned"
+            elif "chính thức" in st_lower:
+                working_status = "Lên chính thức"
+            elif "đang làm" in st_lower or "working" in st_lower:
+                working_status = "Working"
+            else:
+                working_status = raw_status
+
+        existing = db.query(models.User).filter(models.User.employee_code == emp_code).first()
+        if existing:
+            existing.full_name = full_name
+            if position_str: existing.position = position_str
+            if role_str: existing.role = role_str
+            if gender: existing.gender = gender
+            if ethnicity: existing.ethnicity = ethnicity
+            if viettel_email: existing.viettel_email = viettel_email
+            if birthday: existing.birthday = birthday
+            if hometown: existing.hometown = hometown
+            if phone: existing.phone = phone
+            if cccd: existing.cccd = cccd
+            if bank_name: existing.bank_name = bank_name
+            if bank_account: existing.bank_account = bank_account
+            if project: existing.project = project
+            if join_date: existing.join_date = join_date
+            if allowance: existing.allowance = allowance
+            if employee_type: existing.employee_type = employee_type
+            if working_status: existing.working_status = working_status
+            updated_count += 1
+        else:
+            user_data = {
+                "employee_code": emp_code,
+                "full_name": full_name,
+                "role": role_str,
+                "user_type": "intern",
+                "gender": gender,
+                "ethnicity": ethnicity,
+                "viettel_email": viettel_email,
+                "birthday": birthday,
+                "hometown": hometown,
+                "phone": phone,
+                "cccd": cccd,
+                "bank_name": bank_name,
+                "bank_account": bank_account,
+                "project": project,
+                "position": position_str,
+                "join_date": join_date,
+                "allowance": allowance,
+                "employee_type": employee_type,
+                "working_status": working_status,
+                "employment_type": "Fulltime",
+                "account_status": 1
+            }
+            user = models.User(**user_data)
+            db.add(user)
+            created_count += 1
+            
         db.flush()
         
-        # Generate Username
-        name_clean = remove_accents(full_name).lower()
-        parts = name_clean.split()
-        if len(parts) == 0:
-            base_username = "tts_user"
-        elif len(parts) == 1:
-            base_username = f"tts_{parts[0]}"
-        else:
-            first_name = parts[-1]
-            initials = "".join([p[0] for p in parts[:-1]])
-            base_username = f"tts_{first_name}{initials}"
-        
-        username = base_username
-        suffix = 1
-        while db.query(models.Account).filter(models.Account.username == username).first():
-            username = f"{base_username}{suffix}"
-            suffix += 1
-            
-        account = models.Account(
-            user_id=user.id,
-            username=username,
-            password=auth.hash_password("123456")
-        )
-        db.add(account)
-        success_count += 1
-        
     db.commit()
-    return {"message": f"Đã nhập {success_count} thực tập sinh thành công. Bỏ qua {skip_count} người (trùng mã).", "success": success_count, "skipped": skip_count}
+    return {
+        "message": f"Đã nạp {created_count + updated_count} thực tập sinh ({created_count} tạo mới, {updated_count} cập nhật).",
+        "success": created_count + updated_count,
+        "created": created_count,
+        "updated": updated_count
+    }
 
 
 @router.patch("/users/{user_id}/lock")

@@ -26,30 +26,6 @@ def remove_accents(input_str: str) -> str:
     return "".join([c for c in nfkd_form if not unicodedata.combining(c)])
 
 
-def generate_nv_username(full_name: str, db: Session) -> tuple[str, str]:
-    """
-    Sinh username với prefix nv_.
-    Ví dụ: "Trần Đức Lương" → "nv_luongtd"
-    Trả về (base_username, actual_username)
-    """
-    name_clean = remove_accents(full_name).lower()
-    parts = name_clean.split()
-    if len(parts) == 0:
-        base_username = "nv_user"
-    elif len(parts) == 1:
-        base_username = f"nv_{parts[0]}"
-    else:
-        last_name = parts[-1]
-        initials = "".join([p[0] for p in parts[:-1]])
-        base_username = f"nv_{last_name}{initials}"
-
-    username = base_username
-    suffix = 1
-    while db.query(models.Account).filter(models.Account.username == username).first():
-        username = f"{base_username}{suffix}"
-        suffix += 1
-    return base_username, username
-
 
 def enrich_employee(user: models.User) -> dict:
     """Bổ sung thông tin position_name cho employee response"""
@@ -144,16 +120,20 @@ def create_employee(
     user_data["user_type"] = "employee"
     user_data["role"] = "user"
 
+    if not data.viettel_email:
+        raise HTTPException(status_code=400, detail="Vui lòng nhập Email Viettel (được dùng làm tài khoản đăng nhập).")
+        
+    existing_acc = db.query(models.Account).filter(models.Account.username == data.viettel_email).first()
+    if existing_acc:
+        raise HTTPException(status_code=400, detail="Email Viettel này đã được sử dụng.")
+
     user = models.User(**user_data)
     db.add(user)
     db.flush()
 
-    # Sinh username nv_
-    base_username, username = generate_nv_username(data.full_name, db)
-
     account = models.Account(
         user_id=user.id,
-        username=username,
+        username=data.viettel_email,
         password=auth.hash_password("123456"),
     )
     db.add(account)
@@ -417,18 +397,23 @@ def process_import_employees(ws, db: Session) -> schemas.EmployeeImportResult:
             "account_status": 1,
         }
 
+        viettel_email = get_val(8)
+        if not viettel_email:
+            skip_count += 1
+            continue
+            
+        existing_acc = db.query(models.Account).filter(models.Account.username == viettel_email).first()
+        if existing_acc:
+            skip_count += 1
+            continue
+
         user = models.User(**user_data)
         db.add(user)
         db.flush()
 
-        # Sinh username nv_
-        base_username, actual_username = generate_nv_username(full_name, db)
-        if base_username != actual_username:
-            renamed.append({"original": base_username, "actual": actual_username})
-
         account = models.Account(
             user_id=user.id,
-            username=actual_username,
+            username=viettel_email,
             password=auth.hash_password("123456"),
         )
         db.add(account)
@@ -438,9 +423,7 @@ def process_import_employees(ws, db: Session) -> schemas.EmployeeImportResult:
 
     msg_parts = [f"Đã nhập {success_count} nhân viên thành công."]
     if skip_count:
-        msg_parts.append(f"Bỏ qua {skip_count} người (trùng mã).")
-    if renamed:
-        msg_parts.append(f"{len(renamed)} username bị đổi do trùng.")
+        msg_parts.append(f"Bỏ qua {skip_count} người (trùng mã hoặc thiếu/trùng Email Viettel).")
 
     return schemas.EmployeeImportResult(
         success=success_count,
@@ -534,10 +517,9 @@ def export_employees(
 
     headers = [
         "STT", "Mã NV", "Họ và tên", "Vị trí", "Dự án",
-        "Quản lý trực tiếp", "Giới tính", "Ngày sinh", "Email Viettel",
+        "Quản lý trực tiếp", "Giới tính", "Ngày sinh", "Email Viettel (Tên đăng nhập)",
         "SĐT", "CCCD", "Ngân hàng", "Số TK",
         "Tình trạng", "Loại nhân sự", "Vị trí ngồi", "Seri máy tính",
-        "Username"
     ]
 
     for col_idx, h in enumerate(headers, start=1):
@@ -549,11 +531,10 @@ def export_employees(
         ws.column_dimensions[c.column_letter].width = 18
 
     ws.column_dimensions["C"].width = 28
-    ws.column_dimensions["I"].width = 26
+    ws.column_dimensions["I"].width = 32
 
     for row_idx, u in enumerate(employees, start=2):
         pos_name = u.position_rel.name if u.position_rel else (u.position or "")
-        username = u.account.username if u.account else ""
         values = [
             row_idx - 1,
             u.employee_code,
@@ -572,7 +553,6 @@ def export_employees(
             u.staff_category or "",
             u.seat_position or "",
             u.computer_serial or "",
-            username,
         ]
         for col_idx, val in enumerate(values, start=1):
             c = ws.cell(row_idx, col_idx, val)
