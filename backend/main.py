@@ -111,7 +111,7 @@ app.add_middleware(
 
 # Routers
 from routers import auth_router, user_router, admin_router, schedule_router
-from routers import employee_router, documents_router, ai_config_router, chat_router
+from routers import employee_router, documents_router, ai_config_router, chat_router, overtime_router
 app.include_router(auth_router.router)
 app.include_router(user_router.router)
 app.include_router(admin_router.router)
@@ -120,6 +120,7 @@ app.include_router(employee_router.router)
 app.include_router(documents_router.router)
 app.include_router(ai_config_router.router)
 app.include_router(chat_router.router)
+app.include_router(overtime_router.router)
 
 # Serve frontend
 frontend_dir = os.path.join(os.path.dirname(__file__), "..", "frontend")

@@ -13,7 +13,7 @@
     rel="stylesheet" />
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" />
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
-  <link href="static/style.css?v=4.3" rel="stylesheet" />
+  <link href="static/style.css?v=5.2" rel="stylesheet" />
 </head>
 
 <body>
@@ -121,6 +121,9 @@
               <a href="#" class="nav-item py-2" data-page="manage-emp-accounts" id="nav-manage-emp-accounts">
                 <i class="bi bi-person-lines-fill"></i><span>Tài khoản đăng nhập</span>
               </a>
+              <a href="#" class="nav-item py-2" data-page="manage-ot" id="nav-manage-ot">
+                <i class="bi bi-clock-history"></i><span>Quản lý OT</span>
+              </a>
             </div>
           </div>
         </div>
@@ -140,6 +143,9 @@
           <div class="nav-section-label">Cá nhân</div>
           <a href="#" class="nav-item" data-page="profile" id="nav-profile-emp">
             <i class="bi bi-person-badge-fill"></i><span>Hồ sơ cá nhân</span>
+          </a>
+          <a href="#" class="nav-item" data-page="register-ot" id="nav-register-ot">
+            <i class="bi bi-clock-history"></i><span>Chấm công OT</span>
           </a>
         </div>
 
@@ -545,6 +551,116 @@
     </div>
   </div>
 
+  <!-- ═══════════════════════ OT REGISTER MODAL ═══════════════════════ -->
+  <div class="modal fade" id="modal-ot-register" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content glass-modal">
+        <div class="modal-header">
+          <h5 class="modal-title" id="modal-ot-title">Đăng ký OT</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="form-ot-register">
+            <input type="hidden" id="ot-edit-id" />
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Ngày</label>
+              <input id="ot-date" type="date" class="form-control" readonly />
+            </div>
+            <div class="row g-3 mb-3">
+              <div class="col-6">
+                <label class="form-label fw-semibold">Giờ bắt đầu</label>
+                <input id="ot-start" type="time" class="form-control" step="300" />
+              </div>
+              <div class="col-6">
+                <label class="form-label fw-semibold">Giờ kết thúc</label>
+                <input id="ot-end" type="time" class="form-control" step="300" />
+              </div>
+            </div>
+            <!-- Cảnh báo giờ OT -->
+            <div id="ot-time-warning" class="d-none alert alert-warning py-2 small mb-3">
+              <i class="bi bi-exclamation-triangle-fill me-1"></i>
+              <span id="ot-time-warning-text"></span>
+            </div>
+            <!-- Checkbox ngày lễ -->
+            <div class="mb-3 form-check">
+              <input class="form-check-input" type="checkbox" id="ot-is-holiday" />
+              <label class="form-check-label fw-semibold" for="ot-is-holiday">
+                Ngày lễ / Nghỉ bù
+                <small class="text-muted ms-1">(hệ số 3.0 / 3.9)</small>
+              </label>
+            </div>
+            <!-- Preview tự động tách đoạn -->
+            <div id="ot-calc-preview" class="d-none mb-3">
+              <div class="p-3 rounded" style="background:rgba(30,90,200,.07);border:1px solid rgba(30,90,200,.18)">
+                <div class="fw-semibold small mb-2 text-primary">
+                  <i class="bi bi-scissors me-1"></i>Phân tích hệ số OT
+                </div>
+                <div id="ot-segments-preview"></div>
+                <hr class="my-2" />
+                <div class="d-flex justify-content-between small">
+                  <span class="text-muted">Tổng giờ thực tế:</span>
+                  <span class="fw-bold" id="ot-raw-preview">—</span>
+                </div>
+                <div class="d-flex justify-content-between small mt-1">
+                  <span class="text-muted">Tổng giờ quy đổi:</span>
+                  <span class="fw-bold text-primary" id="ot-weighted-preview">—</span>
+                </div>
+              </div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Lý do OT</label>
+              <textarea id="ot-reason" class="form-control" rows="3"
+                placeholder="Cú pháp: [Tên QLTT yêu cầu] - [Công việc cụ thể] (Ví dụ: lucnv11 - upcode...)"></textarea>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+          <button class="btn btn-danger" id="btn-save-ot"><i class="bi bi-check-lg me-1"></i>Đăng ký</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════ OT DETAIL MODAL (Admin) ═══════════════════════ -->
+  <div class="modal fade" id="modal-ot-detail" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content glass-modal">
+        <div class="modal-header">
+          <h5 class="modal-title">Chi tiết OT</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body" id="ot-detail-body"></div>
+        <div class="modal-footer" id="ot-detail-footer"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════ OT REJECT MODAL ═══════════════════════ -->
+  <div class="modal fade" id="modal-ot-reject" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content glass-modal">
+        <div class="modal-header">
+          <h5 class="modal-title">Từ chối OT</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="reject-ot-id" />
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Lý do từ chối <span class="text-danger">*</span></label>
+            <textarea id="reject-reason-text" class="form-control" rows="4"
+              placeholder="Nhập lý do từ chối..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+          <button class="btn btn-danger" id="btn-confirm-reject"><i class="bi bi-x-circle me-1"></i>Xác nhận từ
+            chối</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast -->
   <div class="toast-container position-fixed bottom-0 end-0 p-3">
     <div id="app-toast" class="toast align-items-center border-0" role="alert">
@@ -604,18 +720,19 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="static/pages.js?v=4.3"></script>
-  <script src="static/page_users.js?v=4.3"></script>
-  <script src="static/page_periods.js?v=4.3"></script>
-  <script src="static/page_admin_schedule.js?v=4.3"></script>
-  <script src="static/page_profile.js?v=4.3"></script>
-  <script src="static/page_schedule.js?v=4.3"></script>
-  <script src="static/page_accounts.js?v=4.3"></script>
-  <script src="static/page_employees.js?v=4.3"></script>
-  <script src="static/page_documents.js?v=4.3"></script>
-  <script src="static/page_ai_config.js?v=4.3"></script>
-  <script src="static/chat.js?v=4.3"></script>
-  <script src="static/app.js?v=4.3"></script>
+  <script src="static/pages.js?v=5.5"></script>
+  <script src="static/page_users.js?v=5.5"></script>
+  <script src="static/page_periods.js?v=5.5"></script>
+  <script src="static/page_admin_schedule.js?v=5.5"></script>
+  <script src="static/page_profile.js?v=5.5"></script>
+  <script src="static/page_schedule.js?v=5.5"></script>
+  <script src="static/page_accounts.js?v=5.5"></script>
+  <script src="static/page_employees.js?v=5.5"></script>
+  <script src="static/page_documents.js?v=5.5"></script>
+  <script src="static/page_ai_config.js?v=5.5"></script>
+  <script src="static/chat.js?v=5.5"></script>
+  <script src="static/page_ot.js?v=5.5"></script>
+  <script src="static/app.js?v=5.5"></script>
 </body>
 
 </html>

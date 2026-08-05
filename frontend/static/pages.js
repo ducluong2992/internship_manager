@@ -64,6 +64,8 @@ async function renderPage(page, area) {
       case 'change-password': renderChangePassword(area); break;
       case 'documents': await renderDocuments(area); break;
       case 'ai-config': await renderAIConfig(area); break;
+      case 'register-ot': await renderRegisterOT(area); break;
+      case 'manage-ot': await renderManageOT(area); break;
       default: area.innerHTML = '<div class="empty-state"><i class="bi bi-compass"></i><p>Trang không tồn tại</p></div>';
     }
   } catch (err) {

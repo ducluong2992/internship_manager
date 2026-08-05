@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Date, DateTime, ForeignKey, Text, Boolean, Float
+from sqlalchemy import Column, Integer, String, Date, DateTime, ForeignKey, Text, Boolean, Float, Time
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from database import Base
@@ -60,6 +60,7 @@ class User(Base):
     schedules = relationship("Schedule", back_populates="user")
     account = relationship("Account", back_populates="user", uselist=False, cascade="all, delete-orphan")
     position_rel = relationship("Position", back_populates="users")
+    overtime_requests = relationship("OvertimeRequest", back_populates="user", foreign_keys="OvertimeRequest.user_id")
 
 
 class Account(Base):
@@ -125,3 +126,28 @@ class AIConfig(Base):
     chunk_size = Column(Integer, default=1000)
     overlap = Column(Integer, default=150)
     temperature = Column(Float, default=0.2)
+
+
+class OvertimeRequest(Base):
+    """Bảng đăng ký OT của nhân sự Onsite"""
+    __tablename__ = "overtime_requests"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    project = Column(String, nullable=True)          # Tên dự án tại thời điểm đăng ký
+    work_date = Column(Date, nullable=False)          # Ngày OT
+    start_time = Column(String, nullable=False)       # Giờ bắt đầu "HH:MM"
+    end_time = Column(String, nullable=False)         # Giờ kết thúc "HH:MM"
+    raw_hours = Column(Float, nullable=False)         # Số giờ OT thực tế
+    factor = Column(Float, nullable=False)            # Hệ số: 1.5 / 2.1 / 2.0 / 2.7 / 3.0 / 3.9
+    weighted_hours = Column(Float, nullable=False)    # Giờ quy đổi = raw_hours × factor
+    reason = Column(Text, nullable=True)              # Lý do OT
+    status = Column(String, default="Pending")        # Pending / Approved / Rejected
+    reject_reason = Column(Text, nullable=True)       # Lý do từ chối (admin điền)
+    approved_by = Column(Integer, ForeignKey("users.id"), nullable=True)  # Admin duyệt
+    approved_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    user = relationship("User", back_populates="overtime_requests", foreign_keys=[user_id])
+    approver = relationship("User", foreign_keys=[approved_by])
