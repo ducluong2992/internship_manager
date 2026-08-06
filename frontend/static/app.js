@@ -80,6 +80,8 @@ const PAGE_TITLES = {
   'change-password': 'Đổi mật khẩu',
   'documents': 'Quản lý tài liệu',
   'ai-config': 'Cấu hình AI',
+  'register-ot': 'Chấm công OT',
+  'manage-ot': 'Quản lý OT',
 };
 
 function navigate(page) {
@@ -168,9 +170,9 @@ function showApp() {
   // Menus visibility
   document.getElementById('admin-menu').classList.toggle('d-none', !isAdmin);
   document.getElementById('ai-menu').classList.toggle('d-none', !isAdmin);
-  document.getElementById('intern-menu').classList.toggle('d-none', !isIntern);
   document.getElementById('employee-menu').classList.toggle('d-none', !isEmployee);
 
+  // Nav đến trang sau login
   setupSidebar();
   startClock();
   if (typeof initChat === 'function') initChat();

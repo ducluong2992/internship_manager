@@ -72,7 +72,7 @@ async function renderManageUsers(area) {
             const diff = new Date() - new Date(u.join_date);
             return Math.max(0, Math.floor(diff / (1000*60*60*24))) + ' ngày';
           })()}</td>
-          <td><span class="badge ${(u.employee_type || '').toLowerCase() === 'đi mượn' ? 'bg-warning text-dark' : 'bg-info text-dark'}">${(u.employee_type || '').toLowerCase() === 'đi mượn' ? 'Đi mượn' : 'TTS Trung tâm'}</span></td>
+          <td>${badgeEmpType(u.employee_type)}</td>
           <td>${u.allowance || 'Không'}</td>
           <td>${badgeStatus(u.working_status)}</td>
           <td>${u.position || '—'}</td>
