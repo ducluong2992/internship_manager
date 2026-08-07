@@ -102,8 +102,8 @@ async function renderRegisterOT(area) {
     }
 
     area.innerHTML = `
-    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-      <h4 class="fw-bold mb-0 text-danger"><i class="bi bi-clock-history me-2"></i>Chấm công OT</h4>
+    <div class="section-header mb-3">
+      <div class="section-title"><i class="bi bi-clock-history text-danger"></i> Chấm công OT</div>
     </div>
 
     <!-- Thống kê tháng -->
@@ -414,38 +414,40 @@ async function renderManageOT(area) {
 
   function buildFilters() {
     return `
-    <div class="glass-card p-3 mb-4">
-      <div class="row g-2 align-items-end">
-        <div class="col-6 col-md-2">
-          <label class="form-label small fw-semibold mb-1">Tháng</label>
-          <select class="form-select form-select-sm" id="ot-f-month">
+    <div class="filter-bar mb-3 py-2 px-3">
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <div class="d-flex align-items-center gap-1">
+          <label class="form-label mb-0 small text-nowrap fw-semibold text-muted">Tháng:</label>
+          <select class="form-select form-select-sm" id="ot-f-month" style="width:75px">
             ${Array.from({length:12},(_,i)=>`<option value="${i+1}" ${i+1===filterMonth?'selected':''}>${String(i+1).padStart(2,'0')}</option>`).join('')}
           </select>
         </div>
-        <div class="col-6 col-md-2">
-          <label class="form-label small fw-semibold mb-1">Năm</label>
-          <input type="number" class="form-control form-control-sm" id="ot-f-year" value="${filterYear}" min="2020" max="2099" />
+        <div class="d-flex align-items-center gap-1">
+          <label class="form-label mb-0 small text-nowrap fw-semibold text-muted">Năm:</label>
+          <input type="number" class="form-control form-control-sm" id="ot-f-year" value="${filterYear}" min="2020" max="2099" style="width:80px" />
         </div>
-        <div class="col-6 col-md-2">
-          <label class="form-label small fw-semibold mb-1">Dự án</label>
-          <input type="text" class="form-control form-control-sm" id="ot-f-project" value="${filterProject}" placeholder="Tên dự án..." />
+        <div class="d-flex align-items-center gap-1">
+          <label class="form-label mb-0 small text-nowrap fw-semibold text-muted">Dự án:</label>
+          <input type="text" class="form-control form-control-sm" id="ot-f-project" value="${filterProject}" placeholder="Tên dự án..." style="width:130px" />
         </div>
-        <div class="col-6 col-md-2">
-          <label class="form-label small fw-semibold mb-1">Tên nhân viên</label>
-          <input type="text" class="form-control form-control-sm" id="ot-f-name" value="${filterName}" placeholder="Họ và tên..." />
+        <div class="d-flex align-items-center gap-1">
+          <label class="form-label mb-0 small text-nowrap fw-semibold text-muted">Tên NV:</label>
+          <input type="text" class="form-control form-control-sm" id="ot-f-name" value="${filterName}" placeholder="Họ và tên..." style="width:135px" />
         </div>
-        <div class="col-6 col-md-2">
-          <label class="form-label small fw-semibold mb-1">Trạng thái</label>
-          <select class="form-select form-select-sm" id="ot-f-status">
-            <option value="" ${!filterStatus?'selected':''}>-- Tất cả --</option>
+        <div class="d-flex align-items-center gap-1">
+          <label class="form-label mb-0 small text-nowrap fw-semibold text-muted">Trạng thái:</label>
+          <select class="form-select form-select-sm" id="ot-f-status" style="width:110px">
+            <option value="" ${!filterStatus?'selected':''}>Tất cả</option>
             <option value="Pending"  ${filterStatus==='Pending'?'selected':''}>Chờ duyệt</option>
             <option value="Approved" ${filterStatus==='Approved'?'selected':''}>Đã duyệt</option>
             <option value="Rejected" ${filterStatus==='Rejected'?'selected':''}>Từ chối</option>
           </select>
         </div>
-        <div class="col-6 col-md-3 d-flex gap-2">
-          <button class="btn btn-danger btn-sm" id="ot-filter-btn"><i class="bi bi-search me-1"></i>Lọc</button>
-          <button class="btn btn-outline-danger btn-sm" id="ot-export-btn" title="Xuất Excel">
+        <div class="d-flex gap-1 ms-auto align-items-center">
+          <button class="btn btn-danger btn-sm px-3" id="ot-filter-btn">
+            <i class="bi bi-search me-1"></i>Lọc
+          </button>
+          <button class="btn btn-outline-danger btn-sm px-3 text-nowrap" id="ot-export-btn" title="Xuất Excel">
             <i class="bi bi-file-earmark-excel-fill me-1"></i>Xuất Excel
           </button>
         </div>
@@ -471,14 +473,14 @@ async function renderManageOT(area) {
 
   function buildBulkBar() {
     return `
-    <div class="d-flex gap-2 mb-3 flex-wrap" id="ot-bulk-bar">
+    <div class="d-flex gap-2 mb-3 flex-wrap align-items-center" id="ot-bulk-bar">
       <button class="btn btn-success btn-sm" id="ot-approve-selected">
         <i class="bi bi-check-all me-1"></i>Duyệt các mục đã chọn
       </button>
       <button class="btn btn-outline-success btn-sm" id="ot-approve-all">
         <i class="bi bi-check2-all me-1"></i>Duyệt tất cả Pending
       </button>
-      <span class="text-muted small my-auto" id="ot-selected-count">0 mục đã chọn</span>
+      <span class="text-muted small my-auto ms-1" id="ot-selected-count">0 mục đã chọn</span>
     </div>`;
   }
 
@@ -492,8 +494,8 @@ async function renderManageOT(area) {
             ${r.status === 'Pending' ? `<input type="checkbox" class="form-check-input ot-check" data-id="${r.id}">` : ''}
           </td>
           <td class="text-center small">${r.work_date ? r.work_date.split('-').reverse().join('/') : '—'}</td>
-          <td><span class="badge bg-secondary">${r.employee_code}</span></td>
-          <td>${r.full_name}</td>
+          <td><code style="font-size:0.78rem;color:#475569;background:#f1f5f9;padding:2px 6px;border-radius:4px">${r.employee_code}</code></td>
+          <td class="fw-semibold" style="color:#1e293b">${r.full_name}</td>
           <td class="text-muted small">${r.project || '—'}</td>
           <td class="text-center">${r.start_time} – ${r.end_time}<br><small class="text-muted">${r.raw_hours}h</small></td>
           <td class="text-center"><span class="badge bg-secondary">${r.factor}x</span></td>
@@ -508,18 +510,20 @@ async function renderManageOT(area) {
 
     document.getElementById('ot-tab-content').innerHTML = `
     ${buildBulkBar()}
-    <div class="table-responsive">
-      <table class="table table-hover align-middle mb-0">
-        <thead class="table-light">
-          <tr>
-            <th style="width:40px"><input type="checkbox" class="form-check-input" id="ot-check-all" title="Chọn tất cả Pending"></th>
-            <th>Ngày</th><th>MNV</th><th>Họ tên</th><th>Dự án</th>
-            <th class="text-center">Giờ</th><th class="text-center">Hệ số</th>
-            <th>Trạng thái</th><th class="text-center">Thao tác</th>
-          </tr>
-        </thead>
-        <tbody>${tbody}</tbody>
-      </table>
+    <div class="table-wrap">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th style="width:40px"><input type="checkbox" class="form-check-input" id="ot-check-all" title="Chọn tất cả Pending"></th>
+              <th>Ngày</th><th>MNV</th><th>Họ tên</th><th>Dự án</th>
+              <th class="text-center">Giờ</th><th class="text-center">Hệ số</th>
+              <th>Trạng thái</th><th class="text-center">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>${tbody}</tbody>
+        </table>
+      </div>
     </div>`;
 
     // Select all checkbox
@@ -579,7 +583,7 @@ async function renderManageOT(area) {
 
   function renderSummaryTab(data) {
     const { rows, num_days, month, year } = data;
-    const factors = [1.5, 2.1, 2.0, 2.7, 3.0, 3.9];
+    const DOW = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
 
     if (!rows || rows.length === 0) {
       document.getElementById('ot-tab-content').innerHTML = `
@@ -587,61 +591,119 @@ async function renderManageOT(area) {
       return;
     }
 
-    const dayHeaders = Array.from({length: num_days}, (_,i) => `<th class="text-center p-1" style="min-width:32px;font-size:0.75rem">${i+1}</th>`).join('');
-    const factorHeaders = ['1.5x','2.1x','2.0x','2.7x','3.0x','3.9x'].map(f => `<th class="text-center p-1" style="font-size:0.75rem">${f}</th>`).join('');
+    // Left Fixed Table Rows (STT, Mã NV, Họ và tên - Căn giữa)
+    const leftRows = rows.map((row, idx) => `
+      <tr style="height:48px">
+        <td class="text-center text-muted small" style="width:45px;vertical-align:middle;font-weight:600">${idx + 1}</td>
+        <td class="text-center" style="width:85px;vertical-align:middle">
+          <code style="font-size:0.78rem;color:#475569;background:#f1f5f9;padding:2px 6px;border-radius:4px">${row.employee_code}</code>
+        </td>
+        <td class="text-center fw-bold" style="width:180px;vertical-align:middle;color:#1e293b;font-size:0.82rem">${row.full_name}</td>
+      </tr>`).join('');
 
-    const bodyRows = rows.map((row, idx) => {
+    // Right Scrollable Day Headers (Dòng 1: Số ngày, Dòng 2: Thứ trong tuần)
+    const dayHeaders = Array.from({length: num_days}, (_,i) => {
+      const d = i + 1;
+      const dow = new Date(year, month - 1, d).getDay();
+      const isSunday = dow === 0;
+      const bgStyle = isSunday ? 'background:#fce4ec !important;' : 'background:#f8fafc;';
+      const dowColor = isSunday ? 'color:#d5001c;font-weight:700' : (dow === 6 ? 'color:#e65100;font-weight:600' : 'color:#64748b');
+      return `<th class="text-center p-1" style="min-width:32px;width:32px;font-size:0.75rem;${bgStyle}">
+        <span class="fw-bold" style="color:#1e293b">${d}</span><br>
+        <span style="font-size:0.66rem;${dowColor}">${DOW[dow]}</span>
+      </th>`;
+    }).join('');
+
+    // Right Scrollable Rows (Ngày + Giờ làm với Hệ số nhỏ bên dưới)
+    const rightRows = rows.map((row) => {
       const dayCells = Array.from({length: num_days}, (_,i) => {
         const d = i + 1;
+        const dow = new Date(year, month - 1, d).getDay();
+        const isSunday = dow === 0;
+        const sundayBg = isSunday ? 'background:#fff0f3;' : '';
         const dayData = row.days[d];
-        if (!dayData || dayData.length === 0) return `<td class="text-center p-1" style="font-size:0.8rem">—</td>`;
+        if (!dayData || dayData.length === 0) {
+          return `<td class="text-center p-1" style="font-size:0.75rem;color:#cbd5e1;${sundayBg}">—</td>`;
+        }
         const total = dayData.reduce((acc, x) => acc + x.raw_hours, 0);
+        const factorsStr = Array.from(new Set(dayData.map(x => `${x.factor}x`))).join(', ');
         const detail = dayData.map(x => `${x.start_time}–${x.end_time} (${x.raw_hours}h × ${x.factor})`).join('\n');
-        return `<td class="text-center p-1 ot-summary-day-cell" title="${detail}" style="cursor:pointer;font-size:0.8rem;background:rgba(229,57,53,.08);font-weight:600">${total}h</td>`;
-      }).join('');
-
-      const factorCells = factors.map(f => {
-        const fKey = f.toFixed(1);
-        const val = row.total_by_factor[fKey] || row.total_by_factor[String(f)] || row.total_by_factor[f] || 0;
-        return `<td class="text-center p-1" style="font-size:0.85rem">${val > 0 ? val : '—'}</td>`;
+        return `<td class="text-center p-1 ot-summary-day-cell" title="${detail}" style="cursor:pointer;${sundayBg}">
+          <div style="line-height:1.2">
+            <span style="background:#fef2f2;color:#d5001c;border:1px solid #fecaca;font-size:0.74rem;font-weight:700;padding:1px 4px;border-radius:4px;display:inline-block">${total}h</span>
+            <div style="font-size:0.64rem;color:#64748b;font-weight:600;margin-top:1px">${factorsStr}</div>
+          </div>
+        </td>`;
       }).join('');
 
       return `
-      <tr>
-        <td class="p-2 fw-semibold" style="white-space:nowrap;font-size:0.85rem">${idx+1}. ${row.full_name}</td>
-        <td class="p-2 text-muted small" style="white-space:nowrap">${row.employee_code}</td>
+      <tr style="height:48px">
         ${dayCells}
-        ${factorCells}
-        <td class="text-center fw-bold text-danger p-1" style="font-size:0.85rem">${row.total_raw}h</td>
-        <td class="text-center fw-bold p-1" style="font-size:0.85rem">${row.total_weighted}h</td>
+        <td class="text-center fw-bold text-danger p-1" style="width:65px;vertical-align:middle;font-size:0.8rem;background:#fff5f5">${row.total_raw}h</td>
+        <td class="text-center fw-bold p-1" style="width:70px;vertical-align:middle;font-size:0.82rem;background:#fef2f2;color:#d5001c">${row.total_weighted}h</td>
       </tr>`;
     }).join('');
 
     document.getElementById('ot-tab-content').innerHTML = `
-    <div class="table-responsive" style="max-height:65vh">
-      <table class="table table-bordered table-sm align-middle mb-0" style="font-size:0.85rem">
-        <thead class="table-light" style="position:sticky;top:0;z-index:2">
-          <tr>
-            <th style="min-width:180px">Nhân viên</th>
-            <th style="min-width:80px">MNV</th>
-            ${dayHeaders}
-            ${factorHeaders}
-            <th class="text-center" style="min-width:70px">Tổng OT</th>
-            <th class="text-center" style="min-width:80px">Quy đổi</th>
-          </tr>
-        </thead>
-        <tbody>${bodyRows}</tbody>
-      </table>
+    <div class="d-flex align-items-center justify-content-between mb-3">
+      <span class="fw-bold text-dark" style="font-size:0.85rem">
+        <i class="bi bi-calendar3 me-1 text-danger"></i>Bảng tổng hợp giờ làm OT
+      </span>
+      <div class="d-flex gap-2">
+        <button type="button" class="btn btn-sm btn-danger px-3 py-1 fw-bold shadow-sm" id="ot-scroll-left">
+          <i class="bi bi-chevron-left me-1"></i>◄ Đầu tháng
+        </button>
+        <button type="button" class="btn btn-sm btn-danger px-3 py-1 fw-bold shadow-sm" id="ot-scroll-right">
+          Cuối tháng ►<i class="bi bi-chevron-right ms-1"></i>
+        </button>
+      </div>
+    </div>
+    <div class="ot-split-container">
+      <!-- FIXED LEFT CONTAINER (STT, Mã NV, Họ và tên - Căn giữa) -->
+      <div class="ot-left-fixed">
+        <table class="table table-bordered table-sm align-middle mb-0">
+          <thead>
+            <tr style="height:42px">
+              <th class="text-center" style="width:45px;background:#f8fafc;color:#475569;font-weight:700;font-size:0.78rem;vertical-align:middle">STT</th>
+              <th class="text-center" style="width:85px;background:#f8fafc;color:#475569;font-weight:700;font-size:0.78rem;vertical-align:middle">Mã NV</th>
+              <th class="text-center" style="width:180px;background:#f8fafc;color:#475569;font-weight:700;font-size:0.78rem;vertical-align:middle">Họ và tên</th>
+            </tr>
+          </thead>
+          <tbody>${leftRows}</tbody>
+        </table>
+      </div>
+
+      <!-- SCROLLABLE RIGHT CONTAINER (Ngày, Giờ làm + Hệ số, Tổng OT, Quy đổi) -->
+      <div class="ot-right-scroll" id="ot-summary-wrap">
+        <table class="table table-bordered table-sm align-middle mb-0">
+          <thead>
+            <tr style="height:42px">
+              ${dayHeaders}
+              <th class="text-center" style="vertical-align:middle;background:#fff5f5;color:#d5001c;width:65px;font-size:0.78rem">Tổng OT</th>
+              <th class="text-center" style="vertical-align:middle;background:#fef2f2;color:#d5001c;width:70px;font-size:0.78rem">Quy đổi</th>
+            </tr>
+          </thead>
+          <tbody>${rightRows}</tbody>
+        </table>
+      </div>
     </div>`;
+
+    const wrap = document.getElementById('ot-summary-wrap');
+    if (wrap) {
+      const btnLeft = document.getElementById('ot-scroll-left');
+      const btnRight = document.getElementById('ot-scroll-right');
+      if (btnLeft) btnLeft.onclick = () => { wrap.scrollLeft -= 400; };
+      if (btnRight) btnRight.onclick = () => { wrap.scrollLeft += 400; };
+    }
   }
 
   // ── Render toàn bộ trang ──
   area.innerHTML = `
-  <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-    <h4 class="fw-bold mb-0 text-danger"><i class="bi bi-clock-history me-2"></i>Quản lý OT</h4>
+  <div class="section-header mb-3">
+    <div class="section-title"><i class="bi bi-clock-history text-danger"></i> Quản lý OT</div>
   </div>
   ${buildFilters()}
-  <div class="glass-card p-4">
+  <div class="glass-card p-3" style="overflow:hidden">
     ${buildTabs()}
     <div class="pt-3" id="ot-tab-content">
       <div class="d-flex justify-content-center py-4"><div class="spinner-border text-danger"></div></div>

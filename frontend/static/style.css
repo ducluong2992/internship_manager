@@ -10,7 +10,7 @@
   --bg-dark: #f0f2f5;
   --bg-card: #ffffff;
   --bg-sidebar: #ffffff;
-  --bg-hover: rgb(141 118 118);
+  --bg-hover: #f1f5f9;
   --border: rgba(0, 0, 0, 0.1);
   --text: #1c1e21;
   --text-muted: #000000;
@@ -1803,50 +1803,291 @@ body {
   margin-left: 8px;
 }
 
-/* ── VIETTEL RED ACTION BUTTON STYLES (MATCHING USER REFERENCE IMAGE) ── */
+/* ── VIETTEL RED & COLOR HARMONIZED ACTION BUTTON STYLES ── */
 .btn-outline-primary,
-.btn-outline-danger,
-.btn-outline-success,
-.btn-outline-secondary {
+.btn-outline-danger {
   border: 1.5px solid #d5001c !important;
   color: #d5001c !important;
   background-color: #ffffff !important;
   font-weight: 600 !important;
   border-radius: 50px !important;
-  padding: 5px 16px !important;
-  font-size: 0.84rem !important;
+  padding: 4px 14px !important;
+  font-size: 0.82rem !important;
   transition: all 0.2s ease !important;
 }
 
 .btn-outline-primary:hover,
-.btn-outline-danger:hover,
-.btn-outline-success:hover,
-.btn-outline-secondary:hover {
-  background-color: #fef2f2 !important;
-  color: #b30017 !important;
-  border-color: #b30017 !important;
-  box-shadow: 0 2px 8px rgba(213, 0, 28, 0.15) !important;
+.btn-outline-danger:hover {
+  background-color: #d5001c !important;
+  color: #ffffff !important;
+  border-color: #d5001c !important;
+  box-shadow: 0 2px 8px rgba(213, 0, 28, 0.25) !important;
 }
 
 .btn-primary,
-.btn-danger,
-.btn-success {
+.btn-danger {
   background-color: #d5001c !important;
   border: 1.5px solid #d5001c !important;
   color: #ffffff !important;
   font-weight: 600 !important;
   border-radius: 50px !important;
-  padding: 5px 18px !important;
-  font-size: 0.84rem !important;
+  padding: 4px 16px !important;
+  font-size: 0.82rem !important;
   transition: all 0.2s ease !important;
 }
 
 .btn-primary:hover,
-.btn-danger:hover,
-.btn-success:hover {
+.btn-danger:hover {
   background-color: #b30017 !important;
   border-color: #b30017 !important;
+  color: #ffffff !important;
   box-shadow: 0 4px 12px rgba(213, 0, 28, 0.3) !important;
+}
+
+.btn-success {
+  background-color: #2e7d32 !important;
+  border: 1.5px solid #2e7d32 !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
+  border-radius: 50px !important;
+  padding: 4px 16px !important;
+  font-size: 0.82rem !important;
+  transition: all 0.2s ease !important;
+}
+
+.btn-success:hover {
+  background-color: #1b5e20 !important;
+  border-color: #1b5e20 !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(46, 125, 50, 0.3) !important;
+}
+
+.btn-outline-success {
+  border: 1.5px solid #2e7d32 !important;
+  color: #2e7d32 !important;
+  background-color: #ffffff !important;
+  font-weight: 600 !important;
+  border-radius: 50px !important;
+  padding: 4px 14px !important;
+  font-size: 0.82rem !important;
+  transition: all 0.2s ease !important;
+}
+
+.btn-outline-success:hover {
+  background-color: #2e7d32 !important;
+  color: #ffffff !important;
+  border-color: #2e7d32 !important;
+  box-shadow: 0 2px 8px rgba(46, 125, 50, 0.25) !important;
+}
+
+.btn-outline-secondary {
+  border: 1.5px solid #cbd5e1 !important;
+  color: #475569 !important;
+  background-color: #ffffff !important;
+  font-weight: 600 !important;
+  border-radius: 50px !important;
+  padding: 4px 14px !important;
+  font-size: 0.82rem !important;
+  transition: all 0.2s ease !important;
+}
+
+.btn-outline-secondary:hover {
+  background-color: #f1f5f9 !important;
+  color: #1e293b !important;
+  border-color: #94a3b8 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06) !important;
+}
+
+.btn-secondary {
+  background-color: #64748b !important;
+  border: 1.5px solid #64748b !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
+  border-radius: 50px !important;
+  padding: 4px 16px !important;
+  font-size: 0.82rem !important;
+  transition: all 0.2s ease !important;
+}
+
+.btn-secondary:hover {
+  background-color: #475569 !important;
+  border-color: #475569 !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(100, 116, 139, 0.3) !important;
+}
+
+/* ── OT MANAGEMENT CUSTOM STYLES ── */
+#ot-tabs.nav-tabs {
+  border-bottom: 2px solid #eaedf0;
+  gap: 6px;
+}
+#ot-tabs .nav-link {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #64748b;
+  padding: 6px 16px;
+  border-radius: 8px 8px 0 0;
+  border: 1px solid transparent;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s ease;
+}
+#ot-tabs .nav-link:hover {
+  color: #d5001c;
+  background: rgba(213, 0, 28, 0.04);
+}
+#ot-tabs .nav-link.active {
+  color: #d5001c !important;
+  background: #ffffff !important;
+  border-color: #eaedf0 #eaedf0 #ffffff !important;
+  border-bottom: 3px solid #d5001c !important;
+  font-weight: 700;
+  box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.02);
+}
+
+/* ── OT SUMMARY SPLIT TABLE ── */
+.ot-split-container {
+  display: flex;
+  width: 100%;
+  background: #ffffff;
+  overflow: hidden;
+  border: 1px solid #eaedf0;
+  border-radius: 8px;
+}
+
+.ot-left-fixed {
+  flex: 0 0 310px;
+  width: 310px;
+  border-right: 2px solid #cbd5e1;
+  background: #ffffff;
+  z-index: 5;
+}
+
+.ot-right-scroll {
+  flex: 1 1 0%;
+  min-width: 0 !important;
+  overflow-x: auto !important;
+  overflow-y: hidden;
+  background: #ffffff;
+}
+
+.ot-left-fixed table,
+.ot-right-scroll table {
+  border-collapse: separate;
+  border-spacing: 0;
+  margin-bottom: 0;
+  width: 100%;
+}
+
+.ot-right-scroll table {
+  width: max-content !important;
+  min-width: max-content !important;
+}
+
+/* Scrollbar cho vùng cuộn ngang bảng tổng hợp */
+.ot-right-scroll::-webkit-scrollbar {
+  height: 10px;
+  display: block !important;
+}
+.ot-right-scroll::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 5px;
+}
+.ot-right-scroll::-webkit-scrollbar-thumb {
+  background: #d5001c;
+  border-radius: 5px;
+}
+.ot-right-scroll::-webkit-scrollbar-thumb:hover {
+  background: #b00017;
+}
+
+.ot-left-fixed th,
+.ot-right-scroll th {
+  border-bottom: 2px solid #cbd5e1 !important;
+  border-right: 1px solid #eaedf0 !important;
+}
+
+.ot-left-fixed td,
+.ot-right-scroll td {
+  border-bottom: 1px solid #eaedf0 !important;
+  border-right: 1px solid #eaedf0 !important;
+}
+
+.ot-left-fixed tr:hover,
+.ot-right-scroll tr:hover {
+  background-color: #f8fafc !important;
+}
+.ot-summary-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #f8fafc !important;
+  border-bottom: 2px solid #cbd5e1 !important;
+  padding: 8px 4px !important;
+}
+.ot-summary-table th.ot-sticky-stt,
+.ot-summary-table td.ot-sticky-stt {
+  position: sticky;
+  left: 0;
+  width: 40px;
+  min-width: 40px;
+  max-width: 40px;
+  border-right: 1px solid #e2e8f0 !important;
+  text-align: center;
+}
+.ot-summary-table th.ot-sticky-mnv,
+.ot-summary-table td.ot-sticky-mnv {
+  position: sticky;
+  left: 40px;
+  width: 80px;
+  min-width: 80px;
+  max-width: 80px;
+  border-right: 1px solid #e2e8f0 !important;
+}
+.ot-summary-table th.ot-sticky-name,
+.ot-summary-table td.ot-sticky-name {
+  position: sticky;
+  left: 120px;
+  width: 170px;
+  min-width: 170px;
+  max-width: 170px;
+  border-right: 2px solid #cbd5e1 !important;
+}
+.ot-summary-table th.ot-summary-total,
+.ot-summary-table td.ot-summary-total {
+  width: 70px;
+  min-width: 70px;
+  max-width: 70px;
+  border-left: 2px solid #cbd5e1 !important;
+  background-color: #fff5f5;
+}
+.ot-summary-table th.ot-summary-quydoi,
+.ot-summary-table td.ot-summary-quydoi {
+  width: 75px;
+  min-width: 75px;
+  max-width: 75px;
+  border-left: 1px solid #fecaca !important;
+  background-color: #fef2f2;
+}
+.ot-summary-table td.ot-sticky-stt,
+.ot-summary-table td.ot-sticky-mnv,
+.ot-summary-table td.ot-sticky-name {
+  background-color: #ffffff;
+  z-index: 3;
+}
+.ot-summary-table thead th.ot-sticky-stt,
+.ot-summary-table thead th.ot-sticky-mnv,
+.ot-summary-table thead th.ot-sticky-name {
+  background-color: #f8fafc !important;
+  z-index: 10;
+}
+.ot-summary-table tbody tr:hover td {
+  background-color: #f8fafc !important;
+}
+.ot-summary-table tbody tr:hover td.ot-sticky-total {
+  background-color: #ffe0e0 !important;
+}
+.ot-summary-table tbody tr:hover td.ot-sticky-quydoi {
+  background-color: #fee2e2 !important;
 }
 
 /* ══════════════════════════════════════════
