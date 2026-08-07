@@ -4,59 +4,176 @@
 async function renderManageUsers(area) {
   let users = await api('GET', '/admin/users');
   let filter = '';
-  let filterStatus = '';
+
+  if (!window.userFilterProject) window.userFilterProject = new Set();
+  if (!window.userFilterEmpType) window.userFilterEmpType = new Set();
+  if (!window.userFilterAllowance) window.userFilterAllowance = new Set();
+  if (!window.userFilterStatus) window.userFilterStatus = new Set();
+  if (!window.userFilterPosition) window.userFilterPosition = new Set();
 
   function filtered() {
-    return users.filter(u => u.user_type === 'intern' &&
-      (!filterStatus || u.working_status === filterStatus) &&
-      (u.full_name.toLowerCase().includes(filter) ||
+    return users.filter(u => {
+      if (u.user_type !== 'intern') return false;
+
+      // Search text
+      const matchSearch = !filter || (
+        u.full_name.toLowerCase().includes(filter) ||
         u.employee_code.toLowerCase().includes(filter) ||
-        (u.project || '').toLowerCase().includes(filter)));
+        (u.project || '').toLowerCase().includes(filter) ||
+        (u.position || '').toLowerCase().includes(filter) ||
+        (u.employee_type || '').toLowerCase().includes(filter)
+      );
+      if (!matchSearch) return false;
+
+      // 1. Dự án
+      if (window.userFilterProject.size > 0) {
+        const hasProj = u.project && u.project.trim() !== '' && u.project !== '—';
+        let projMatch = false;
+        if (window.userFilterProject.has('__IN_PROJECT__') && hasProj) projMatch = true;
+        if (window.userFilterProject.has('__NO_PROJECT__') && !hasProj) projMatch = true;
+        if (!projMatch) return false;
+      }
+
+      // 2. Loại Nhân Sự
+      if (window.userFilterEmpType.size > 0) {
+        const empTypeVal = u.employee_type || 'Khác';
+        if (!window.userFilterEmpType.has(empTypeVal)) return false;
+      }
+
+      // 3. Trợ cấp
+      if (window.userFilterAllowance.size > 0) {
+        const hasAllowance = u.allowance && u.allowance !== 'Không' && u.allowance.trim() !== '';
+        let allowMatch = false;
+        if (window.userFilterAllowance.has('Có') && hasAllowance) allowMatch = true;
+        if (window.userFilterAllowance.has('Không') && !hasAllowance) allowMatch = true;
+        if (!allowMatch) return false;
+      }
+
+      // 4. Trạng thái
+      if (window.userFilterStatus.size > 0) {
+        if (!window.userFilterStatus.has(u.working_status)) return false;
+      }
+
+      // 5. Vị trí
+      if (window.userFilterPosition.size > 0) {
+        const posVal = u.position || 'Chưa phân vị trí';
+        if (!window.userFilterPosition.has(posVal)) return false;
+      }
+
+      return true;
+    });
   }
 
   function render() {
     const searchEl = document.getElementById('user-search');
     const isFocused = document.activeElement && document.activeElement.id === 'user-search';
-    const cursorStart = isFocused ? searchEl.selectionStart : null;
-    const cursorEnd = isFocused ? searchEl.selectionEnd : null;
+    const cursorStart = isFocused ? searchEl?.selectionStart : null;
+    const cursorEnd = isFocused ? searchEl?.selectionEnd : null;
 
     const list = filtered();
     const working = users.filter(u => u.user_type === 'intern' && u.working_status === 'Working').length;
+
+    // Build filter options lists
+    const projectOptions = [
+      { key: '__IN_PROJECT__', label: 'Đang trong dự án' },
+      { key: '__NO_PROJECT__', label: 'Không trong dự án' }
+    ];
+
+    const uniqueEmpTypes = [...new Set(users.filter(u => u.user_type === 'intern').map(u => u.employee_type || 'Khác'))].sort();
+    const empTypeOptions = uniqueEmpTypes.map(t => ({ key: t, label: t }));
+
+    const allowanceOptions = [
+      { key: 'Có', label: 'Có trợ cấp' },
+      { key: 'Không', label: 'Không trợ cấp' }
+    ];
+
+    const statusOptions = [
+      { key: 'Working', label: 'Đang làm' },
+      { key: 'Resigned', label: 'Đã nghỉ' }
+    ];
+
+    const uniquePositions = [...new Set(users.filter(u => u.user_type === 'intern').map(u => u.position || 'Chưa phân vị trí'))].sort();
+    const positionOptions = uniquePositions.map(p => ({ key: p, label: p }));
+
+    const renderFilterHeader = (colTitle, options, activeSet, varName) => {
+      const isActive = activeSet.size > 0;
+      const isAllChecked = activeSet.size === 0;
+      let html = `<th class="dropdown">
+        <div class="d-inline-flex align-items-center">
+          <span>${colTitle}</span>
+          <span class="filter-icon-btn ${isActive ? 'active' : ''}" 
+                data-bs-toggle="dropdown" 
+                data-bs-auto-close="outside"
+                title="Lọc ${colTitle}">
+            <i class="bi bi-funnel"></i>
+          </span>
+          <ul class="dropdown-menu table-filter-menu shadow-sm" style="min-width: 180px; max-height: 280px; overflow-y: auto;">
+            <li>
+              <label class="dropdown-item d-flex align-items-center" style="cursor:pointer">
+                <input type="checkbox" class="form-check-input me-2" onchange="toggleAllUserFilter('${varName}', this.checked)" ${isAllChecked ? 'checked' : ''}> 
+                <span class="filter-text-all">(Tất cả)</span>
+              </label>
+            </li>
+            <li><hr class="dropdown-divider my-1"></li>`;
+      
+      options.forEach(opt => {
+        const key = typeof opt === 'object' ? opt.key : opt;
+        const label = typeof opt === 'object' ? opt.label : opt;
+        const checked = activeSet.has(key);
+        const safeKey = String(key).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        const safeLabel = String(label).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        html += `<li>
+          <label class="dropdown-item d-flex align-items-center" style="cursor:pointer">
+            <input type="checkbox" class="form-check-input me-2" value="${safeKey}" onchange="toggleUserFilter('${varName}', this.value, this.checked)" ${checked ? 'checked' : ''}>
+            <span>${safeLabel}</span>
+          </label>
+        </li>`;
+      });
+      
+      html += `</ul></div></th>`;
+      return html;
+    };
+
     area.innerHTML = `
 <div class="section-header">
   <div class="section-title"><i class="bi bi-people-fill text-danger"></i> Danh sách thực tập sinh</div>
   <div>
-    <button class="btn btn-outline-success btn-sm me-2" onclick="downloadImportTemplate()"><i class="bi bi-download me-1"></i>Tải mẫu Excel</button>
+    <button class="btn btn-outline-danger btn-sm me-2" onclick="downloadImportTemplate()"><i class="bi bi-download me-1"></i>Tải mẫu Excel</button>
     <div class="dropdown d-inline-block me-2">
-      <button class="btn btn-success btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+      <button class="btn btn-outline-danger btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
         <i class="bi bi-upload me-1"></i>Nhập dữ liệu
       </button>
       <ul class="dropdown-menu shadow">
-        <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); document.getElementById('import-file-input').click()"><i class="bi bi-file-earmark-excel me-2 text-success"></i>Nhập từ Excel</a></li>
+        <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); document.getElementById('import-file-input').click()"><i class="bi bi-file-earmark-excel me-2 text-danger"></i>Nhập từ Excel</a></li>
         <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); promptImportLink()"><i class="bi bi-link-45deg me-2 text-primary"></i>Nhập từ link sheet</a></li>
       </ul>
     </div>
     <input type="file" id="import-file-input" class="d-none" accept=".xlsx" onchange="handleImportExcel(event)" />
-    <button class="btn btn-primary btn-sm" id="btn-add-user"><i class="bi bi-person-plus-fill me-1"></i>Thêm mới</button>
+    <button class="btn btn-danger btn-sm" id="btn-add-user"><i class="bi bi-person-plus-fill me-1"></i>Thêm mới</button>
   </div>
 </div>
 <div class="filter-bar mb-3">
-  <input class="form-control" id="user-search" placeholder="Tìm kiếm tên, mã NV, dự án..." value="${filter}" style="max-width:280px">
-  <select id="filter-status" class="form-select" style="max-width:150px">
-    <option value="">Tất cả trạng thái</option>
-    <option value="Working" ${filterStatus === 'Working' ? 'selected' : ''}>Đang làm</option>
-    <option value="Resigned" ${filterStatus === 'Resigned' ? 'selected' : ''}>Đã nghỉ</option>
-  </select>
+  <input class="form-control" id="user-search" placeholder="Tìm kiếm tên, mã NV, dự án..." value="${filter}" style="max-width:300px">
+  <button class="btn btn-outline-secondary btn-sm" id="btn-reset-user-filter" title="Khôi phục bộ lọc">
+    <i class="bi bi-arrow-counterclockwise me-1"></i>Khôi phục bộ lọc
+  </button>
   <span class="ms-auto small text-muted align-self-center">
     <strong class="text-success">${working}</strong> đang làm · <strong>${list.length}</strong> hiển thị
   </span>
 </div>
 <div class="table-wrap">
-  <div class="table-responsive">
+  <div class="table-responsive" style="min-height: 400px;">
     <table class="table table-hover">
       <thead><tr>
-        <th>Mã NV</th><th>Họ tên</th><th>Dự án</th><th>Số ngày đã làm</th><th>Loại nhân sự</th>
-        <th>Trợ cấp</th><th>Trạng thái</th><th>Vị trí</th><th style="width:100px">Thao tác</th>
+        <th>Mã NV</th>
+        <th>Họ tên</th>
+        ${renderFilterHeader('Dự án', projectOptions, window.userFilterProject, 'userFilterProject')}
+        <th>Số ngày đã làm</th>
+        ${renderFilterHeader('Loại nhân sự', empTypeOptions, window.userFilterEmpType, 'userFilterEmpType')}
+        ${renderFilterHeader('Trợ cấp', allowanceOptions, window.userFilterAllowance, 'userFilterAllowance')}
+        ${renderFilterHeader('Trạng thái', statusOptions, window.userFilterStatus, 'userFilterStatus')}
+        ${renderFilterHeader('Vị trí', positionOptions, window.userFilterPosition, 'userFilterPosition')}
+        <th style="width:100px">Thao tác</th>
       </tr></thead>
       <tbody>
         ${list.length ? list.map(u => `
@@ -75,14 +192,14 @@ async function renderManageUsers(area) {
           <td>${badgeEmpType(u.employee_type)}</td>
           <td>${u.allowance || 'Không'}</td>
           <td>${badgeStatus(u.working_status)}</td>
-          <td>${u.position || '—'}</td>
+          <td>${u.position ? `<span class="role-pill">${u.position}</span>` : '—'}</td>
           <td>
             <button class="btn-icon edit me-1" title="Sửa" onclick="openEditUser(${u.id})"><i class="bi bi-pencil-fill"></i></button>
             <button class="btn-icon" style="background:rgba(248,81,73,.1);color:var(--danger)" title="Xóa" onclick="deleteUser(${u.id},'${u.full_name}')">
               <i class="bi bi-trash-fill"></i>
             </button>
           </td>
-        </tr>`).join('') : '<tr><td colspan="8" class="text-center py-4 text-muted">Không có dữ liệu</td></tr>'}
+        </tr>`).join('') : '<tr><td colspan="9" class="text-center py-4 text-muted">Không có dữ liệu</td></tr>'}
       </tbody>
     </table>
   </div>
@@ -90,14 +207,38 @@ async function renderManageUsers(area) {
 
     document.getElementById('btn-add-user').onclick = () => openUserModal(null);
     document.getElementById('user-search').addEventListener('input', e => { filter = e.target.value.toLowerCase(); render(); });
-    document.getElementById('filter-status').addEventListener('change', e => { filterStatus = e.target.value; render(); });
+    document.getElementById('btn-reset-user-filter').onclick = () => {
+      filter = '';
+      window.userFilterProject.clear();
+      window.userFilterEmpType.clear();
+      window.userFilterAllowance.clear();
+      window.userFilterStatus.clear();
+      window.userFilterPosition.clear();
+      render();
+    };
 
     if (isFocused) {
       const newSearchEl = document.getElementById('user-search');
-      newSearchEl.focus();
-      newSearchEl.setSelectionRange(cursorStart, cursorEnd);
+      newSearchEl?.focus();
+      newSearchEl?.setSelectionRange(cursorStart, cursorEnd);
     }
   }
+
+  window.toggleUserFilter = (varName, val, isChecked) => {
+    const activeSet = window[varName];
+    if (isChecked) {
+      activeSet.add(val);
+    } else {
+      activeSet.delete(val);
+    }
+    render();
+  };
+
+  window.toggleAllUserFilter = (varName, isChecked) => {
+    window[varName].clear();
+    render();
+  };
+
   render();
 }
 
@@ -107,7 +248,13 @@ window.openEditUser = async (id) => {
 };
 
 window.deleteUser = async (id, name) => {
-  if (!confirm(`⚠️ Xác nhận XÓA tài khoản "${name}"?\n\nHành động này không thể hoàn tác và sẽ xóa toàn bộ lịch liên quan.`)) return;
+  const ok = await showConfirm({
+    title: 'Xóa tài khoản thực tập sinh',
+    message: `Xác nhận XÓA tài khoản "${name}"?\n\nHành động này không thể hoàn tác và sẽ xóa toàn bộ lịch liên quan.`,
+    okText: 'Xóa tài khoản',
+    type: 'danger'
+  });
+  if (!ok) return;
   try {
     const r = await api('DELETE', `/admin/users/${id}`);
     toast(r.message, 'success');
@@ -232,7 +379,12 @@ window.handleImportExcel = async function (event) {
 };
 
 window.promptImportLink = async function () {
-  const url = prompt("Nhập đường dẫn Google Sheets\\n(Lưu ý: File Google Sheets cần được chia sẻ ở chế độ 'Bất kỳ ai có đường liên kết đều có thể xem'):");
+  const fn = window.showPrompt || showPrompt;
+  const url = await fn({
+    title: 'Nhập đường dẫn Google Sheets',
+    message: 'Lưu ý: File Google Sheets cần được chia sẻ ở chế độ "Bất kỳ ai có đường liên kết đều có thể xem"',
+    placeholder: 'https://docs.google.com/spreadsheets/d/...'
+  });
   if (!url) return;
   if (!url.includes('docs.google.com/spreadsheets')) {
     toast('Đường dẫn không hợp lệ', 'error');

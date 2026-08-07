@@ -42,14 +42,208 @@ async function api(method, path, body) {
   return data;
 }
 
-// ── Toast ──
-function toast(msg, type = 'success') {
+// ── Toast (Thông báo góc dưới bên trái) ──
+function toast(msg, type = 'success', delay = 3500) {
   const el = document.getElementById('app-toast');
   const msgEl = document.getElementById('toast-msg');
-  el.className = `toast align-items-center border-0 ${type}`;
+  const iconWrap = document.getElementById('toast-icon');
+
+  if (!el || !msgEl) return;
+
+  const ICONS = {
+    success: '<i class="bi bi-check-circle-fill fs-5"></i>',
+    error: '<i class="bi bi-x-circle-fill fs-5"></i>',
+    danger: '<i class="bi bi-x-circle-fill fs-5"></i>',
+    warning: '<i class="bi bi-exclamation-triangle-fill fs-5"></i>',
+    info: '<i class="bi bi-info-circle-fill fs-5"></i>'
+  };
+
+  const actualType = type === 'danger' ? 'error' : type;
+  el.className = `toast align-items-center border-0 ${actualType}`;
+  if (iconWrap) iconWrap.innerHTML = ICONS[actualType] || ICONS.info;
   msgEl.textContent = msg;
-  bootstrap.Toast.getOrCreateInstance(el, { delay: 3000 }).show();
+
+  const toastInstance = bootstrap.Toast.getOrCreateInstance(el, { delay });
+  toastInstance.show();
 }
+
+// Ghi đè alert mặc định của web để hiển thị bằng Toast góc dưới bên trái
+window.alert = function (msg) {
+  toast(msg, 'info', 4500);
+};
+
+// ── Confirm Modal (Hộp thoại xác nhận ở giữa màn hình) ──
+function showConfirm(options = {}) {
+  return new Promise((resolve) => {
+    const modalEl = document.getElementById('app-confirm-modal');
+    if (!modalEl) {
+      resolve(confirm(typeof options === 'string' ? options : options.message || 'Xác nhận?'));
+      return;
+    }
+
+    const title = typeof options === 'string' ? 'Xác nhận thao tác' : (options.title || 'Xác nhận thao tác');
+    const message = typeof options === 'string' ? options : (options.message || 'Bạn có chắc chắn muốn thực hiện thao tác này?');
+    const okText = options.okText || 'Xác nhận';
+    const cancelText = options.cancelText || 'Hủy bỏ';
+    const type = options.type || 'danger'; // 'danger', 'warning', 'info'
+
+    document.getElementById('confirm-modal-title').textContent = title;
+    document.getElementById('confirm-modal-message').textContent = message;
+    
+    const okBtn = document.getElementById('confirm-modal-ok-btn');
+    const cancelBtn = document.getElementById('confirm-modal-cancel-btn');
+    const iconBg = document.getElementById('confirm-modal-icon-bg');
+    const iconEl = document.getElementById('confirm-modal-icon');
+
+    okBtn.textContent = okText;
+    cancelBtn.textContent = cancelText;
+
+    // Config Icon & Colors based on type
+    if (iconBg && iconEl) {
+      iconBg.className = 'confirm-icon-wrap mx-auto mb-3 confirm-icon-' + type;
+      if (type === 'danger') {
+        iconEl.className = 'bi bi-trash3-fill';
+        okBtn.className = 'btn btn-danger px-4 py-2 rounded-3 fw-semibold';
+      } else if (type === 'warning') {
+        iconEl.className = 'bi bi-exclamation-triangle-fill';
+        okBtn.className = 'btn btn-warning text-white px-4 py-2 rounded-3 fw-semibold';
+      } else {
+        iconEl.className = 'bi bi-question-circle-fill';
+        okBtn.className = 'btn btn-primary px-4 py-2 rounded-3 fw-semibold';
+      }
+    }
+
+    const modalInstance = bootstrap.Modal.getOrCreateInstance(modalEl);
+
+    let isHandled = false;
+
+    const cleanup = () => {
+      okBtn.removeEventListener('click', onOk);
+      cancelBtn.removeEventListener('click', onCancel);
+      modalEl.removeEventListener('hidden.bs.modal', onHidden);
+    };
+
+    const onOk = () => {
+      if (isHandled) return;
+      isHandled = true;
+      cleanup();
+      modalInstance.hide();
+      resolve(true);
+    };
+
+    const onCancel = () => {
+      if (isHandled) return;
+      isHandled = true;
+      cleanup();
+      modalInstance.hide();
+      resolve(false);
+    };
+
+    const onHidden = () => {
+      if (isHandled) return;
+      isHandled = true;
+      cleanup();
+      resolve(false);
+    };
+
+    okBtn.addEventListener('click', onOk);
+    cancelBtn.addEventListener('click', onCancel);
+    modalEl.addEventListener('hidden.bs.modal', onHidden);
+
+    modalEl.style.setProperty('z-index', '1090', 'important');
+    modalInstance.show();
+  });
+}
+
+// ── Prompt Modal (Hộp thoại nhập dữ liệu ở giữa màn hình) ──
+function showPrompt(options = {}) {
+  return new Promise((resolve) => {
+    const modalEl = document.getElementById('app-prompt-modal');
+    if (!modalEl) {
+      resolve(prompt(typeof options === 'string' ? options : options.message || 'Nhập giá trị:'));
+      return;
+    }
+
+    const title = typeof options === 'string' ? 'Nhập thông tin' : (options.title || 'Nhập thông tin');
+    const message = typeof options === 'string' ? options : (options.message || 'Vui lòng nhập thông tin bên dưới:');
+    const defaultValue = typeof options === 'object' ? (options.defaultValue || '') : '';
+    const placeholder = typeof options === 'object' ? (options.placeholder || 'Nhập đường dẫn Google Sheets...') : 'Nhập đường dẫn...';
+
+    document.getElementById('prompt-modal-title').textContent = title;
+    document.getElementById('prompt-modal-message').textContent = message;
+
+    const inputEl = document.getElementById('prompt-modal-input');
+    inputEl.value = defaultValue;
+    inputEl.placeholder = placeholder;
+
+    const okBtn = document.getElementById('prompt-modal-ok-btn');
+    const cancelBtn = document.getElementById('prompt-modal-cancel-btn');
+
+    const modalInstance = bootstrap.Modal.getOrCreateInstance(modalEl);
+    let isHandled = false;
+
+    const cleanup = () => {
+      okBtn.removeEventListener('click', onOk);
+      cancelBtn.removeEventListener('click', onCancel);
+      inputEl.removeEventListener('keydown', onKeyDown);
+      modalEl.removeEventListener('hidden.bs.modal', onHidden);
+    };
+
+    const onOk = () => {
+      if (isHandled) return;
+      isHandled = true;
+      const val = inputEl.value.trim();
+      cleanup();
+      modalInstance.hide();
+      resolve(val ? val : null);
+    };
+
+    const onCancel = () => {
+      if (isHandled) return;
+      isHandled = true;
+      cleanup();
+      modalInstance.hide();
+      resolve(null);
+    };
+
+    const onHidden = () => {
+      if (isHandled) return;
+      isHandled = true;
+      cleanup();
+      resolve(null);
+    };
+
+    const onKeyDown = (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        onOk();
+      }
+    };
+
+    okBtn.addEventListener('click', onOk);
+    cancelBtn.addEventListener('click', onCancel);
+    inputEl.addEventListener('keydown', onKeyDown);
+    modalEl.addEventListener('hidden.bs.modal', onHidden);
+
+    modalEl.addEventListener('shown.bs.modal', () => {
+      inputEl.focus();
+      inputEl.select();
+    }, { once: true });
+
+    modalEl.style.setProperty('z-index', '1090', 'important');
+    modalInstance.show();
+  });
+}
+
+// Gắn các hàm thông báo & modal lên window object toàn cục
+window.toast = toast;
+window.showConfirm = showConfirm;
+window.showPrompt = showPrompt;
+
+// Ghi đè prompt mặc định của web để hiển thị bằng Prompt Modal góc giữa màn hình
+window.prompt = function (message, defaultValue = '') {
+  return showPrompt({ message, defaultValue });
+};
 
 // ── Toggle password visibility ──
 function togglePass(id, btn) {
@@ -69,19 +263,20 @@ function startClock() {
 // ── Page routing ──
 const PAGE_TITLES = {
   dashboard: 'Dashboard',
-  'manage-users': 'Quản lý Thực tập sinh',
-  'manage-employees': 'Quản lý Nhân sự',
-  'manage-periods': 'Quản lý Kỳ đăng ký',
-  'manage-accounts': 'Tài khoản đăng nhập',
-  'admin-schedule': 'Bảng lịch theo tháng',
-  profile: 'Hồ sơ cá nhân',
-  'register-schedule': 'Đăng ký lịch thực tập',
-  'view-schedule': 'Xem lịch của tôi',
-  'change-password': 'Đổi mật khẩu',
-  'documents': 'Quản lý tài liệu',
-  'ai-config': 'Cấu hình AI',
-  'register-ot': 'Chấm công OT',
-  'manage-ot': 'Quản lý OT',
+  'manage-users': 'Quản lý thực tập sinh / Danh sách TTS',
+  'admin-schedule': 'Quản lý thực tập sinh / Lịch Thực tập',
+  'manage-periods': 'Quản lý thực tập sinh / Quản lý Kỳ đăng ký',
+  'manage-accounts': 'Quản lý thực tập sinh / Quản lý tài khoản',
+  'manage-employees': 'Quản lý nhân sự / Danh sách nhân viên',
+  'manage-emp-accounts': 'Quản lý nhân sự / Quản lý tài khoản',
+  'manage-ot': 'Quản lý nhân sự / Quản lý OT',
+  'documents': 'Tài liệu / Quản lý tài liệu',
+  'ai-config': 'Tài liệu / Cấu hình AI',
+  profile: 'Cá nhân / Hồ sơ cá nhân',
+  'register-ot': 'Cá nhân / Chấm công OT',
+  'register-schedule': 'Cá nhân / Đăng ký lịch thực tập',
+  'view-schedule': 'Cá nhân / Xem lịch của tôi',
+  'change-password': 'Tài khoản / Đổi mật khẩu',
 };
 
 function navigate(page) {

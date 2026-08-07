@@ -4,9 +4,9 @@
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function otBadge(status) {
-  if (status === 'Approved') return `<span class="custom-badge" style="background:rgba(46,125,50,.15);color:#2e7d32;border:1px solid rgba(46,125,50,.3)"><i class="bi bi-check-circle-fill" style="font-size:9px"></i> Đã duyệt</span>`;
-  if (status === 'Pending')  return `<span class="custom-badge" style="background:rgba(237,108,2,.15);color:#e65100;border:1px solid rgba(237,108,2,.3)"><i class="bi bi-hourglass-split" style="font-size:9px"></i> Chờ duyệt</span>`;
-  return `<span class="custom-badge" style="background:rgba(211,47,47,.15);color:#d32f2f;border:1px solid rgba(211,47,47,.3)"><i class="bi bi-x-circle-fill" style="font-size:9px"></i> Từ chối</span>`;
+  if (status === 'Approved') return `<span class="custom-badge" style="background:rgba(46,125,50,.15);color:#2e7d32;border:1px solid rgba(46,125,50,.3)">Đã duyệt</span>`;
+  if (status === 'Pending')  return `<span class="custom-badge" style="background:rgba(237,108,2,.15);color:#e65100;border:1px solid rgba(237,108,2,.3)">Chờ duyệt</span>`;
+  return `<span class="custom-badge" style="background:rgba(211,47,47,.15);color:#d32f2f;border:1px solid rgba(211,47,47,.3)">Từ chối</span>`;
 }
 
 function otCalendarDotClass(status) {
@@ -244,7 +244,13 @@ async function renderRegisterOT(area) {
   };
 
   window.deleteOT = async (id) => {
-    if (!confirm('Bạn có chắc muốn xóa đăng ký OT này?')) return;
+    const ok = await showConfirm({
+      title: 'Xóa đăng ký OT',
+      message: 'Bạn có chắc chắn muốn xóa đăng ký OT này không?',
+      okText: 'Xóa đăng ký',
+      type: 'danger'
+    });
+    if (!ok) return;
     try {
       await api('DELETE', `/overtime/${id}`);
       toast('Đã xóa đăng ký OT.', 'success');
@@ -437,10 +443,10 @@ async function renderManageOT(area) {
             <option value="Rejected" ${filterStatus==='Rejected'?'selected':''}>Từ chối</option>
           </select>
         </div>
-        <div class="col-6 col-md-2 d-flex gap-1">
-          <button class="btn btn-danger btn-sm flex-grow-1" id="ot-filter-btn"><i class="bi bi-search me-1"></i>Lọc</button>
-          <button class="btn btn-success btn-sm" id="ot-export-btn" title="Xuất Excel">
-            <i class="bi bi-file-earmark-excel-fill"></i>
+        <div class="col-6 col-md-3 d-flex gap-2">
+          <button class="btn btn-danger btn-sm" id="ot-filter-btn"><i class="bi bi-search me-1"></i>Lọc</button>
+          <button class="btn btn-outline-danger btn-sm" id="ot-export-btn" title="Xuất Excel">
+            <i class="bi bi-file-earmark-excel-fill me-1"></i>Xuất Excel
           </button>
         </div>
       </div>
@@ -535,7 +541,13 @@ async function renderManageOT(area) {
 
     document.getElementById('ot-approve-selected').onclick = async () => {
       if (selectedIds.size === 0) { toast('Chưa chọn OT nào.', 'error'); return; }
-      if (!confirm(`Duyệt ${selectedIds.size} OT đã chọn?`)) return;
+      const ok = await showConfirm({
+        title: 'Duyệt danh sách OT',
+        message: `Xác nhận duyệt ${selectedIds.size} OT đã chọn?`,
+        okText: 'Duyệt OT',
+        type: 'warning'
+      });
+      if (!ok) return;
       try {
         const res = await api('POST', '/overtime/admin/approve-selected', { ids: [...selectedIds] });
         toast(res.message, 'success');
@@ -544,7 +556,13 @@ async function renderManageOT(area) {
     };
 
     document.getElementById('ot-approve-all').onclick = async () => {
-      if (!confirm(`Duyệt tất cả OT Pending trong tháng ${filterMonth}/${filterYear}?`)) return;
+      const ok = await showConfirm({
+        title: 'Duyệt toàn bộ OT',
+        message: `Duyệt tất cả OT Pending trong tháng ${filterMonth}/${filterYear}?`,
+        okText: 'Duyệt tất cả',
+        type: 'warning'
+      });
+      if (!ok) return;
       try {
         const params = new URLSearchParams({ month: filterMonth, year: filterYear, ...(filterProject ? { project: filterProject } : {}) });
         const res = await api('POST', `/overtime/admin/approve-all-pending?${params}`);
@@ -688,7 +706,13 @@ async function renderManageOT(area) {
 
   // ── Global actions ──
   window.adminApproveOT = async (id) => {
-    if (!confirm('Duyệt yêu cầu OT này?')) return;
+    const ok = await showConfirm({
+      title: 'Duyệt yêu cầu OT',
+      message: 'Xác nhận duyệt yêu cầu OT này?',
+      okText: 'Duyệt OT',
+      type: 'warning'
+    });
+    if (!ok) return;
     try {
       await api('POST', `/overtime/admin/${id}/approve`);
       toast('Đã duyệt OT!', 'success');

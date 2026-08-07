@@ -22,8 +22,8 @@ async function renderManageAccounts(area, userType = 'intern') {
     const list = filtered();
     area.innerHTML = `
 <div class="section-header">
-  <div class="section-title"><i class="bi bi-person-lines-fill text-danger"></i> Tổng hợp tài khoản ${userType === 'intern' ? 'TTS' : 'Nhân viên'}</div>
-  <button class="btn btn-success btn-sm" onclick="exportAccounts('${userType}')"><i class="bi bi-file-earmark-excel-fill me-1"></i>Xuất Excel</button>
+  <div class="section-title"><i class="bi bi-person-lines-fill text-danger"></i> Quản lý tài khoản ${userType === 'intern' ? 'TTS' : 'Nhân viên'}</div>
+  <button class="btn btn-outline-danger btn-sm" onclick="exportAccounts('${userType}')"><i class="bi bi-file-earmark-excel-fill me-1"></i>Xuất Excel</button>
 </div>
 <div class="filter-bar mb-3">
   <input class="form-control" id="account-search" placeholder="Tìm kiếm tên, mã NV, tên đăng nhập..." value="${filter}" style="max-width:350px">
@@ -94,7 +94,13 @@ window.exportAccounts = function (userType = 'intern') {
 };
 
 window.resetAccountPwd = async (id, name) => {
-  if (!confirm(`Đặt lại mật khẩu về "123456" cho ${name}?`)) return;
+  const ok = await showConfirm({
+    title: 'Đặt lại mật khẩu',
+    message: `Đặt lại mật khẩu về "123456" cho ${name}?`,
+    okText: 'Đặt lại mật khẩu',
+    type: 'warning'
+  });
+  if (!ok) return;
   try { const r = await api('PATCH', `/admin/users/${id}/reset-password`); toast(r.message); }
   catch (e) { toast(e.message, 'error'); }
 };

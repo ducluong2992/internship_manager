@@ -12,12 +12,25 @@ async function renderAdminSchedule(area) {
   }
 
   function renderGrid(data) {
+    function getWeekIdx(year, month, day) {
+      const first = new Date(year, month - 1, 1);
+      const firstDow = (first.getDay() + 6) % 7; // Monday = 0
+      return Math.floor((day - 1 + firstDow) / 7);
+    }
+
     const workdays = getWorkdays(selYear, selMonth);
     const DOW = ['CN','T2','T3','T4','T5','T6','T7'];
 
     const headerCells = workdays.map(d => {
       const dow = new Date(selYear, selMonth-1, d).getDay();
-      return `<div class="sched-head-cell">${d}<br><span style="font-size:0.65rem">${DOW[dow]}</span></div>`;
+      const weekIdx = getWeekIdx(selYear, selMonth, d);
+      const isAltWeek = weekIdx % 2 === 1;
+      const bgStyle = isAltWeek ? 'background:#fff5f5;' : 'background:#fafafa;';
+      const dowStyle = dow === 0 ? 'color:#d5001c;font-weight:700;' : (dow === 6 ? 'color:#e65100;' : 'color:#64748b;');
+      return `<div class="sched-head-cell" style="${bgStyle}">
+        <span class="fw-bold">${d}</span><br>
+        <span style="font-size:0.68rem;${dowStyle}">${DOW[dow]}</span>
+      </div>`;
     }).join('');
 
     let rows = '';
@@ -35,49 +48,74 @@ async function renderAdminSchedule(area) {
         Chưa có thực tập sinh đăng ký
       </div>`;
     } else {
-      // grand total row at bottom
-      let grandTotal = 0;
-      rows = data.rows.map(row => {
+      let grandSC = 0;
+      let grandHalf = 0;
+      let grandQuyDoi = 0;
+
+      rows = data.rows.map((row, idx) => {
         const schedMap = {};
         (row.schedules || []).forEach(s => { schedMap[s.work_day] = s.shift; });
-        let total = 0;
+        
+        let countSC = 0;
+        let countHalf = 0;
+
         const cells = workdays.map(d => {
           const dateStr = toDateStr(selYear, selMonth, d);
           const shift = schedMap[dateStr] || '';
-          if (shift === 'SC') total += 1;
-          else if (shift === 'S' || shift === 'C') total += 0.5;
-          const cls = shift === 'SC' ? 'shift-sc' : (shift ? 'shift-s' : '');
-          return `<div class="sched-cell"><span class="${cls}" style="padding:2px 6px;border-radius:4px;font-weight:${shift?700:400}">${shift||'<span style="opacity:.25">·</span>'}</span></div>`;
+          if (shift === 'SC') countSC++;
+          else if (shift === 'S' || shift === 'C') countHalf++;
+
+          const weekIdx = getWeekIdx(selYear, selMonth, d);
+          const isAltWeek = weekIdx % 2 === 1;
+          const bgStyle = isAltWeek ? 'background:#fff5f5;' : 'background:#ffffff;';
+
+          let shiftHtml = '<span style="color:#cbd5e1;font-size:0.75rem">—</span>';
+          if (shift === 'SC') {
+            shiftHtml = '<span class="sched-shift-sc">SC</span>';
+          } else if (shift === 'S') {
+            shiftHtml = '<span class="sched-shift-half">S</span>';
+          } else if (shift === 'C') {
+            shiftHtml = '<span class="sched-shift-half">C</span>';
+          }
+
+          return `<div class="sched-cell" style="${bgStyle}">${shiftHtml}</div>`;
         }).join('');
-        grandTotal += total;
+
+        const quyDoi = countSC * 1.0 + countHalf * 0.5;
+        grandSC += countSC;
+        grandHalf += countHalf;
+        grandQuyDoi += quyDoi;
+
         const hasSchedule = row.schedules && row.schedules.length > 0;
         return `
         <div class="sched-data-row" style="--day-count:${workdays.length}">
+          <div class="sched-stt-cell">${idx + 1}</div>
           <div class="sched-name-cell">
             <strong>${row.full_name}</strong><br>
             <small class="text-muted">${row.employee_code}${row.project ? ' · ' + row.project : ''}</small>
-            ${!hasSchedule ? '<br><span style="font-size:0.68rem;color:var(--text-muted);opacity:.6">Chưa đăng ký</span>' : ''}
+            ${!hasSchedule ? '<br><span style="font-size:0.68rem;color:#94a3b8">Chưa đăng ký</span>' : ''}
           </div>
           ${cells}
-          <div class="sched-cell"><span class="total-badge">${total > 0 ? total : '—'}</span></div>
+          <div class="sched-cell sched-quydoi-val">${quyDoi % 1 === 0 ? quyDoi.toFixed(0) : quyDoi.toFixed(1)}</div>
         </div>`;
       }).join('');
 
       // Grand total footer row
       rows += `
-      <div class="sched-data-row" style="--day-count:${workdays.length};background:rgba(229,57,53,0.06);font-weight:700">
-        <div class="sched-name-cell" style="color:var(--primary)">
-          <i class="bi bi-sigma me-1"></i>TỔNG CỘNG
-          <small style="display:block;color:var(--text-muted);font-weight:400">${registeredCount}/${data.rows.length} đã đăng ký</small>
+      <div class="sched-data-row sched-grand-total-row" style="--day-count:${workdays.length}">
+        <div class="sched-stt-cell fw-bold">∑</div>
+        <div class="sched-name-cell text-danger fw-bold">
+          TỔNG CỘNG
+          <small style="display:block;color:#64748b;font-weight:400">${registeredCount}/${data.rows.length} đã đăng ký</small>
         </div>
         ${workdays.map(() => '<div class="sched-cell"></div>').join('')}
-        <div class="sched-cell"><span class="total-badge" style="background:rgba(229,57,53,.2);font-size:.9rem">${grandTotal}</span></div>
+        <div class="sched-cell sched-quydoi-val fw-bold" style="background:#d5001c;color:#ffffff;">${grandQuyDoi % 1 === 0 ? grandQuyDoi.toFixed(0) : grandQuyDoi.toFixed(1)}</div>
       </div>`;
     }
 
     area.innerHTML = `
 <div class="section-header">
-  <div class="section-title"><i class="bi bi-table text-warning"></i> Bảng lịch thực tập</div>
+  <div class="section-title"><i class="bi bi-table text-danger"></i> Lịch Thực tập</div>
   <div class="d-flex gap-2 align-items-center flex-wrap">
     <select id="sel-month" class="form-select form-select-sm" style="width:130px">
       ${[...Array(12)].map((_,i)=>`<option value="${i+1}" ${i+1===selMonth?'selected':''}>Tháng ${i+1}</option>`).join('')}
@@ -110,7 +148,7 @@ ${data.period ? `
 <div class="d-flex gap-3 mb-3 align-items-center flex-wrap">
   <span>${badgePeriod(data.period.status)}</span>
   <span class="small text-muted">Tháng ${data.period.month}/${data.period.year}</span>
-  <span class="small text-muted">Đăng ký: <strong class="text-info">${registeredCount}/${data.rows.length}</strong> TTS</span>
+  <span class="small text-muted">Đăng ký: <strong class="text-danger">${registeredCount}/${data.rows.length}</strong> TTS</span>
   <button class="btn btn-sm btn-outline-danger" onclick="deleteSchedPeriod(${data.period.id})">
     <i class="bi bi-trash me-1"></i>Xóa kỳ
   </button>
@@ -119,9 +157,10 @@ ${data.period ? `
 <div class="schedule-grid-wrap">
   <div class="schedule-grid" style="--day-count:${workdays.length}">
     <div class="sched-header-row" style="--day-count:${workdays.length}">
-      <div class="sched-head-name">Họ tên / Mã NV</div>
+      <div class="sched-head-stt">STT</div>
+      <div class="sched-head-name">Họ và tên</div>
       ${headerCells}
-      <div class="sched-head-cell">Tổng</div>
+      <div class="sched-head-quydoi">Quy đổi</div>
     </div>
     ${rows}
   </div>
@@ -189,7 +228,12 @@ ${data.period ? `
       };
 
       window.promptSchedImportLink = async function () {
-        const url = prompt('Nhập đường dẫn Google Sheets (phải được chia sẻ công khai "Bất kỳ ai có liên kết"):');
+        const fn = window.showPrompt || showPrompt;
+        const url = await fn({
+          title: 'Nhập đường dẫn Google Sheets',
+          message: 'Lưu ý: File Google Sheets phải được chia sẻ công khai "Bất kỳ ai có liên kết"',
+          placeholder: 'https://docs.google.com/spreadsheets/d/...'
+        });
         if (!url) return;
         toast('Đang tải danh sách sheet...', 'info');
         try {
@@ -229,7 +273,13 @@ ${data.period ? `
       };
 
       window.deleteSchedPeriod = async function (periodId) {
-        if (!confirm(`Xóa kỳ tháng ${selMonth}/${selYear}?\n\nToàn bộ lịch đã import sẽ bị xóa.`)) return;
+        const ok = await showConfirm({
+          title: 'Xóa kỳ lịch',
+          message: `Xóa kỳ tháng ${selMonth}/${selYear}?\n\nToàn bộ lịch đã import sẽ bị xóa.`,
+          okText: 'Xóa kỳ lịch',
+          type: 'danger'
+        });
+        if (!ok) return;
         try {
           await api('DELETE', `/admin/periods/${periodId}`);
           toast('Đã xóa kỳ đăng ký', 'success');

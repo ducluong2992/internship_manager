@@ -59,7 +59,7 @@ async function renderAIConfig(area) {
           </div>
           
           <div class="col-12 text-end mt-4">
-            <button type="submit" class="btn btn-primary" id="btn-save-cfg"><i class="bi bi-check-lg me-2"></i>Lưu cấu hình</button>
+            <button type="submit" class="btn btn-danger btn-sm" id="btn-save-cfg"><i class="bi bi-check-lg me-1"></i>Lưu cấu hình</button>
           </div>
         </div>
       </form>

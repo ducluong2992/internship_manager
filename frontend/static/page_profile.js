@@ -41,24 +41,16 @@ async function renderProfile(area) {
       </div>
       <div class="d-flex gap-2 flex-wrap">
         ${isEmployee
-          ? `<span class="custom-badge" style="background:rgba(88,166,255,.15);color:var(--info);border:1px solid rgba(88,166,255,.3)">
-              <i class="bi bi-briefcase-fill" style="font-size:9px"></i> Nhân viên
-             </span>
+          ? `<span class="custom-badge" style="background:rgba(88,166,255,.15);color:var(--info);border:1px solid rgba(88,166,255,.3)">Nhân viên</span>
              ${user.employment_status === 'Chính thức'
-               ? `<span class="custom-badge" style="background:rgba(63,185,80,.15);color:var(--success);border:1px solid rgba(63,185,80,.3)"><i class="bi bi-patch-check-fill" style="font-size:9px"></i> Chính thức</span>`
-               : `<span class="custom-badge" style="background:rgba(255,193,7,.15);color:#d39e00;border:1px solid rgba(255,193,7,.3)"><i class="bi bi-hourglass-split" style="font-size:9px"></i> Thử việc</span>`
+               ? `<span class="custom-badge" style="background:rgba(63,185,80,.15);color:var(--success);border:1px solid rgba(63,185,80,.3)">Chính thức</span>`
+               : `<span class="custom-badge" style="background:rgba(255,193,7,.15);color:#d39e00;border:1px solid rgba(255,193,7,.3)">Thử việc</span>`
              }
-             ${positionLabel !== '—' ? `<span class="custom-badge" style="background:rgba(229,57,53,.1);color:var(--danger);border:1px solid rgba(229,57,53,.25)"><i class="bi bi-person-workspace" style="font-size:9px"></i> ${positionLabel}</span>` : ''}`
+             ${positionLabel !== '—' ? `<span class="custom-badge" style="background:rgba(229,57,53,.1);color:var(--danger);border:1px solid rgba(229,57,53,.25)">${positionLabel}</span>` : ''}`
           : `${badgeStatus(user.working_status)}
-             <span class="custom-badge" style="background:rgba(88,166,255,.15);color:var(--info);border:1px solid rgba(88,166,255,.3)">
-               <i class="bi bi-clock-fill" style="font-size:9px"></i> ${user.employment_type || 'Fulltime'}
-             </span>
-             ${user.project ? `<span class="custom-badge" style="background:rgba(210,153,34,.15);color:var(--warning);border:1px solid rgba(210,153,34,.3)">
-               <i class="bi bi-folder-fill" style="font-size:9px"></i> ${user.project}
-             </span>` : ''}
-             ${user.allowance === 'Có' ? `<span class="custom-badge" style="background:rgba(63,185,80,.15);color:var(--success);border:1px solid rgba(63,185,80,.3)">
-               <i class="bi bi-cash-coin" style="font-size:9px"></i> Có trợ cấp
-             </span>` : ''}`
+             <span class="custom-badge" style="background:rgba(88,166,255,.15);color:var(--info);border:1px solid rgba(88,166,255,.3)">${user.employment_type || 'Fulltime'}</span>
+             ${user.project ? `<span class="custom-badge" style="background:rgba(210,153,34,.15);color:var(--warning);border:1px solid rgba(210,153,34,.3)">${user.project}</span>` : ''}
+             ${user.allowance === 'Có' ? `<span class="custom-badge" style="background:rgba(63,185,80,.15);color:var(--success);border:1px solid rgba(63,185,80,.3)">Có trợ cấp</span>` : ''}`
         }
       </div>
     </div>

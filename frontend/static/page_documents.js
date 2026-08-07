@@ -10,9 +10,9 @@ async function renderDocuments(area) {
   area.innerHTML = `
 <div class="glass-card p-4">
   <div class="section-header mb-4">
-    <div class="section-title"><i class="bi bi-file-earmark-text-fill text-primary"></i> Quản lý Tài liệu Tri thức</div>
-    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modal-upload">
-      <i class="bi bi-cloud-upload me-2"></i>Upload tài liệu
+    <div class="section-title"><i class="bi bi-file-earmark-text-fill text-danger"></i> Quản lý Tài liệu Tri thức</div>
+    <button class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#modal-upload">
+      <i class="bi bi-cloud-upload me-1"></i>Upload tài liệu
     </button>
   </div>
   
@@ -36,9 +36,9 @@ async function renderDocuments(area) {
             <td>${d.uploaded_by || '—'}</td>
             <td>${fmtDateTime(d.created_at)}</td>
             <td>
-              ${d.status === 'READY' ? '<span class="badge bg-success">READY</span>' : 
-                d.status === 'PROCESSING' ? '<span class="badge bg-warning text-dark"><i class="spinner-border spinner-border-sm me-1"></i>PROCESSING</span>' : 
-                '<span class="badge bg-danger">ERROR</span>'}
+              ${d.status === 'READY' ? '<span class="custom-badge badge-working">READY</span>' : 
+                d.status === 'PROCESSING' ? '<span class="custom-badge" style="background:rgba(255,193,7,.18);color:#9c5700;border:1px solid rgba(255,193,7,.35)"><i class="spinner-border spinner-border-sm me-1" style="width:10px;height:10px"></i>PROCESSING</span>' : 
+                '<span class="custom-badge badge-resigned">ERROR</span>'}
             </td>
             <td>
               <div class="form-check form-switch">
@@ -98,7 +98,13 @@ async function renderDocuments(area) {
   tbody.addEventListener('click', async e => {
     const btn = e.target.closest('.btn-delete-doc');
     if (btn) {
-      if (!confirm('Bạn có chắc chắn muốn xóa tài liệu này? Vector trong DB cũng sẽ bị xóa.')) return;
+      const ok = await showConfirm({
+        title: 'Xóa tài liệu',
+        message: 'Bạn có chắc chắn muốn xóa tài liệu này? Vector trong CSDL cũng sẽ bị xóa.',
+        okText: 'Xóa tài liệu',
+        type: 'danger'
+      });
+      if (!ok) return;
       const tr = btn.closest('tr');
       const id = tr.dataset.id;
       try {

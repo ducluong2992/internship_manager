@@ -59,7 +59,13 @@ window.openEditPeriod = async (id) => {
 window.togglePeriod = async (id, currentStatus) => {
   const newStatus = currentStatus === 'open' ? 'closed' : 'open';
   const label = newStatus === 'open' ? 'mở' : 'đóng';
-  if (!confirm(`Xác nhận ${label} kỳ đăng ký này?`)) return;
+  const ok = await showConfirm({
+    title: `${label.toUpperCase()} kỳ đăng ký`,
+    message: `Xác nhận ${label} kỳ đăng ký này?`,
+    okText: `Đồng ý ${label}`,
+    type: newStatus === 'open' ? 'info' : 'warning'
+  });
+  if (!ok) return;
   try {
     await api('PUT', `/admin/periods/${id}`, { status: newStatus });
     toast(`Đã ${label} kỳ đăng ký`);
@@ -68,7 +74,13 @@ window.togglePeriod = async (id, currentStatus) => {
 };
 
 window.deletePeriod = async (id, month, year) => {
-  if (!confirm(`⚠️ Xóa kỳ Tháng ${month}/${year}?\n\nToàn bộ lịch đăng ký trong kỳ này cũng sẽ bị xóa.`)) return;
+  const ok = await showConfirm({
+    title: 'Xóa kỳ đăng ký',
+    message: `Xóa kỳ Tháng ${month}/${year}?\n\nToàn bộ lịch đăng ký trong kỳ này cũng sẽ bị xóa.`,
+    okText: 'Xóa kỳ đăng ký',
+    type: 'danger'
+  });
+  if (!ok) return;
   try {
     const r = await api('DELETE', `/admin/periods/${id}`);
     toast(r.message, 'success');
