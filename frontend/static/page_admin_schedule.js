@@ -19,10 +19,10 @@ async function renderAdminSchedule(area) {
     }
 
     const workdays = getWorkdays(selYear, selMonth);
-    const DOW = ['CN','T2','T3','T4','T5','T6','T7'];
+    const DOW = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
 
     const headerCells = workdays.map(d => {
-      const dow = new Date(selYear, selMonth-1, d).getDay();
+      const dow = new Date(selYear, selMonth - 1, d).getDay();
       const weekIdx = getWeekIdx(selYear, selMonth, d);
       const isAltWeek = weekIdx % 2 === 1;
       const bgStyle = isAltWeek ? 'background:#fff5f5;' : 'background:#fafafa;';
@@ -55,7 +55,7 @@ async function renderAdminSchedule(area) {
       rows = data.rows.map((row, idx) => {
         const schedMap = {};
         (row.schedules || []).forEach(s => { schedMap[s.work_day] = s.shift; });
-        
+
         let countSC = 0;
         let countHalf = 0;
 
@@ -88,7 +88,7 @@ async function renderAdminSchedule(area) {
 
         const hasSchedule = row.schedules && row.schedules.length > 0;
         return `
-        <div class="sched-data-row" style="--day-count:${workdays.length}">
+        <div class="sched-data-row" style="--day-count:${workdays.length}" data-quydoi="${quyDoi}">
           <div class="sched-stt-cell">${idx + 1}</div>
           <div class="sched-name-cell">
             <strong>${row.full_name}</strong><br>
@@ -118,20 +118,20 @@ async function renderAdminSchedule(area) {
   <div class="section-title"><i class="bi bi-table text-danger"></i> Lịch Thực tập</div>
   <div class="d-flex gap-2 align-items-center flex-wrap">
     <select id="sel-month" class="form-select form-select-sm" style="width:130px">
-      ${[...Array(12)].map((_,i)=>`<option value="${i+1}" ${i+1===selMonth?'selected':''}>Tháng ${i+1}</option>`).join('')}
+      ${[...Array(12)].map((_, i) => `<option value="${i + 1}" ${i + 1 === selMonth ? 'selected' : ''}>Tháng ${i + 1}</option>`).join('')}
     </select>
     <select id="sel-year" class="form-select form-select-sm" style="width:100px">
-      ${[2024,2025,2026,2027].map(y=>`<option ${y===selYear?'selected':''}>${y}</option>`).join('')}
+      ${[2024, 2025, 2026, 2027].map(y => `<option ${y === selYear ? 'selected' : ''}>${y}</option>`).join('')}
     </select>
     <button class="btn btn-sm btn-primary" id="btn-load-sched"><i class="bi bi-search me-1"></i>Xem</button>
-    <button class="btn btn-sm btn-outline-success" id="btn-export" ${!data.period?'disabled':''}>
+    <button class="btn btn-sm btn-outline-success" id="btn-export" ${!data.period ? 'disabled' : ''}>
       <i class="bi bi-file-earmark-excel-fill me-1"></i>Xuất Excel
     </button>
-    <button class="btn btn-sm btn-outline-secondary" id="btn-download-tpl" ${!data.period?'disabled':''}>
+    <button class="btn btn-sm btn-outline-secondary" id="btn-download-tpl" ${!data.period ? 'disabled' : ''}>
       <i class="bi bi-download me-1"></i>Tải file mẫu
     </button>
     <div class="dropdown">
-      <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" ${!data.period?'disabled':''}>
+      <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" ${!data.period ? 'disabled' : ''}>
         <i class="bi bi-upload me-1"></i>Import Lịch
       </button>
       <ul class="dropdown-menu">
@@ -152,6 +152,10 @@ ${data.period ? `
   <button class="btn btn-sm btn-outline-danger" onclick="deleteSchedPeriod(${data.period.id})">
     <i class="bi bi-trash me-1"></i>Xóa kỳ
   </button>
+  <div class="d-flex align-items-center gap-2 ms-auto">
+    <label class="small text-secondary fw-semibold mb-0" for="input-min-quydoi">Số buổi tối thiểu:</label>
+    <input type="number" id="input-min-quydoi" class="form-control form-control-sm border-danger-subtle shadow-sm" style="width: 85px; font-weight: 600;" min="0" step="0.5" placeholder="0" value="${window.minQuyDoiValue !== undefined ? window.minQuyDoiValue : ''}">
+  </div>
 </div>` : ''}
 
 <div class="schedule-grid-wrap">
@@ -165,6 +169,63 @@ ${data.period ? `
     ${rows}
   </div>
 </div>`;
+
+    const applyMinFilter = () => {
+      const minInput = document.getElementById('input-min-quydoi');
+      if (!minInput) return;
+      const rawVal = minInput.value.trim();
+      window.minQuyDoiValue = rawVal;
+      const minVal = parseFloat(rawVal);
+      const isFiltering = !isNaN(minVal) && rawVal !== '';
+
+      const dataRows = area.querySelectorAll('.sched-data-row[data-quydoi]');
+      dataRows.forEach(rowEl => {
+        const qd = parseFloat(rowEl.getAttribute('data-quydoi'));
+        const isBelow = isFiltering && !isNaN(qd) && qd < minVal;
+
+        const cells = rowEl.querySelectorAll('.sched-stt-cell, .sched-name-cell, .sched-cell');
+        const sttCell = rowEl.querySelector('.sched-stt-cell');
+        const qdCell = rowEl.querySelector('.sched-quydoi-val');
+
+        if (isBelow) {
+          rowEl.classList.add('below-min-quydoi');
+          cells.forEach(cell => {
+            cell.style.setProperty('background', '#fee2e2', 'important');
+            cell.style.setProperty('background-color', '#fee2e2', 'important');
+          });
+          if (sttCell) {
+            sttCell.style.setProperty('border-left', '4px solid #dc2626', 'important');
+          }
+          if (qdCell) {
+            qdCell.style.setProperty('background', '#fca5a5', 'important');
+            qdCell.style.setProperty('background-color', '#fca5a5', 'important');
+            qdCell.style.setProperty('color', '#991b1b', 'important');
+          }
+        } else {
+          rowEl.classList.remove('below-min-quydoi');
+          cells.forEach(cell => {
+            cell.style.removeProperty('background');
+            cell.style.removeProperty('background-color');
+          });
+          if (sttCell) {
+            sttCell.style.removeProperty('border-left');
+          }
+          if (qdCell) {
+            qdCell.style.removeProperty('background');
+            qdCell.style.removeProperty('background-color');
+            qdCell.style.removeProperty('color');
+          }
+        }
+      });
+    };
+
+    const minInput = document.getElementById('input-min-quydoi');
+    if (minInput) {
+      minInput.addEventListener('input', applyMinFilter);
+      minInput.addEventListener('keyup', applyMinFilter);
+      minInput.addEventListener('change', applyMinFilter);
+      applyMinFilter();
+    }
 
     document.getElementById('btn-load-sched').onclick = async () => {
       selMonth = parseInt(document.getElementById('sel-month').value);
@@ -245,7 +306,7 @@ ${data.period ? `
           if (!res.sheets || res.sheets.length === 0) {
             throw new Error('Không tìm thấy sheet nào trong file.');
           }
-          
+
           const select = document.getElementById('sheet-select');
           select.innerHTML = '';
           res.sheets.forEach(sheet => {
@@ -254,10 +315,10 @@ ${data.period ? `
             opt.textContent = sheet;
             select.appendChild(opt);
           });
-          
+
           const modal = new bootstrap.Modal(document.getElementById('modal-select-sheet'));
           modal.show();
-          
+
           const confirmBtn = document.getElementById('btn-confirm-sheet');
           confirmBtn.onclick = async () => {
             modal.hide();

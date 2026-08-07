@@ -927,6 +927,32 @@ def toggle_lock(
     return {"account_status": user.account_status, "message": "Đã cập nhật trạng thái tài khoản"}
 
 
+@router.post("/users/lock-resigned-accounts")
+def lock_resigned_accounts(
+    user_type: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    _: models.User = Depends(auth.require_admin),
+):
+    query = db.query(models.User)
+    if user_type:
+        query = query.filter(models.User.user_type == user_type)
+
+    users = query.all()
+    locked_count = 0
+    for u in users:
+        st = ((u.working_status or "") + " " + (getattr(u, "employment_status", "") or "")).lower()
+        if any(k in st for k in ["resigned", "nghỉ", "đã nghỉ"]):
+            if u.account_status != 0:
+                u.account_status = 0
+                locked_count += 1
+
+    db.commit()
+    return {
+        "message": f"Đã khóa thành công {locked_count} tài khoản có trạng thái Đã nghỉ việc.",
+        "locked_count": locked_count
+    }
+
+
 @router.patch("/users/{user_id}/reset-password")
 def reset_password(
     user_id: int,

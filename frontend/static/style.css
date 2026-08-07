@@ -974,6 +974,26 @@ body {
   border-bottom: 1px solid #eaedf0;
 }
 
+/* ── Highlight rows below minimum converted shifts ── */
+.sched-data-row.below-min-quydoi .sched-stt-cell {
+  background: #fee2e2 !important;
+  background-color: #fee2e2 !important;
+  border-left: 4px solid #dc2626 !important;
+}
+
+.sched-data-row.below-min-quydoi .sched-name-cell,
+.sched-data-row.below-min-quydoi .sched-cell {
+  background: #fee2e2 !important;
+  background-color: #fee2e2 !important;
+}
+
+.sched-data-row.below-min-quydoi .sched-quydoi-val {
+  background: #fca5a5 !important;
+  background-color: #fca5a5 !important;
+  color: #991b1b !important;
+  font-weight: 800 !important;
+}
+
 /* Shift Badges inside Schedule Matrix */
 .sched-shift-sc {
   background: #fef2f2;

@@ -77,9 +77,9 @@ async function renderManageEmployees(area) {
 
     area.innerHTML = `
 <div class="section-header">
-  <div class="section-title"><i class="bi bi-briefcase-fill text-danger"></i> Danh sách nhân viên</div>
+  <div class="section-title"><i class="bi bi-people-fill text-danger"></i> Danh sách nhân viên</div>
   <div class="d-flex gap-2 flex-wrap">
-    <button class="btn btn-outline-danger btn-sm" onclick="downloadEmployeeTemplate()">
+    <button class="btn btn-outline-secondary btn-sm" onclick="downloadEmployeeTemplate()">
       <i class="bi bi-download me-1"></i>Tải mẫu Excel
     </button>
     <div class="dropdown d-inline-block">
@@ -94,7 +94,7 @@ async function renderManageEmployees(area) {
       </ul>
     </div>
     <input type="file" id="emp-import-file" class="d-none" accept=".xlsx" onchange="handleEmployeeImportExcel(event)" />
-    <button class="btn btn-outline-danger btn-sm" onclick="exportEmployees()">
+    <button class="btn btn-outline-success btn-sm" onclick="exportEmployees()">
       <i class="bi bi-file-earmark-arrow-down me-1"></i>Xuất Excel
     </button>
     <button class="btn btn-danger btn-sm" id="btn-add-employee">
