@@ -645,46 +645,48 @@ async function renderManageOT(area) {
     }).join('');
 
     document.getElementById('ot-tab-content').innerHTML = `
-    <div class="d-flex align-items-center justify-content-between mb-3">
-      <span class="fw-bold text-dark" style="font-size:0.85rem">
-        <i class="bi bi-calendar3 me-1 text-danger"></i>Bảng tổng hợp giờ làm OT
-      </span>
-      <div class="d-flex gap-2">
-        <button type="button" class="btn btn-sm btn-danger px-3 py-1 fw-bold shadow-sm" id="ot-scroll-left">
-          <i class="bi bi-chevron-left me-1"></i>◄ Đầu tháng
-        </button>
-        <button type="button" class="btn btn-sm btn-danger px-3 py-1 fw-bold shadow-sm" id="ot-scroll-right">
-          Cuối tháng ►<i class="bi bi-chevron-right ms-1"></i>
-        </button>
+    <div class="glass-card p-3" style="overflow:hidden">
+      <div class="d-flex align-items-center justify-content-between mb-3">
+        <span class="fw-bold text-dark" style="font-size:0.85rem">
+          <i class="bi bi-calendar3 me-1 text-danger"></i>Bảng tổng hợp giờ làm OT
+        </span>
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-sm btn-danger px-3 py-1 fw-bold shadow-sm" id="ot-scroll-left">
+            <i class="bi bi-chevron-left me-1"></i>◄ Đầu tháng
+          </button>
+          <button type="button" class="btn btn-sm btn-danger px-3 py-1 fw-bold shadow-sm" id="ot-scroll-right">
+            Cuối tháng ►<i class="bi bi-chevron-right ms-1"></i>
+          </button>
+        </div>
       </div>
-    </div>
-    <div class="ot-split-container">
-      <!-- FIXED LEFT CONTAINER (STT, Mã NV, Họ và tên - Căn giữa) -->
-      <div class="ot-left-fixed">
-        <table class="table table-bordered table-sm align-middle mb-0">
-          <thead>
-            <tr style="height:42px">
-              <th class="text-center" style="width:45px;background:#f8fafc;color:#475569;font-weight:700;font-size:0.78rem;vertical-align:middle">STT</th>
-              <th class="text-center" style="width:85px;background:#f8fafc;color:#475569;font-weight:700;font-size:0.78rem;vertical-align:middle">Mã NV</th>
-              <th class="text-center" style="width:180px;background:#f8fafc;color:#475569;font-weight:700;font-size:0.78rem;vertical-align:middle">Họ và tên</th>
-            </tr>
-          </thead>
-          <tbody>${leftRows}</tbody>
-        </table>
-      </div>
+      <div class="ot-split-container">
+        <!-- FIXED LEFT CONTAINER (STT, Mã NV, Họ và tên - Căn giữa) -->
+        <div class="ot-left-fixed">
+          <table class="table table-bordered table-sm align-middle mb-0">
+            <thead>
+              <tr style="height:42px">
+                <th class="text-center" style="width:45px;background:#f8fafc;color:#475569;font-weight:700;font-size:0.78rem;vertical-align:middle">STT</th>
+                <th class="text-center" style="width:85px;background:#f8fafc;color:#475569;font-weight:700;font-size:0.78rem;vertical-align:middle">Mã NV</th>
+                <th class="text-center" style="width:180px;background:#f8fafc;color:#475569;font-weight:700;font-size:0.78rem;vertical-align:middle">Họ và tên</th>
+              </tr>
+            </thead>
+            <tbody>${leftRows}</tbody>
+          </table>
+        </div>
 
-      <!-- SCROLLABLE RIGHT CONTAINER (Ngày, Giờ làm + Hệ số, Tổng OT, Quy đổi) -->
-      <div class="ot-right-scroll" id="ot-summary-wrap">
-        <table class="table table-bordered table-sm align-middle mb-0">
-          <thead>
-            <tr style="height:42px">
-              ${dayHeaders}
-              <th class="text-center" style="vertical-align:middle;background:#fff5f5;color:#d5001c;width:65px;font-size:0.78rem">Tổng OT</th>
-              <th class="text-center" style="vertical-align:middle;background:#fef2f2;color:#d5001c;width:70px;font-size:0.78rem">Quy đổi</th>
-            </tr>
-          </thead>
-          <tbody>${rightRows}</tbody>
-        </table>
+        <!-- SCROLLABLE RIGHT CONTAINER (Ngày, Giờ làm + Hệ số, Tổng OT, Quy đổi) -->
+        <div class="ot-right-scroll" id="ot-summary-wrap">
+          <table class="table table-bordered table-sm align-middle mb-0">
+            <thead>
+              <tr style="height:42px">
+                ${dayHeaders}
+                <th class="text-center" style="vertical-align:middle;background:#fff5f5;color:#d5001c;width:65px;font-size:0.78rem">Tổng OT</th>
+                <th class="text-center" style="vertical-align:middle;background:#fef2f2;color:#d5001c;width:70px;font-size:0.78rem">Quy đổi</th>
+              </tr>
+            </thead>
+            <tbody>${rightRows}</tbody>
+          </table>
+        </div>
       </div>
     </div>`;
 
@@ -703,7 +705,7 @@ async function renderManageOT(area) {
     <div class="section-title"><i class="bi bi-clock-history text-danger"></i> Quản lý OT</div>
   </div>
   ${buildFilters()}
-  <div class="glass-card p-3" style="overflow:hidden">
+  <div class="glass-card p-3">
     ${buildTabs()}
     <div class="pt-3" id="ot-tab-content">
       <div class="d-flex justify-content-center py-4"><div class="spinner-border text-danger"></div></div>
