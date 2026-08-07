@@ -390,16 +390,20 @@ window.handleEmployeeImportExcel = async function (event) {
 
 window.promptEmployeeImportLink = async function () {
   const fn = window.showPrompt || showPrompt;
+  const savedUrl = localStorage.getItem('last_emp_sheet_url') || localStorage.getItem('last_sheet_url') || '';
   const url = await fn({
     title: 'Nhập đường dẫn Google Sheets',
     message: 'Lưu ý: File Google Sheets cần được chia sẻ ở chế độ "Bất kỳ ai có đường liên kết đều có thể xem"',
-    placeholder: 'https://docs.google.com/spreadsheets/d/...'
+    placeholder: 'https://docs.google.com/spreadsheets/d/...',
+    defaultValue: savedUrl
   });
   if (!url) return;
   if (!url.includes('docs.google.com/spreadsheets')) {
     toast('Đường dẫn không hợp lệ', 'error');
     return;
   }
+  localStorage.setItem('last_emp_sheet_url', url);
+  localStorage.setItem('last_sheet_url', url);
   toast('Đang xử lý dữ liệu từ link...', 'info');
   try {
     const res = await api('POST', '/employees/import-link', { url });

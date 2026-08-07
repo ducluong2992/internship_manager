@@ -378,12 +378,16 @@ window.handleImportExcel = async function (event) {
   }
 };
 
+let currentReconcileData = null;
+
 window.promptImportLink = async function () {
   const fn = window.showPrompt || showPrompt;
+  const savedUrl = localStorage.getItem('last_user_sheet_url') || localStorage.getItem('last_sheet_url') || '';
   const url = await fn({
     title: 'Nhập đường dẫn Google Sheets',
     message: 'Lưu ý: File Google Sheets cần được chia sẻ ở chế độ "Bất kỳ ai có đường liên kết đều có thể xem"',
-    placeholder: 'https://docs.google.com/spreadsheets/d/...'
+    placeholder: 'https://docs.google.com/spreadsheets/d/...',
+    defaultValue: savedUrl
   });
   if (!url) return;
   if (!url.includes('docs.google.com/spreadsheets')) {
@@ -391,12 +395,169 @@ window.promptImportLink = async function () {
     return;
   }
 
-  toast('Đang xử lý dữ liệu từ link...', 'info');
+  localStorage.setItem('last_user_sheet_url', url);
+  localStorage.setItem('last_sheet_url', url);
+
+  toast('Đang đối chiếu dữ liệu từ link...', 'info');
   try {
-    const res = await api('POST', '/admin/users/import-link', { url: url });
-    toast(res.message, res.success > 0 ? 'success' : 'info');
-    navigate('manage-users');
+    const data = await api('POST', '/admin/users/preview-import-link', { url: url });
+    currentReconcileData = data;
+    showReconcileModal(data);
   } catch (err) {
-    toast(err.message, 'error');
+    toast(err.message || 'Lỗi khi đối chiếu dữ liệu', 'error');
   }
 };
+
+function showReconcileModal(data) {
+  const { updated, added, removed, unchanged_count, format_warnings } = data;
+
+  const warnContainer = document.getElementById('reconcile-warnings-container');
+  if (warnContainer) {
+    if (format_warnings && format_warnings.length > 0) {
+      warnContainer.innerHTML = `
+        <div class="alert alert-warning py-2 px-3 mb-3 border-warning-subtle text-dark rounded-2" style="font-size: 12px; background: #fff8e1;">
+          <div class="fw-bold mb-1 text-warning-emphasis"><i class="bi bi-exclamation-triangle-fill me-1 text-warning"></i>Cảnh báo định dạng ô dữ liệu Excel:</div>
+          <ul class="mb-0 ps-3">
+            ${format_warnings.map(w => `<li>${w}</li>`).join('')}
+          </ul>
+        </div>`;
+    } else {
+      warnContainer.innerHTML = '';
+    }
+  }
+
+  document.getElementById('rec-count-updated').textContent = updated.length;
+  document.getElementById('rec-count-added').textContent = added.length;
+  document.getElementById('rec-count-removed').textContent = removed.length;
+  document.getElementById('rec-count-unchanged').textContent = unchanged_count || 0;
+
+  document.getElementById('badge-count-updated').textContent = `${updated.length} người`;
+  document.getElementById('badge-count-added').textContent = `${added.length} người`;
+  document.getElementById('badge-count-removed').textContent = `${removed.length} người`;
+
+  // Render Section 1: Updated
+  const updatedContainer = document.getElementById('list-rec-updated');
+  if (updated.length === 0) {
+    updatedContainer.innerHTML = `<div class="text-muted text-center py-2 bg-light rounded" style="font-size: 12px;">Không có thực tập sinh thay đổi thông tin</div>`;
+  } else {
+    updatedContainer.innerHTML = updated.map(item => `
+      <div class="border rounded p-2 bg-white" style="font-size: 12px;">
+        <div class="d-flex align-items-center justify-content-between mb-1 pb-1 border-bottom">
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-secondary font-monospace" style="font-size: 10px;">${item.employee_code}</span>
+            <strong class="text-dark" style="font-size: 13px;">${item.full_name}</strong>
+          </div>
+          <span class="text-muted" style="font-size: 11px;">${item.changes.length} thay đổi</span>
+        </div>
+        <div class="d-flex flex-column gap-1 pt-1">
+          ${item.changes.map(ch => `
+            <div class="p-1 px-2 rounded bg-light border d-flex align-items-center flex-wrap gap-2" style="font-size: 12px;">
+              <span class="fw-semibold text-secondary" style="min-width: 100px;">${ch.field_name}:</span>
+              <span class="text-decoration-line-through text-muted">${ch.old_value || '—'}</span>
+              <i class="bi bi-arrow-right text-secondary fs-6"></i>
+              <span class="fw-bold text-dark">${ch.new_value}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // Render Section 2: Added
+  const addedContainer = document.getElementById('list-rec-added');
+  if (added.length === 0) {
+    addedContainer.innerHTML = `<div class="text-muted text-center py-2 bg-light rounded" style="font-size: 12px;">Không có thực tập sinh thêm mới</div>`;
+  } else {
+    addedContainer.innerHTML = added.map(item => `
+      <div class="border rounded p-2 bg-white" style="font-size: 12px;">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-secondary font-monospace" style="font-size: 10px;">${item.employee_code}</span>
+            <strong class="text-dark" style="font-size: 13px;">${item.full_name}</strong>
+            <span class="badge bg-light text-dark border" style="font-size: 10px;">Mới</span>
+          </div>
+          <div class="text-muted d-flex gap-3" style="font-size: 11px;">
+            <span>${item.project || '—'}</span>
+            <span>${item.position || '—'}</span>
+            ${item.viettel_email ? `<span>${item.viettel_email}</span>` : ''}
+          </div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // Render Section 3: Removed (In Web but not in Sheet)
+  const removedContainer = document.getElementById('list-rec-removed');
+  if (removed.length === 0) {
+    removedContainer.innerHTML = `<div class="text-muted text-center py-2 bg-light rounded" style="font-size: 12px;">Tất cả thực tập sinh trên Web đều có trong Sheet</div>`;
+  } else {
+    removedContainer.innerHTML = removed.map(item => `
+      <div class="border rounded p-2 bg-white" style="font-size: 12px;">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-secondary font-monospace" style="font-size: 10px;">${item.employee_code}</span>
+            <strong class="text-dark" style="font-size: 13px;">${item.full_name}</strong>
+            <span class="text-muted" style="font-size: 11px;">${item.position || '—'} · ${item.project || '—'}</span>
+          </div>
+          <div class="choice-button-group d-flex align-items-center gap-1">
+            <input type="radio" class="btn-check" name="rec_removed_${item.id}" id="choice_keep_${item.id}" value="keep" checked>
+            <label class="btn btn-outline-secondary btn-sm px-2 py-0" for="choice_keep_${item.id}" style="font-size: 11px;">Giữ lại</label>
+
+            <input type="radio" class="btn-check" name="rec_removed_${item.id}" id="choice_delete_${item.id}" value="delete">
+            <label class="btn btn-outline-danger btn-sm px-2 py-0" for="choice_delete_${item.id}" style="font-size: 11px;">Xóa đi</label>
+          </div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // Set up confirm action button
+  const confirmBtn = document.getElementById('btn-confirm-reconcile');
+  confirmBtn.onclick = () => executeReconcileSync(data);
+
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('modal-import-reconcile')).show();
+}
+
+window.setAllRemovedChoice = function (action) {
+  if (!currentReconcileData || !currentReconcileData.removed) return;
+  currentReconcileData.removed.forEach(item => {
+    const radio = document.getElementById(`choice_${action}_${item.id}`);
+    if (radio) radio.checked = true;
+  });
+};
+
+async function executeReconcileSync(data) {
+  const deleteIds = [];
+  if (data.removed && data.removed.length) {
+    data.removed.forEach(item => {
+      const deleteRadio = document.getElementById(`choice_delete_${item.id}`);
+      if (deleteRadio && deleteRadio.checked) {
+        deleteIds.push(item.id);
+      }
+    });
+  }
+
+  const payload = {
+    updates: data.updated || [],
+    additions: data.added || [],
+    delete_ids: deleteIds
+  };
+
+  const confirmBtn = document.getElementById('btn-confirm-reconcile');
+  const originalHtml = confirmBtn.innerHTML;
+  confirmBtn.disabled = true;
+  confirmBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Đang cập nhật...`;
+
+  try {
+    const res = await api('POST', '/admin/users/confirm-import-link', payload);
+    toast(res.message, 'success');
+    bootstrap.Modal.getInstance(document.getElementById('modal-import-reconcile')).hide();
+    navigate('manage-users');
+  } catch (err) {
+    toast(err.message || 'Lỗi khi cập nhật dữ liệu', 'error');
+  } finally {
+    confirmBtn.disabled = false;
+    confirmBtn.innerHTML = originalHtml;
+  }
+};
+

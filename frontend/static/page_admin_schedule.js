@@ -229,12 +229,16 @@ ${data.period ? `
 
       window.promptSchedImportLink = async function () {
         const fn = window.showPrompt || showPrompt;
+        const savedUrl = localStorage.getItem('last_sched_sheet_url') || localStorage.getItem('last_sheet_url') || '';
         const url = await fn({
           title: 'Nhập đường dẫn Google Sheets',
           message: 'Lưu ý: File Google Sheets phải được chia sẻ công khai "Bất kỳ ai có liên kết"',
-          placeholder: 'https://docs.google.com/spreadsheets/d/...'
+          placeholder: 'https://docs.google.com/spreadsheets/d/...',
+          defaultValue: savedUrl
         });
         if (!url) return;
+        localStorage.setItem('last_sched_sheet_url', url);
+        localStorage.setItem('last_sheet_url', url);
         toast('Đang tải danh sách sheet...', 'info');
         try {
           const res = await api('POST', `/admin/schedule/import-link-sheets`, { url });

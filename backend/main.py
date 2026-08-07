@@ -1,3 +1,6 @@
+import warnings
+warnings.filterwarnings('ignore', category=UserWarning, module='openpyxl')
+
 # pyrefly: ignore [missing-import]
 from fastapi import FastAPI
 # pyrefly: ignore [missing-import]

@@ -166,7 +166,8 @@ function showPrompt(options = {}) {
 
     const title = typeof options === 'string' ? 'Nhập thông tin' : (options.title || 'Nhập thông tin');
     const message = typeof options === 'string' ? options : (options.message || 'Vui lòng nhập thông tin bên dưới:');
-    const defaultValue = typeof options === 'object' ? (options.defaultValue || '') : '';
+    const savedUrl = localStorage.getItem('last_sheet_url') || '';
+    const defaultValue = typeof options === 'object' ? (options.defaultValue || savedUrl) : savedUrl;
     const placeholder = typeof options === 'object' ? (options.placeholder || 'Nhập đường dẫn Google Sheets...') : 'Nhập đường dẫn...';
 
     document.getElementById('prompt-modal-title').textContent = title;
@@ -193,6 +194,9 @@ function showPrompt(options = {}) {
       if (isHandled) return;
       isHandled = true;
       const val = inputEl.value.trim();
+      if (val && val.includes('docs.google.com/spreadsheets')) {
+        localStorage.setItem('last_sheet_url', val);
+      }
       cleanup();
       modalInstance.hide();
       resolve(val ? val : null);
@@ -225,10 +229,14 @@ function showPrompt(options = {}) {
     inputEl.addEventListener('keydown', onKeyDown);
     modalEl.addEventListener('hidden.bs.modal', onHidden);
 
-    modalEl.addEventListener('shown.bs.modal', () => {
+    const onShown = () => {
       inputEl.focus();
-      inputEl.select();
-    }, { once: true });
+      if (inputEl.value) {
+        inputEl.select();
+      }
+      modalEl.removeEventListener('shown.bs.modal', onShown);
+    };
+    modalEl.addEventListener('shown.bs.modal', onShown);
 
     modalEl.style.setProperty('z-index', '1090', 'important');
     modalInstance.show();

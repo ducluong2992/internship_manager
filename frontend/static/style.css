@@ -1929,3 +1929,29 @@ th.dropdown .dropdown-toggle::after {
   font-size: 13px !important;
   font-family: 'Be Vietnam Pro', sans-serif !important;
 }
+
+/* ══════════════════════════════════════════
+   SHEET IMPORT RECONCILE MODAL & DIFF CARDS
+══════════════════════════════════════════ */
+#modal-import-reconcile .modal-content {
+  border-radius: 12px !important;
+  overflow: hidden;
+}
+
+.reconcile-section {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.choice-button-group .btn-check:checked + label.btn-outline-secondary {
+  background-color: #475569 !important;
+  border-color: #475569 !important;
+  color: #ffffff !important;
+}
+
+.choice-button-group .btn-check:checked + label.btn-outline-danger {
+  background-color: #d5001c !important;
+  border-color: #d5001c !important;
+  color: #ffffff !important;
+}
+
