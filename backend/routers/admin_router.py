@@ -1054,6 +1054,11 @@ def get_stats(
     emp_cho_muon = [u for u in employees if (u.staff_category or '').lower() in ["cho mượn", "đi mượn"]]
     emp_onsite = [u for u in employees if (u.staff_category or '').lower() in ["onsite"]]
     
+    emp_probation = [u for u in employees if (u.employment_status or '').lower() in ["thử việc", "thu viec", "học việc", "hoc viec"]]
+    emp_resigned = [u for u in employees if (u.employment_status or '').lower() in ["đã nghỉ việc", "da nghi viec", "nghỉ việc", "nghi viec"] or (u.working_status or '').lower() == "resigned"]
+    emp_in_project = [u for u in employees if u.project and u.project.strip() and u.project.strip() != '—']
+    emp_no_project = [u for u in employees if not (u.project and u.project.strip() and u.project.strip() != '—')]
+    
     today_date = now.date()
     today_schedules = (
         db.query(models.Schedule, models.User)
@@ -1078,6 +1083,10 @@ def get_stats(
         "emp_trung_tam": len(emp_trung_tam),
         "emp_cho_muon": len(emp_cho_muon),
         "emp_onsite": len(emp_onsite),
+        "emp_probation": len(emp_probation),
+        "emp_resigned": len(emp_resigned),
+        "emp_in_project": len(emp_in_project),
+        "emp_no_project": len(emp_no_project),
         "total_periods": len(periods),
         "open_periods": len(open_periods),
         "today_workers": today_workers,

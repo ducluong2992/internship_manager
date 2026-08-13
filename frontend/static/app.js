@@ -85,18 +85,24 @@ function showConfirm(options = {}) {
     const message = typeof options === 'string' ? options : (options.message || 'Bạn có chắc chắn muốn thực hiện thao tác này?');
     const okText = options.okText || 'Xác nhận';
     const cancelText = options.cancelText || 'Hủy bỏ';
-    const type = options.type || 'danger'; // 'danger', 'warning', 'info'
+    const type = options.type || 'warning'; // 'danger', 'warning', 'info'
 
     document.getElementById('confirm-modal-title').textContent = title;
     document.getElementById('confirm-modal-message').textContent = message;
-    
-    const okBtn = document.getElementById('confirm-modal-ok-btn');
-    const cancelBtn = document.getElementById('confirm-modal-cancel-btn');
-    const iconBg = document.getElementById('confirm-modal-icon-bg');
-    const iconEl = document.getElementById('confirm-modal-icon');
+
+    // Purge old event listeners by cloning buttons
+    const oldOk = document.getElementById('confirm-modal-ok-btn');
+    const oldCancel = document.getElementById('confirm-modal-cancel-btn');
+    const okBtn = oldOk.cloneNode(true);
+    const cancelBtn = oldCancel.cloneNode(true);
+    oldOk.parentNode.replaceChild(okBtn, oldOk);
+    oldCancel.parentNode.replaceChild(cancelBtn, oldCancel);
 
     okBtn.textContent = okText;
     cancelBtn.textContent = cancelText;
+
+    const iconBg = document.getElementById('confirm-modal-icon-bg');
+    const iconEl = document.getElementById('confirm-modal-icon');
 
     // Config Icon & Colors based on type
     if (iconBg && iconEl) {
@@ -114,12 +120,9 @@ function showConfirm(options = {}) {
     }
 
     const modalInstance = bootstrap.Modal.getOrCreateInstance(modalEl);
-
     let isHandled = false;
 
     const cleanup = () => {
-      okBtn.removeEventListener('click', onOk);
-      cancelBtn.removeEventListener('click', onCancel);
       modalEl.removeEventListener('hidden.bs.modal', onHidden);
     };
 

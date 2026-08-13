@@ -5,13 +5,13 @@
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function otBadge(status) {
   if (status === 'Approved') return `<span class="custom-badge" style="background:rgba(46,125,50,.15);color:#2e7d32;border:1px solid rgba(46,125,50,.3)">Đã duyệt</span>`;
-  if (status === 'Pending')  return `<span class="custom-badge" style="background:rgba(237,108,2,.15);color:#e65100;border:1px solid rgba(237,108,2,.3)">Chờ duyệt</span>`;
+  if (status === 'Pending') return `<span class="custom-badge" style="background:rgba(237,108,2,.15);color:#e65100;border:1px solid rgba(237,108,2,.3)">Chờ duyệt</span>`;
   return `<span class="custom-badge" style="background:rgba(211,47,47,.15);color:#d32f2f;border:1px solid rgba(211,47,47,.3)">Từ chối</span>`;
 }
 
 function otCalendarDotClass(status) {
   if (status === 'Approved') return 'ot-dot-approved';
-  if (status === 'Pending')  return 'ot-dot-pending';
+  if (status === 'Pending') return 'ot-dot-pending';
   return 'ot-dot-rejected';
 }
 
@@ -21,7 +21,7 @@ function otCalendarDotClass(status) {
 async function renderRegisterOT(area) {
   const now = new Date();
   let curMonth = now.getMonth() + 1;
-  let curYear  = now.getFullYear();
+  let curYear = now.getFullYear();
 
   // Kiểm tra quyền Onsite
   const stats = await api('GET', `/overtime/my/stats?month=${curMonth}&year=${curYear}`);
@@ -53,7 +53,7 @@ async function renderRegisterOT(area) {
     const startOffset = (firstDow === 0 ? 6 : firstDow - 1); // T2=0, CN=6
     for (let i = 0; i < startOffset; i++) calCells += `<div class="ot-cal-cell ot-cal-empty"></div>`;
     for (let d = 1; d <= daysInM; d++) {
-      const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
       const dow = new Date(year, month - 1, d).getDay();
       const isWeekend = dow === 0 || dow === 6;
       const dayRecs = dayMap[d] || [];
@@ -62,7 +62,7 @@ async function renderRegisterOT(area) {
       const hoursCenter = dayTotalRaw > 0 ? `<div class="ot-cal-center-hours">${dayTotalRaw}h</div>` : '';
 
       calCells += `
-      <div class="ot-cal-cell ${isWeekend?'ot-cal-weekend':''}" data-date="${dateStr}" onclick="openOTRegisterModal('${dateStr}')">
+      <div class="ot-cal-cell ${isWeekend ? 'ot-cal-weekend' : ''}" data-date="${dateStr}" onclick="openOTRegisterModal('${dateStr}')">
         <div class="ot-cal-day">${d}</div>
         ${hoursCenter}
         <div class="ot-cal-dots">${dots}</div>
@@ -75,7 +75,7 @@ async function renderRegisterOT(area) {
       listRows = `<tr><td colspan="6" class="text-center text-muted py-4">Chưa có đăng ký OT nào trong tháng này.</td></tr>`;
     } else {
       records.forEach(r => {
-        const day = r.work_date.split('-').reverse().join('/').substring(0,5);
+        const day = r.work_date.split('-').reverse().join('/').substring(0, 5);
         const rejectInfo = r.status === 'Rejected' ? `
           <div class="mt-1 small text-danger"><i class="bi bi-chat-left-text me-1"></i>
             <strong>Lý do từ chối:</strong> ${r.reject_reason || ''}
@@ -110,7 +110,7 @@ async function renderRegisterOT(area) {
     <div class="row g-3 mb-4">
       <div class="col-md-4">
         <div class="glass-card p-3 text-center border-start border-danger border-4">
-          <div class="text-muted small fw-semibold text-uppercase mb-1">Tháng ${String(month).padStart(2,'0')}/${year}</div>
+          <div class="text-muted small fw-semibold text-uppercase mb-1">Tháng ${String(month).padStart(2, '0')}/${year}</div>
           <div class="fs-2 fw-bold text-danger">${st.total_raw_hours}<span class="fs-6 text-muted fw-normal"> giờ OT</span></div>
           <div class="small text-muted mt-1">Giờ quy đổi: <strong>${st.total_weighted_hours}h</strong></div>
         </div>
@@ -150,7 +150,7 @@ async function renderRegisterOT(area) {
         <button class="btn btn-outline-secondary btn-sm" id="ot-prev-month">
           <i class="bi bi-chevron-left"></i>
         </button>
-        <h6 class="fw-bold mb-0">Tháng ${String(month).padStart(2,'0')}/${year}</h6>
+        <h6 class="fw-bold mb-0">Tháng ${String(month).padStart(2, '0')}/${year}</h6>
         <button class="btn btn-outline-secondary btn-sm" id="ot-next-month">
           <i class="bi bi-chevron-right"></i>
         </button>
@@ -167,7 +167,7 @@ async function renderRegisterOT(area) {
 
     <!-- Danh sách đăng ký -->
     <div class="glass-card p-4">
-      <h6 class="fw-bold mb-3"><i class="bi bi-list-ul me-2 text-danger"></i>Danh sách đăng ký OT — Tháng ${String(month).padStart(2,'0')}/${year}</h6>
+      <h6 class="fw-bold mb-3"><i class="bi bi-list-ul me-2 text-danger"></i>Danh sách đăng ký OT — Tháng ${String(month).padStart(2, '0')}/${year}</h6>
       <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
           <thead class="table-light">
@@ -262,21 +262,21 @@ async function renderRegisterOT(area) {
   let previewTimer = null;
   async function updateOTCalcPreview() {
     const dStr = document.getElementById('ot-date').value;
-    const s    = document.getElementById('ot-start').value;
-    const e    = document.getElementById('ot-end').value;
+    const s = document.getElementById('ot-start').value;
+    const e = document.getElementById('ot-end').value;
     const isHoliday = document.getElementById('ot-is-holiday').checked;
-    const preview   = document.getElementById('ot-calc-preview');
-    const warning   = document.getElementById('ot-time-warning');
-    const warningTxt= document.getElementById('ot-time-warning-text');
+    const preview = document.getElementById('ot-calc-preview');
+    const warning = document.getElementById('ot-time-warning');
+    const warningTxt = document.getElementById('ot-time-warning-text');
 
     if (!s || !e || !dStr) { preview.classList.add('d-none'); return; }
 
     const [sh, sm] = s.split(':').map(Number);
     const [eh, em] = e.split(':').map(Number);
     const startMin = sh * 60 + sm;
-    const endMin   = eh * 60 + em;
+    const endMin = eh * 60 + em;
     const dObj = new Date(dStr + 'T00:00:00');
-    const dow  = dObj.getDay();
+    const dow = dObj.getDay();
     const isWeekend = dow === 0 || dow === 6;
 
     // Cảnh báo thời gian không hợp lệ
@@ -328,10 +328,10 @@ async function renderRegisterOT(area) {
 
   // ── Save OT ──
   document.getElementById('btn-save-ot').onclick = async () => {
-    const editId    = document.getElementById('ot-edit-id').value;
-    const dateStr   = document.getElementById('ot-date').value;
+    const editId = document.getElementById('ot-edit-id').value;
+    const dateStr = document.getElementById('ot-date').value;
     const startTime = document.getElementById('ot-start').value;
-    const endTime   = document.getElementById('ot-end').value;
+    const endTime = document.getElementById('ot-end').value;
     const isHoliday = document.getElementById('ot-is-holiday').checked;
 
     if (!startTime || !endTime) {
@@ -354,9 +354,9 @@ async function renderRegisterOT(area) {
 
     const body = {
       start_time: startTime,
-      end_time:   endTime,
+      end_time: endTime,
       is_holiday: isHoliday,
-      reason:     document.getElementById('ot-reason').value.trim() || null,
+      reason: document.getElementById('ot-reason').value.trim() || null,
     };
 
     try {
@@ -384,20 +384,20 @@ async function renderRegisterOT(area) {
 // ══════════════════════════════════════════════════════════════════════════════
 async function renderManageOT(area) {
   const now = new Date();
-  let filterMonth  = now.getMonth() + 1;
-  let filterYear   = now.getFullYear();
+  let filterMonth = now.getMonth() + 1;
+  let filterYear = now.getFullYear();
   let filterStatus = '';
-  let filterProject= '';
-  let filterName   = '';
-  let activeTab    = 'list'; // 'list' | 'summary'
-  let selectedIds  = new Set();
+  let filterProject = '';
+  let filterName = '';
+  let activeTab = 'list'; // 'list' | 'summary'
+  let selectedIds = new Set();
 
   async function reload() {
     const params = new URLSearchParams({
       month: filterMonth, year: filterYear,
-      ...(filterStatus  ? { status: filterStatus }       : {}),
-      ...(filterProject ? { project: filterProject }     : {}),
-      ...(filterName    ? { employee_name: filterName }  : {}),
+      ...(filterStatus ? { status: filterStatus } : {}),
+      ...(filterProject ? { project: filterProject } : {}),
+      ...(filterName ? { employee_name: filterName } : {}),
     });
     const records = await api('GET', `/overtime/admin/list?${params}`);
     renderListTab(records);
@@ -407,9 +407,43 @@ async function renderManageOT(area) {
     const params = new URLSearchParams({
       month: filterMonth, year: filterYear,
       ...(filterProject ? { project: filterProject } : {}),
+      ...(filterName ? { employee_name: filterName } : {}),
     });
     const data = await api('GET', `/overtime/admin/summary?${params}`);
     renderSummaryTab(data);
+  }
+
+  function buildHeaderTabs() {
+    const listActive = activeTab === 'list';
+    return `
+    <div class="mb-3">
+      <ul class="nav nav-tabs" id="ot-tabs">
+        <li class="nav-item">
+          <button class="nav-link ${listActive ? 'active' : ''}" id="ot-top-tab-list" type="button">
+            <i class="bi bi-clock-history me-1"></i>Quản lý OT
+          </button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link ${!listActive ? 'active' : ''}" id="ot-top-tab-summary" type="button">
+            <i class="bi bi-table me-1"></i>Bảng tổng hợp
+          </button>
+        </li>
+      </ul>
+    </div>`;
+  }
+
+  function updateTopTabsUI() {
+    const btnList = document.getElementById('ot-top-tab-list');
+    const btnSum = document.getElementById('ot-top-tab-summary');
+    if (!btnList || !btnSum) return;
+    const listActive = activeTab === 'list';
+    if (listActive) {
+      btnList.classList.add('active');
+      btnSum.classList.remove('active');
+    } else {
+      btnList.classList.remove('active');
+      btnSum.classList.add('active');
+    }
   }
 
   function buildFilters() {
@@ -419,7 +453,7 @@ async function renderManageOT(area) {
         <div class="d-flex align-items-center gap-1">
           <label class="form-label mb-0 small text-nowrap fw-semibold text-muted">Tháng:</label>
           <select class="form-select form-select-sm" id="ot-f-month" style="width:75px">
-            ${Array.from({length:12},(_,i)=>`<option value="${i+1}" ${i+1===filterMonth?'selected':''}>${String(i+1).padStart(2,'0')}</option>`).join('')}
+            ${Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}" ${i + 1 === filterMonth ? 'selected' : ''}>${String(i + 1).padStart(2, '0')}</option>`).join('')}
           </select>
         </div>
         <div class="d-flex align-items-center gap-1">
@@ -437,10 +471,10 @@ async function renderManageOT(area) {
         <div class="d-flex align-items-center gap-1">
           <label class="form-label mb-0 small text-nowrap fw-semibold text-muted">Trạng thái:</label>
           <select class="form-select form-select-sm" id="ot-f-status" style="width:110px">
-            <option value="" ${!filterStatus?'selected':''}>Tất cả</option>
-            <option value="Pending"  ${filterStatus==='Pending'?'selected':''}>Chờ duyệt</option>
-            <option value="Approved" ${filterStatus==='Approved'?'selected':''}>Đã duyệt</option>
-            <option value="Rejected" ${filterStatus==='Rejected'?'selected':''}>Từ chối</option>
+            <option value="" ${!filterStatus ? 'selected' : ''}>Tất cả</option>
+            <option value="Pending"  ${filterStatus === 'Pending' ? 'selected' : ''}>Chờ duyệt</option>
+            <option value="Approved" ${filterStatus === 'Approved' ? 'selected' : ''}>Đã duyệt</option>
+            <option value="Rejected" ${filterStatus === 'Rejected' ? 'selected' : ''}>Từ chối</option>
           </select>
         </div>
         <div class="d-flex gap-1 ms-auto align-items-center">
@@ -453,22 +487,6 @@ async function renderManageOT(area) {
         </div>
       </div>
     </div>`;
-  }
-
-  function buildTabs() {
-    return `
-    <ul class="nav nav-tabs mb-0" id="ot-tabs">
-      <li class="nav-item">
-        <a class="nav-link ${activeTab==='list'?'active':''}" href="#" id="ot-tab-list">
-          <i class="bi bi-list-ul me-1"></i>Danh sách OT
-        </a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link ${activeTab==='summary'?'active':''}" href="#" id="ot-tab-summary">
-          <i class="bi bi-table me-1"></i>Bảng tổng hợp
-        </a>
-      </li>
-    </ul>`;
   }
 
   function buildBulkBar() {
@@ -527,7 +545,7 @@ async function renderManageOT(area) {
     </div>`;
 
     // Select all checkbox
-    document.getElementById('ot-check-all').onchange = function() {
+    document.getElementById('ot-check-all').onchange = function () {
       document.querySelectorAll('.ot-check').forEach(cb => {
         cb.checked = this.checked;
         const id = parseInt(cb.dataset.id);
@@ -536,7 +554,7 @@ async function renderManageOT(area) {
       updateSelectedCount();
     };
     document.querySelectorAll('.ot-check').forEach(cb => {
-      cb.onchange = function() {
+      cb.onchange = function () {
         const id = parseInt(this.dataset.id);
         this.checked ? selectedIds.add(id) : selectedIds.delete(id);
         updateSelectedCount();
@@ -587,40 +605,32 @@ async function renderManageOT(area) {
 
     if (!rows || rows.length === 0) {
       document.getElementById('ot-tab-content').innerHTML = `
-      <div class="text-center text-muted py-5">Không có dữ liệu OT Approved trong tháng này.</div>`;
+      <div class="text-center text-muted py-5"><i class="bi bi-inbox me-2"></i>Không có dữ liệu OT Approved trong tháng này.</div>`;
       return;
     }
 
-    // Left Fixed Table Rows (STT, Mã NV, Họ và tên - Căn giữa)
-    const leftRows = rows.map((row, idx) => `
-      <tr style="height:48px">
-        <td class="text-center text-muted small" style="width:45px;vertical-align:middle;font-weight:600">${idx + 1}</td>
-        <td class="text-center" style="width:85px;vertical-align:middle">
-          <code style="font-size:0.78rem;color:#475569;background:#f1f5f9;padding:2px 6px;border-radius:4px">${row.employee_code}</code>
-        </td>
-        <td class="text-center fw-bold" style="width:180px;vertical-align:middle;color:#1e293b;font-size:0.82rem">${row.full_name}</td>
-      </tr>`).join('');
-
-    // Right Scrollable Day Headers (Dòng 1: Số ngày, Dòng 2: Thứ trong tuần)
-    const dayHeaders = Array.from({length: num_days}, (_,i) => {
+    // Header số ngày trong tháng + thứ
+    const dayHeaders = Array.from({ length: num_days }, (_, i) => {
       const d = i + 1;
       const dow = new Date(year, month - 1, d).getDay();
       const isSunday = dow === 0;
-      const bgStyle = isSunday ? 'background:#fce4ec !important;' : 'background:#f8fafc;';
-      const dowColor = isSunday ? 'color:#d5001c;font-weight:700' : (dow === 6 ? 'color:#e65100;font-weight:600' : 'color:#64748b');
-      return `<th class="text-center p-1" style="min-width:32px;width:32px;font-size:0.75rem;${bgStyle}">
+      const isSaturday = dow === 6;
+      const bgStyle = isSunday ? 'background:#fce4ec !important;' : (isSaturday ? 'background:#fff7ed !important;' : 'background:#f8fafc;');
+      const dowColor = isSunday ? 'color:#d5001c;font-weight:700' : (isSaturday ? 'color:#e65100;font-weight:600' : 'color:#64748b');
+      return `<th class="text-center p-1" style="min-width:38px;width:38px;font-size:0.75rem;${bgStyle}">
         <span class="fw-bold" style="color:#1e293b">${d}</span><br>
         <span style="font-size:0.66rem;${dowColor}">${DOW[dow]}</span>
       </th>`;
     }).join('');
 
-    // Right Scrollable Rows (Ngày + Giờ làm với Hệ số nhỏ bên dưới)
-    const rightRows = rows.map((row) => {
-      const dayCells = Array.from({length: num_days}, (_,i) => {
+    // Danh sách dòng dữ liệu cho bảng
+    const tableRows = rows.map((row, idx) => {
+      const dayCells = Array.from({ length: num_days }, (_, i) => {
         const d = i + 1;
         const dow = new Date(year, month - 1, d).getDay();
         const isSunday = dow === 0;
-        const sundayBg = isSunday ? 'background:#fff0f3;' : '';
+        const isSaturday = dow === 6;
+        const sundayBg = isSunday ? 'background:#fff0f3;' : (isSaturday ? 'background:#fffbeb;' : '');
         const dayData = row.days[d];
         if (!dayData || dayData.length === 0) {
           return `<td class="text-center p-1" style="font-size:0.75rem;color:#cbd5e1;${sundayBg}">—</td>`;
@@ -638,86 +648,85 @@ async function renderManageOT(area) {
 
       return `
       <tr style="height:48px">
+        <td class="col-sticky col-stt text-center text-muted small" style="vertical-align:middle;font-weight:600">${idx + 1}</td>
+        <td class="col-sticky col-mnv text-center" style="vertical-align:middle">
+          <code style="font-size:0.78rem;color:#475569;background:#f1f5f9;padding:2px 6px;border-radius:4px">${row.employee_code}</code>
+        </td>
+        <td class="col-sticky col-name text-center fw-bold" style="vertical-align:middle;color:#1e293b;font-size:0.82rem">${row.full_name}</td>
         ${dayCells}
-        <td class="text-center fw-bold text-danger p-1" style="width:65px;vertical-align:middle;font-size:0.8rem;background:#fff5f5">${row.total_raw}h</td>
-        <td class="text-center fw-bold p-1" style="width:70px;vertical-align:middle;font-size:0.82rem;background:#fef2f2;color:#d5001c">${row.total_weighted}h</td>
+        <td class="text-center fw-bold text-danger p-1 ot-summary-total" style="vertical-align:middle;font-size:0.8rem">${row.total_raw}h</td>
+        <td class="text-center fw-bold p-1 ot-summary-quydoi" style="vertical-align:middle;font-size:0.82rem;color:#d5001c">${row.total_weighted}h</td>
       </tr>`;
     }).join('');
 
     document.getElementById('ot-tab-content').innerHTML = `
-    <div class="glass-card p-3" style="overflow:hidden">
-      <div class="d-flex align-items-center justify-content-between mb-3">
-        <span class="fw-bold text-dark" style="font-size:0.85rem">
-          <i class="bi bi-calendar3 me-1 text-danger"></i>Bảng tổng hợp giờ làm OT
-        </span>
-        <div class="d-flex gap-2">
-          <button type="button" class="btn btn-sm btn-danger px-3 py-1 fw-bold shadow-sm" id="ot-scroll-left">
-            <i class="bi bi-chevron-left me-1"></i>◄ Đầu tháng
-          </button>
-          <button type="button" class="btn btn-sm btn-danger px-3 py-1 fw-bold shadow-sm" id="ot-scroll-right">
-            Cuối tháng ►<i class="bi bi-chevron-right ms-1"></i>
-          </button>
-        </div>
-      </div>
-      <div class="ot-split-container">
-        <!-- FIXED LEFT CONTAINER (STT, Mã NV, Họ và tên - Căn giữa) -->
-        <div class="ot-left-fixed">
-          <table class="table table-bordered table-sm align-middle mb-0">
-            <thead>
-              <tr style="height:42px">
-                <th class="text-center" style="width:45px;background:#f8fafc;color:#475569;font-weight:700;font-size:0.78rem;vertical-align:middle">STT</th>
-                <th class="text-center" style="width:85px;background:#f8fafc;color:#475569;font-weight:700;font-size:0.78rem;vertical-align:middle">Mã NV</th>
-                <th class="text-center" style="width:180px;background:#f8fafc;color:#475569;font-weight:700;font-size:0.78rem;vertical-align:middle">Họ và tên</th>
-              </tr>
-            </thead>
-            <tbody>${leftRows}</tbody>
-          </table>
-        </div>
-
-        <!-- SCROLLABLE RIGHT CONTAINER (Ngày, Giờ làm + Hệ số, Tổng OT, Quy đổi) -->
-        <div class="ot-right-scroll" id="ot-summary-wrap">
-          <table class="table table-bordered table-sm align-middle mb-0">
-            <thead>
-              <tr style="height:42px">
-                ${dayHeaders}
-                <th class="text-center" style="vertical-align:middle;background:#fff5f5;color:#d5001c;width:65px;font-size:0.78rem">Tổng OT</th>
-                <th class="text-center" style="vertical-align:middle;background:#fef2f2;color:#d5001c;width:70px;font-size:0.78rem">Quy đổi</th>
-              </tr>
-            </thead>
-            <tbody>${rightRows}</tbody>
-          </table>
-        </div>
-      </div>
+    <div class="table-wrapper ot-summary-scroll-container" id="ot-summary-wrap">
+      <table class="sticky-table ot-summary-table mb-0" id="ot-summary-table">
+        <thead>
+          <tr style="height:42px">
+            <th class="col-sticky col-stt text-center" style="background:#f8fafc;color:#475569;font-weight:700;font-size:0.78rem;vertical-align:middle">STT</th>
+            <th class="col-sticky col-mnv text-center" style="background:#f8fafc;color:#475569;font-weight:700;font-size:0.78rem;vertical-align:middle">Mã NV</th>
+            <th class="col-sticky col-name text-center" style="background:#f8fafc;color:#475569;font-weight:700;font-size:0.78rem;vertical-align:middle">Họ và tên</th>
+            ${dayHeaders}
+            <th class="text-center ot-summary-total" style="vertical-align:middle;color:#d5001c;font-size:0.78rem">Tổng OT</th>
+            <th class="text-center ot-summary-quydoi" style="vertical-align:middle;color:#d5001c;font-size:0.78rem">Quy đổi</th>
+          </tr>
+        </thead>
+        <tbody>${tableRows}</tbody>
+      </table>
     </div>`;
 
-    const wrap = document.getElementById('ot-summary-wrap');
-    if (wrap) {
-      const btnLeft = document.getElementById('ot-scroll-left');
-      const btnRight = document.getElementById('ot-scroll-right');
-      if (btnLeft) btnLeft.onclick = () => { wrap.scrollLeft -= 400; };
-      if (btnRight) btnRight.onclick = () => { wrap.scrollLeft += 400; };
-    }
+    // Dynamic sticky positioning logic from huong_dan_lam_bang_cuon_ngang_sticky.md
+    setTimeout(() => {
+      const table = document.getElementById('ot-summary-table');
+      if (!table) return;
+      const rows = table.querySelectorAll('tr');
+      rows.forEach(row => {
+        const cells = row.children;
+        let leftOffset = 0;
+        for (let i = 0; i < 3; i++) {
+          if (!cells[i]) continue;
+          cells[i].style.position = 'sticky';
+          cells[i].style.left = `${leftOffset}px`;
+          leftOffset += cells[i].offsetWidth;
+        }
+      });
+    }, 50);
   }
 
   // ── Render toàn bộ trang ──
   area.innerHTML = `
-  <div class="section-header mb-3">
-    <div class="section-title"><i class="bi bi-clock-history text-danger"></i> Quản lý OT</div>
-  </div>
+  ${buildHeaderTabs()}
   ${buildFilters()}
-  <div class="glass-card p-3">
-    ${buildTabs()}
-    <div class="pt-3" id="ot-tab-content">
+  <div class="glass-card p-3" style="max-width:100%;min-width:0;overflow:hidden">
+    <div id="ot-tab-content" style="max-width:100%;min-width:0">
       <div class="d-flex justify-content-center py-4"><div class="spinner-border text-danger"></div></div>
     </div>
   </div>`;
 
+  // ── Top tab events ──
+  document.getElementById('ot-top-tab-list').onclick = async () => {
+    if (activeTab === 'list') return;
+    activeTab = 'list';
+    updateTopTabsUI();
+    document.getElementById('ot-tab-content').innerHTML = '<div class="d-flex justify-content-center py-4"><div class="spinner-border text-danger"></div></div>';
+    await reload();
+  };
+
+  document.getElementById('ot-top-tab-summary').onclick = async () => {
+    if (activeTab === 'summary') return;
+    activeTab = 'summary';
+    updateTopTabsUI();
+    document.getElementById('ot-tab-content').innerHTML = '<div class="d-flex justify-content-center py-4"><div class="spinner-border text-danger"></div></div>';
+    await reloadSummary();
+  };
+
   // ── Filter events ──
   document.getElementById('ot-filter-btn').onclick = async () => {
-    filterMonth  = parseInt(document.getElementById('ot-f-month').value);
-    filterYear   = parseInt(document.getElementById('ot-f-year').value);
-    filterProject= document.getElementById('ot-f-project').value.trim();
-    filterName   = document.getElementById('ot-f-name').value.trim();
+    filterMonth = parseInt(document.getElementById('ot-f-month').value);
+    filterYear = parseInt(document.getElementById('ot-f-year').value);
+    filterProject = document.getElementById('ot-f-project').value.trim();
+    filterName = document.getElementById('ot-f-name').value.trim();
     filterStatus = document.getElementById('ot-f-status').value;
     if (activeTab === 'list') await reload();
     else await reloadSummary();
@@ -752,22 +761,6 @@ async function renderManageOT(area) {
     }
   };
 
-  // ── Tab events ──
-  document.getElementById('ot-tab-list').onclick = async (e) => {
-    e.preventDefault();
-    activeTab = 'list';
-    document.getElementById('ot-tab-list').classList.add('active');
-    document.getElementById('ot-tab-summary').classList.remove('active');
-    await reload();
-  };
-  document.getElementById('ot-tab-summary').onclick = async (e) => {
-    e.preventDefault();
-    activeTab = 'summary';
-    document.getElementById('ot-tab-summary').classList.add('active');
-    document.getElementById('ot-tab-list').classList.remove('active');
-    await reloadSummary();
-  };
-
   // ── Global actions ──
   window.adminApproveOT = async (id) => {
     const ok = await showConfirm({
@@ -791,7 +784,7 @@ async function renderManageOT(area) {
   };
 
   document.getElementById('btn-confirm-reject').onclick = async () => {
-    const id     = document.getElementById('reject-ot-id').value;
+    const id = document.getElementById('reject-ot-id').value;
     const reason = document.getElementById('reject-reason-text').value.trim();
     if (!reason) { toast('Vui lòng nhập lý do từ chối.', 'error'); return; }
     try {
