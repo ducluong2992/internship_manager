@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from io import BytesIO
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -25,7 +25,9 @@ def parse_time_minutes(t: str) -> int:
 
 
 def minutes_to_hhmm(mins: int) -> str:
-    return f"{mins // 60:02d}:{mins % 60:02d}"
+    h = (mins // 60) % 24
+    m = mins % 60
+    return f"{h:02d}:{m:02d}"
 
 
 def calc_raw_hours(start_min: int, end_min: int) -> float:
@@ -45,52 +47,125 @@ def get_factor(is_holiday: bool, is_weekend: bool, before_22: bool) -> float:
     return 1.5 if before_22 else 2.1
 
 
-def split_segments(start_min: int, end_min: int, is_holiday: bool, is_weekend: bool) -> list:
+def split_segments(start_min: int, end_min: int, is_holiday: bool, is_weekend: bool, work_date: Optional[date] = None) -> list:
     """
-    Tách [start_min, end_min] tại ranh giới 22:00 thành tối đa 2 đoạn.
-    Mỗi đoạn chứa (start_min, end_min, factor, raw_hours).
+    Tách chính xác theo từng ngày lịch và các mốc hệ số (phân tách tại ranh giới 22:00 và 24:00/00:00).
+    - Các đoạn trước 24:00 (1440 min) thuộc về work_date.
+    - Các đoạn sau 24:00 (end_min > 1440) thuộc về next_date = work_date + 1 ngày!
     """
+    if work_date is None:
+        work_date = date.today()
+
+    day_start = (8 * 60) if (is_weekend or is_holiday) else (18 * 60 + 30)
     segments = []
-    if start_min < SPLIT_HOUR and end_min > SPLIT_HOUR:
-        # Đoạn trước 22:00
-        seg1_raw = calc_raw_hours(start_min, SPLIT_HOUR)
-        seg1_factor = get_factor(is_holiday, is_weekend, before_22=True)
-        segments.append({
-            "start_time": minutes_to_hhmm(start_min),
-            "end_time": minutes_to_hhmm(SPLIT_HOUR),
-            "raw_hours": seg1_raw,
-            "factor": seg1_factor,
-            "weighted_hours": round(seg1_raw * seg1_factor, 2),
-        })
-        # Đoạn sau 22:00
-        seg2_raw = calc_raw_hours(SPLIT_HOUR, end_min)
-        seg2_factor = get_factor(is_holiday, is_weekend, before_22=False)
-        segments.append({
-            "start_time": minutes_to_hhmm(SPLIT_HOUR),
-            "end_time": minutes_to_hhmm(end_min),
-            "raw_hours": seg2_raw,
-            "factor": seg2_factor,
-            "weighted_hours": round(seg2_raw * seg2_factor, 2),
-        })
-    else:
-        # Không qua 22:00: toàn bộ trong 1 đoạn
-        before_22 = end_min <= SPLIT_HOUR
-        raw = calc_raw_hours(start_min, end_min)
-        factor = get_factor(is_holiday, is_weekend, before_22=before_22)
-        segments.append({
-            "start_time": minutes_to_hhmm(start_min),
-            "end_time": minutes_to_hhmm(end_min),
-            "raw_hours": raw,
-            "factor": factor,
-            "weighted_hours": round(raw * factor, 2),
-        })
+
+    # 1. Các đoạn trong work_date (0 - 1440 phút)
+    s_curr = max(0, start_min)
+    e_curr = min(end_min, 1440)
+
+    if s_curr < e_curr:
+        # 1.1. Rạng sáng ngày hiện tại (00:00 - 08:00)
+        s1 = max(s_curr, 0)
+        e1 = min(e_curr, 8 * 60)
+        if s1 < e1:
+            raw = calc_raw_hours(s1, e1)
+            factor = get_factor(is_holiday, is_weekend, before_22=False)
+            segments.append({
+                "work_date": work_date,
+                "start_time": minutes_to_hhmm(s1),
+                "end_time": minutes_to_hhmm(e1),
+                "raw_hours": raw,
+                "factor": factor,
+                "weighted_hours": round(raw * factor, 2),
+                "shift_type": "night",
+                "shift_name": "Ban đêm",
+            })
+
+        # 1.2. Khung ban ngày (day_start - 22:00)
+        s2 = max(s_curr, day_start)
+        e2 = min(e_curr, 22 * 60)
+        if s2 < e2:
+            raw = calc_raw_hours(s2, e2)
+            factor = get_factor(is_holiday, is_weekend, before_22=True)
+            segments.append({
+                "work_date": work_date,
+                "start_time": minutes_to_hhmm(s2),
+                "end_time": minutes_to_hhmm(e2),
+                "raw_hours": raw,
+                "factor": factor,
+                "weighted_hours": round(raw * factor, 2),
+                "shift_type": "day",
+                "shift_name": "Ban ngày",
+            })
+
+        # 1.3. Khung ban đêm trước nửa đêm (22:00 - 24:00)
+        s3 = max(s_curr, 22 * 60)
+        e3 = min(e_curr, 24 * 60)
+        if s3 < e3:
+            raw = calc_raw_hours(s3, e3)
+            factor = get_factor(is_holiday, is_weekend, before_22=False)
+            segments.append({
+                "work_date": work_date,
+                "start_time": minutes_to_hhmm(s3),
+                "end_time": "24:00" if e3 == 1440 else minutes_to_hhmm(e3),
+                "raw_hours": raw,
+                "factor": factor,
+                "weighted_hours": round(raw * factor, 2),
+                "shift_type": "night",
+                "shift_name": "Ban đêm",
+            })
+
+    # 2. Các đoạn sang ngày hôm sau (next_date) nếu end_min > 1440
+    if end_min > 1440:
+        next_date = work_date + timedelta(days=1)
+        next_is_weekend = next_date.weekday() in (5, 6)
+        next_day_start = (8 * 60) if next_is_weekend else (18 * 60 + 30)
+
+        rem_start = 0
+        rem_end = end_min - 1440
+
+        # 2.1. Khung ban đêm rạng sáng ngày hôm sau (00:00 - 08:00)
+        s4 = max(rem_start, 0)
+        e4 = min(rem_end, 8 * 60)
+        if s4 < e4:
+            raw = calc_raw_hours(s4, e4)
+            factor = get_factor(False, next_is_weekend, before_22=False)
+            segments.append({
+                "work_date": next_date,
+                "start_time": minutes_to_hhmm(s4),
+                "end_time": minutes_to_hhmm(e4),
+                "raw_hours": raw,
+                "factor": factor,
+                "weighted_hours": round(raw * factor, 2),
+                "shift_type": "night",
+                "shift_name": "Ban đêm",
+            })
+
+        # 2.2. Khung ban ngày tiếp theo (nếu có)
+        s5 = max(rem_start, next_day_start)
+        e5 = min(rem_end, 22 * 60)
+        if s5 < e5:
+            raw = calc_raw_hours(s5, e5)
+            factor = get_factor(False, next_is_weekend, before_22=True)
+            segments.append({
+                "work_date": next_date,
+                "start_time": minutes_to_hhmm(s5),
+                "end_time": minutes_to_hhmm(e5),
+                "raw_hours": raw,
+                "factor": factor,
+                "weighted_hours": round(raw * factor, 2),
+                "shift_type": "day",
+                "shift_name": "Ban ngày",
+            })
+
     return segments
 
 
-def validate_ot_time(start: str, end: str, work_date: date):
+def validate_ot_time(start: str, end: str, work_date: date, is_holiday: bool = False):
     """Validate thời gian OT theo nghiệp vụ:
-    - Thứ 2 đến Thứ 6: bắt đầu từ 18:30 trở đi
-    - Thứ 7 và Chủ Nhật: bắt đầu tính OT mọi lúc
+    - Nếu giờ kết thúc <= giờ bắt đầu: Hỗ trợ OT xuyên đêm (qua 24:00)
+    - Thứ 2 đến Thứ 6 (không phải ngày lễ): bắt đầu từ 18:30 trở đi
+    - Thứ 7, Chủ Nhật hoặc Ngày lễ: bắt đầu tính OT mọi lúc
     """
     try:
         start_min = parse_time_minutes(start)
@@ -98,22 +173,26 @@ def validate_ot_time(start: str, end: str, work_date: date):
     except Exception:
         raise HTTPException(status_code=400, detail="Định dạng giờ không hợp lệ. Dùng HH:MM")
 
-    if work_date.weekday() in (0, 1, 2, 3, 4):
+    # Nếu qua đêm (ví dụ 20:00 -> 02:00), cộng thêm 24 giờ
+    if end_min <= start_min:
+        end_min += 24 * 60
+
+    is_weekend = work_date.weekday() in (5, 6)
+    if not is_weekend and not is_holiday:
         if start_min < 18 * 60 + 30:
             raise HTTPException(
                 status_code=400,
-                detail="Thời gian bắt đầu OT các ngày từ Thứ 2 đến Thứ 6 phải từ 18:30 trở đi."
+                detail="Thời gian bắt đầu OT các ngày từ Thứ 2 đến Thứ 6 (không phải ngày lễ) phải từ 18:30 trở đi."
             )
-    if end_min <= start_min:
-        raise HTTPException(
-            status_code=400,
-            detail="Thời gian kết thúc phải lớn hơn thời gian bắt đầu."
-        )
+
     raw = calc_raw_hours(start_min, end_min)
+    if raw <= 0:
+        raise HTTPException(status_code=400, detail="Thời gian OT phải lớn hơn 0.")
     if raw > 24:
         raise HTTPException(status_code=400, detail="OT không được quá 24 giờ.")
 
     return start_min, end_min, raw
+
 
 
 def check_overlap(
@@ -164,30 +243,34 @@ def create_overtime(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ):
-    """Nhân sự Onsite đăng ký OT — tự động tách 2 bản ghi nếu vượt 22:00"""
+    """Nhân sự Onsite đăng ký OT — tự động tách bản ghi theo ngày và khung giờ 22:00/24:00"""
     if current_user.user_type != "employee":
         raise HTTPException(status_code=403, detail="Chỉ nhân sự mới được đăng ký OT.")
-    if current_user.staff_category != "Onsite":
+    if (current_user.staff_category or "").strip().lower() != "onsite":
         raise HTTPException(status_code=403, detail="Bạn chưa được cấp quyền đăng ký OT. Vui lòng liên hệ quản trị viên.")
     if not current_user.project:
         raise HTTPException(status_code=403, detail="Bạn chưa được gán dự án. Vui lòng liên hệ quản trị viên.")
     if current_user.account_status != 1:
         raise HTTPException(status_code=403, detail="Tài khoản đang bị khóa.")
 
-    start_min, end_min, _ = validate_ot_time(body.start_time, body.end_time, body.work_date)
+    now = datetime.now()
+    if body.work_date.year < now.year or (body.work_date.year == now.year and body.work_date.month < now.month):
+        raise HTTPException(status_code=400, detail="Không thể đăng ký OT cho các tháng trong quá khứ.")
+
+    start_min, end_min, _ = validate_ot_time(body.start_time, body.end_time, body.work_date, body.is_holiday)
 
     # Kiểm tra trùng cho toàn bộ khoảng [start, end]
     check_overlap(db, current_user.id, body.work_date, start_min, end_min)
 
     is_weekend = body.work_date.weekday() in (5, 6)
-    segments = split_segments(start_min, end_min, body.is_holiday, is_weekend)
+    segments = split_segments(start_min, end_min, body.is_holiday, is_weekend, body.work_date)
 
     created = []
     for seg in segments:
         ot = models.OvertimeRequest(
             user_id=current_user.id,
             project=current_user.project,
-            work_date=body.work_date,
+            work_date=seg["work_date"],
             start_time=seg["start_time"],
             end_time=seg["end_time"],
             raw_hours=seg["raw_hours"],
@@ -231,7 +314,10 @@ def get_my_overtime(
         models.OvertimeRequest.user_id == current_user.id,
         models.OvertimeRequest.work_date >= first_day,
         models.OvertimeRequest.work_date <= last_day,
-    ).order_by(models.OvertimeRequest.work_date).all()
+    ).order_by(
+        models.OvertimeRequest.work_date.desc(),
+        models.OvertimeRequest.id.desc()
+    ).all()
 
     return [enrich_ot(r) for r in records]
 
@@ -271,7 +357,7 @@ def get_my_ot_stats(
         "pending_count": pending,
         "approved_count": approved,
         "rejected_count": rejected,
-        "is_onsite": current_user.staff_category == "Onsite",
+        "is_onsite": (current_user.staff_category or "").strip().lower() == "onsite",
         "has_project": bool(current_user.project),
     }
 
@@ -288,10 +374,14 @@ def preview_ot_split(
     except Exception:
         raise HTTPException(status_code=400, detail="Định dạng giờ không hợp lệ.")
     if end_min <= start_min:
-        raise HTTPException(status_code=400, detail="Giờ kết thúc phải lớn hơn giờ bắt đầu.")
+        end_min += 24 * 60
+
+    raw = calc_raw_hours(start_min, end_min)
+    if raw <= 0 or raw > 24:
+        raise HTTPException(status_code=400, detail="Tổng thời gian OT phải từ 0 đến 24 giờ.")
 
     is_weekend = body.work_date.weekday() in (5, 6)
-    segments = split_segments(start_min, end_min, body.is_holiday, is_weekend)
+    segments = split_segments(start_min, end_min, body.is_holiday, is_weekend, body.work_date)
     return {
         "segments": segments,
         "total_raw_hours": round(sum(s["raw_hours"] for s in segments), 2),
@@ -318,28 +408,47 @@ def update_overtime(
     if ot.status == "Approved":
         raise HTTPException(status_code=400, detail="Không thể sửa OT đã được duyệt.")
 
+    now = datetime.now()
+    if ot.work_date.year < now.year or (ot.work_date.year == now.year and ot.work_date.month < now.month):
+        raise HTTPException(status_code=400, detail="Không thể chỉnh sửa OT cho các tháng trong quá khứ.")
+
     new_start = body.start_time or ot.start_time
     new_end = body.end_time or ot.end_time
     is_holiday = body.is_holiday if body.is_holiday is not None else False
 
-    start_min, end_min, _ = validate_ot_time(new_start, new_end, ot.work_date)
+    start_min, end_min, _ = validate_ot_time(new_start, new_end, ot.work_date, is_holiday)
     check_overlap(db, current_user.id, ot.work_date, start_min, end_min, exclude_ids=[ot_id])
 
-    # Tính lại hệ số dựa vào giờ mới
     is_weekend = ot.work_date.weekday() in (5, 6)
-    before_22 = end_min <= SPLIT_HOUR
-    new_factor = get_factor(is_holiday, is_weekend, before_22=before_22)
-    raw_hours = calc_raw_hours(start_min, end_min)
+    segments = split_segments(start_min, end_min, is_holiday, is_weekend)
 
-    ot.start_time = new_start
-    ot.end_time = new_end
-    ot.factor = new_factor
-    ot.raw_hours = raw_hours
-    ot.weighted_hours = round(raw_hours * new_factor, 2)
+    # Segment 1: Cập nhật bản ghi hiện tại
+    ot.start_time = segments[0]["start_time"]
+    ot.end_time = segments[0]["end_time"]
+    ot.factor = segments[0]["factor"]
+    ot.raw_hours = segments[0]["raw_hours"]
+    ot.weighted_hours = segments[0]["weighted_hours"]
     if body.reason is not None:
         ot.reason = body.reason
     ot.status = "Pending"
     ot.reject_reason = None
+
+    # Segment 2 (nếu vượt ranh giới 22:00): Tạo bản ghi mới cho đoạn sau 22:00
+    if len(segments) == 2:
+        ot2 = models.OvertimeRequest(
+            user_id=current_user.id,
+            project=current_user.project or ot.project,
+            work_date=ot.work_date,
+            start_time=segments[1]["start_time"],
+            end_time=segments[1]["end_time"],
+            raw_hours=segments[1]["raw_hours"],
+            factor=segments[1]["factor"],
+            weighted_hours=segments[1]["weighted_hours"],
+            reason=body.reason if body.reason is not None else ot.reason,
+            status="Pending",
+        )
+        db.add(ot2)
+
     db.commit()
     db.refresh(ot)
     return enrich_ot(ot)
@@ -368,6 +477,21 @@ def delete_overtime(
 # ═══════════════════════════════════════════════════════════════════════════════
 # ADMIN ENDPOINTS
 # ═══════════════════════════════════════════════════════════════════════════════
+
+@router.delete("/admin/{ot_id}")
+def admin_delete_ot(
+    ot_id: int,
+    db: Session = Depends(get_db),
+    _: models.User = Depends(auth.require_admin),
+):
+    """Admin xóa yêu cầu OT bất kỳ (kể cả Approved)"""
+    ot = db.query(models.OvertimeRequest).filter(models.OvertimeRequest.id == ot_id).first()
+    if not ot:
+        raise HTTPException(status_code=404, detail="Không tìm thấy yêu cầu OT.")
+    db.delete(ot)
+    db.commit()
+    return {"message": "Đã xóa yêu cầu OT."}
+
 
 @router.get("/admin/list")
 def admin_list_ot(
@@ -399,12 +523,16 @@ def admin_list_ot(
     if status:
         q = q.filter(models.OvertimeRequest.status == status)
     if employee_name:
-        q = q.filter(models.User.full_name.ilike(f"%{employee_name}%"))
+        term = f"%{employee_name.strip()}%"
+        q = q.filter(
+            (models.User.full_name.ilike(term)) | (models.User.employee_code.ilike(term))
+        )
     if staff_category:
         q = q.filter(models.User.staff_category == staff_category)
 
     records = q.order_by(
-        models.OvertimeRequest.work_date,
+        models.OvertimeRequest.work_date.desc(),
+        models.OvertimeRequest.id.desc(),
         models.User.full_name
     ).all()
 
@@ -416,6 +544,7 @@ def admin_ot_summary(
     month: int = Query(default=None),
     year: int = Query(default=None),
     project: Optional[str] = Query(default=None),
+    employee_name: Optional[str] = Query(default=None),
     db: Session = Depends(get_db),
     _: models.User = Depends(auth.require_admin),
 ):
@@ -437,6 +566,11 @@ def admin_ot_summary(
     )
     if project:
         q = q.filter(models.OvertimeRequest.project.ilike(f"%{project}%"))
+    if employee_name:
+        term = f"%{employee_name.strip()}%"
+        q = q.filter(
+            (models.User.full_name.ilike(term)) | (models.User.employee_code.ilike(term))
+        )
 
     records = q.order_by(models.User.full_name, models.OvertimeRequest.work_date).all()
 
@@ -493,12 +627,10 @@ def admin_approve_ot(
     db: Session = Depends(get_db),
     admin: models.User = Depends(auth.require_admin),
 ):
-    """Admin duyệt 1 OT"""
+    """Admin duyệt 1 OT (cho phép duyệt lại kể cả khi đã từ chối)"""
     ot = db.query(models.OvertimeRequest).filter(models.OvertimeRequest.id == ot_id).first()
     if not ot:
         raise HTTPException(status_code=404, detail="Không tìm thấy yêu cầu OT.")
-    if ot.status != "Pending":
-        raise HTTPException(status_code=400, detail="Chỉ duyệt được OT đang ở trạng thái Pending.")
     ot.status = "Approved"
     ot.approved_by = admin.id
     ot.approved_at = datetime.now()
@@ -521,12 +653,29 @@ def admin_reject_ot(
     ot = db.query(models.OvertimeRequest).filter(models.OvertimeRequest.id == ot_id).first()
     if not ot:
         raise HTTPException(status_code=404, detail="Không tìm thấy yêu cầu OT.")
-    if ot.status != "Pending":
-        raise HTTPException(status_code=400, detail="Chỉ từ chối được OT đang ở trạng thái Pending.")
     ot.status = "Rejected"
     ot.reject_reason = body.reject_reason.strip()
     ot.approved_by = admin.id
     ot.approved_at = datetime.now()
+    db.commit()
+    db.refresh(ot)
+    return enrich_ot(ot)
+
+
+@router.post("/admin/{ot_id}/reset-pending", response_model=schemas.OvertimeResponse)
+def admin_reset_pending_ot(
+    ot_id: int,
+    db: Session = Depends(get_db),
+    _: models.User = Depends(auth.require_admin),
+):
+    """Admin trả trạng thái OT về Pending (Chưa duyệt/Chờ duyệt)"""
+    ot = db.query(models.OvertimeRequest).filter(models.OvertimeRequest.id == ot_id).first()
+    if not ot:
+        raise HTTPException(status_code=404, detail="Không tìm thấy yêu cầu OT.")
+    ot.status = "Pending"
+    ot.approved_by = None
+    ot.approved_at = None
+    ot.reject_reason = None
     db.commit()
     db.refresh(ot)
     return enrich_ot(ot)
@@ -823,10 +972,111 @@ def admin_export_excel(
 
     ws.freeze_panes = ws.cell(DATA_R, DAY_S)
 
+    ws.freeze_panes = ws.cell(DATA_R, DAY_S)
+
+    # ── SHEET 2: PHỤ LỤC 03 — THỜI GIAN LÀM THÊM GIỜ CỦA CBNV ──
+    ws2 = wb.create_sheet(title=f"Phu_Luc_03_T{month:02d}_{year}")
+
+    def mc2(r1, c1, r2, c2, val="", font=None, fill=None, align=None, border=None):
+        if r1 != r2 or c1 != c2:
+            ws2.merge_cells(start_row=r1, start_column=c1, end_row=r2, end_column=c2)
+        cell = ws2.cell(r1, c1, val)
+        if font:   cell.font = font
+        if fill:   cell.fill = fill
+        if align:  cell.alignment = align
+        if border: cell.border = border
+        return cell
+
+    # Row 2 & 3
+    mc2(2, 1, 2, 6, "CÔNG TY ĐẦU TƯ CÔNG NGHỆ VIETTEL", Font(name="Times New Roman", size=12), align=ca)
+    mc2(2, 7, 2, 13, "CỘNG HOÀ XÃ HỘI CHỦ NGHĨA VIỆT NAM", Font(name="Times New Roman", size=12), align=ca)
+    mc2(3, 1, 3, 6, "PHÒNG CHÍNH TRỊ NHÂN SỰ", Font(name="Times New Roman", bold=True, size=12), align=ca)
+    mc2(3, 7, 3, 13, "Độc lập – Tự do – Hạnh phúc", Font(name="Times New Roman", bold=True, size=12), align=ca)
+
+    # Row 5 Title
+    ws2.row_dimensions[5].height = 28
+    mc2(5, 1, 5, 13, "PHỤ LỤC 03: THỜI GIAN LÀM THÊM GIỜ CỦA CBNV", Font(name="Times New Roman", bold=True, size=14), align=ca)
+
+    # Group records by project
+    proj_map = {}
+    proj_order = []
+    for ot in records:
+        pname = (ot.project or "Khác").strip()
+        if pname not in proj_map:
+            proj_map[pname] = []
+            proj_order.append(pname)
+        proj_map[pname].append(ot)
+
+    cur_r = 7
+    pl03_headers = [
+        "STT", "MNV", "Họ và tên", "Phòng ban", "Chức danh", "Dự án",
+        "Thứ", "Ngày", "Giờ", "Thời gian\nOT", "Số MM OT", "Số MM khách\nhàng ghi nhận", "Ghi chú"
+    ]
+
+    for p_idx, pname in enumerate(proj_order, 1):
+        p_records = proj_map[pname]
+
+        # Row Title Dự án
+        ws2.row_dimensions[cur_r].height = 26
+        mc2(cur_r, 1, cur_r, 13, f"{p_idx}. Dự án {pname}", Font(name="Times New Roman", bold=True, size=14), align=la)
+        cur_r += 1
+
+        # Table Header
+        ws2.row_dimensions[cur_r].height = 34
+        for ci, h in enumerate(pl03_headers, 1):
+            mc2(cur_r, ci, cur_r, ci, h, Font(name="Times New Roman", bold=True, size=11), align=ca, border=_thin())
+        cur_r += 1
+
+        # Subtotal Row
+        ws2.row_dimensions[cur_r].height = 22
+        proj_tot_raw = round(sum(x.raw_hours for x in p_records), 2)
+        mc2(cur_r, 3, cur_r, 3, f"THÁNG {month:02d}/{year}", Font(name="Times New Roman", bold=True, size=11), align=la)
+        mc2(cur_r, 10, cur_r, 10, proj_tot_raw, Font(name="Times New Roman", bold=True, size=11), align=ca)
+        cur_r += 1
+
+        # Data Rows
+        for i, ot in enumerate(p_records, 1):
+            ws2.row_dimensions[cur_r].height = 22
+            dow = ot.work_date.weekday()
+            dow_num = "CN" if dow == 6 else str(dow + 2)
+            time_str = f"{ot.start_time.replace(':', 'h')} - {ot.end_time.replace(':', 'h')}"
+            date_str = ot.work_date.strftime("%d/%m/%Y")
+
+            row_data = [
+                i,
+                ot.user.employee_code if ot.user else "",
+                ot.user.full_name if ot.user else "",
+                (ot.user.staff_category if ot.user else "") or "Onsite",
+                (ot.user.position if ot.user else "") or "DEV",
+                ot.project or pname,
+                dow_num,
+                date_str,
+                time_str,
+                ot.raw_hours,
+                "",
+                "",
+                ot.reason or ""
+            ]
+
+            for ci, val in enumerate(row_data, 1):
+                cell_fill = _fill("FFFF00") if ci <= 10 else None
+                mc2(cur_r, ci, cur_r, ci, val, Font(name="Times New Roman", size=11), fill=cell_fill, align=la if ci in (3, 6, 13) else ca, border=_thin())
+
+            cur_r += 1
+        cur_r += 1
+
+    # Footer
+    ws2.row_dimensions[cur_r].height = 24
+    mc2(cur_r, 1, cur_r, 4, "TTPM TÀI CHÍNH SỐ", Font(name="Times New Roman", bold=True, size=12), align=la)
+
+    pl03_widths = {1: 6.0, 2: 12.0, 3: 24.0, 4: 16.0, 5: 14.0, 6: 26.0, 7: 7.0, 8: 14.0, 9: 18.0, 10: 13.0, 11: 12.0, 12: 20.0, 13: 16.0}
+    for ci, w in pl03_widths.items():
+        ws2.column_dimensions[get_column_letter(ci)].width = w
+
     buf = BytesIO()
     wb.save(buf)
     buf.seek(0)
-    fname = f"OT_T{month:02d}_{year}.xlsx"
+    fname = f"Phu_Luc_OT_T{month:02d}_{year}.xlsx"
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

@@ -15,6 +15,26 @@ function otCalendarDotClass(status) {
   return 'ot-dot-rejected';
 }
 
+function formatTime24h(timeStr) {
+  if (!timeStr) return '';
+  let str = timeStr.trim().toUpperCase();
+  if (str.includes('AM') || str.includes('PM')) {
+    const isPM = str.includes('PM');
+    str = str.replace('AM', '').replace('PM', '').trim();
+    let [h, m] = str.split(':').map(Number);
+    if (isPM && h < 12) h += 12;
+    if (!isPM && h === 12) h = 0;
+    return `${String(h).padStart(2, '0')}:${String(m || 0).padStart(2, '0')}`;
+  }
+  const parts = str.split(':');
+  if (parts.length >= 2) {
+    const h = String(parseInt(parts[0])).padStart(2, '0');
+    const m = String(parseInt(parts[1])).padStart(2, '0');
+    return `${h}:${m}`;
+  }
+  return timeStr;
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // NHÂN SỰ — Đăng ký / Xem OT
 // ══════════════════════════════════════════════════════════════════════════════
@@ -49,6 +69,9 @@ async function renderRegisterOT(area) {
     });
 
     // Calendar grid
+    const todayObj = new Date();
+    const todayStr = `${todayObj.getFullYear()}-${String(todayObj.getMonth() + 1).padStart(2, '0')}-${String(todayObj.getDate()).padStart(2, '0')}`;
+
     let calCells = '';
     const startOffset = (firstDow === 0 ? 6 : firstDow - 1); // T2=0, CN=6
     for (let i = 0; i < startOffset; i++) calCells += `<div class="ot-cal-cell ot-cal-empty"></div>`;
@@ -56,18 +79,30 @@ async function renderRegisterOT(area) {
       const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
       const dow = new Date(year, month - 1, d).getDay();
       const isWeekend = dow === 0 || dow === 6;
+      const isToday = (dateStr === todayStr);
       const dayRecs = dayMap[d] || [];
       const dots = dayRecs.map(r => `<span class="ot-cal-dot ${otCalendarDotClass(r.status)}"></span>`).join('');
       const dayTotalRaw = dayRecs.reduce((acc, r) => acc + r.raw_hours, 0);
       const hoursCenter = dayTotalRaw > 0 ? `<div class="ot-cal-center-hours">${dayTotalRaw}h</div>` : '';
 
+      const hasOT = dayRecs.length > 0;
+      const clickAction = hasOT ? `openOTDayHistoryModal('${dateStr}')` : `openOTRegisterModal('${dateStr}')`;
+      const cellTitle = hasOT ? `Bấm để xem lịch sử OT ngày ${d}/${month}/${year}` : `Bấm để đăng ký OT ngày ${d}/${month}/${year}`;
+      const todayClass = isToday ? 'ot-cal-today' : '';
+      const todayBadge = isToday ? `<span class="badge bg-danger ms-1" style="font-size:0.65rem">Hôm nay</span>` : '';
+
       calCells += `
-      <div class="ot-cal-cell ${isWeekend ? 'ot-cal-weekend' : ''}" data-date="${dateStr}" onclick="openOTRegisterModal('${dateStr}')">
-        <div class="ot-cal-day">${d}</div>
+      <div class="ot-cal-cell ${isWeekend ? 'ot-cal-weekend' : ''} ${todayClass}" data-date="${dateStr}" onclick="${clickAction}" style="cursor:pointer" title="${cellTitle}">
+        <div class="ot-cal-day d-flex align-items-center justify-content-between">
+          <span>${d}</span>
+          ${todayBadge}
+        </div>
         ${hoursCenter}
         <div class="ot-cal-dots">${dots}</div>
       </div>`;
     }
+
+    const DOW_NAMES = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
 
     // Danh sách bên dưới
     let listRows = '';
@@ -75,7 +110,11 @@ async function renderRegisterOT(area) {
       listRows = `<tr><td colspan="6" class="text-center text-muted py-4">Chưa có đăng ký OT nào trong tháng này.</td></tr>`;
     } else {
       records.forEach(r => {
-        const day = r.work_date.split('-').reverse().join('/').substring(0, 5);
+        const parts = r.work_date.split('-');
+        const dObj = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+        const dowStr = DOW_NAMES[dObj.getDay()];
+        const formattedDate = `${dowStr}, ${parts[2]}/${parts[1]}/${parts[0]}`;
+
         const rejectInfo = r.status === 'Rejected' ? `
           <div class="mt-1 small text-danger"><i class="bi bi-chat-left-text me-1"></i>
             <strong>Lý do từ chối:</strong> ${r.reject_reason || ''}
@@ -91,8 +130,8 @@ async function renderRegisterOT(area) {
           </div>` : '';
         listRows += `
         <tr>
-          <td class="fw-semibold">${day}</td>
-          <td>${r.start_time} – ${r.end_time}</td>
+          <td class="fw-semibold">${formattedDate}</td>
+          <td>${formatTime24h(r.start_time)} – ${formatTime24h(r.end_time)}</td>
           <td class="text-center">${r.raw_hours}h</td>
           <td class="text-center"><span class="badge bg-secondary">${r.factor}x</span></td>
           <td>${otBadge(r.status)}${rejectInfo}${pendingActions}</td>
@@ -104,6 +143,7 @@ async function renderRegisterOT(area) {
     area.innerHTML = `
     <div class="section-header mb-3">
       <div class="section-title"><i class="bi bi-clock-history text-danger"></i> Chấm công OT</div>
+      <button class="btn btn-danger btn-sm px-3 fw-bold" onclick="openOTRegisterModal()"><i class="bi bi-plus-lg me-1"></i>Đăng ký OT</button>
     </div>
 
     <!-- Thống kê tháng -->
@@ -172,7 +212,7 @@ async function renderRegisterOT(area) {
         <table class="table table-hover align-middle mb-0">
           <thead class="table-light">
             <tr>
-              <th>Ngày</th>
+              <th>Ngày OT</th>
               <th>Giờ</th>
               <th class="text-center">Thực tế</th>
               <th class="text-center">Hệ số</th>
@@ -206,19 +246,212 @@ async function renderRegisterOT(area) {
 
   await reloadOT();
 
+  // ── Native-Style 24h Time Picker (Matches Chrome wheel picker 1:1, NO AM/PM) ──
+  function setupNative24hPicker(inputId, popupId, onChangeCallback) {
+    const inputEl = document.getElementById(inputId);
+    const popupEl = document.getElementById(popupId);
+    if (!inputEl || !popupEl) return;
+
+    function renderPicker() {
+      let curH = '18';
+      let curM = '30';
+      const val = (inputEl.value || '').trim();
+      if (val && val.includes(':')) {
+        const parts = val.split(':');
+        const hNum = parseInt(parts[0]);
+        const mNum = parseInt(parts[1]);
+        if (!isNaN(hNum)) curH = String(Math.min(23, Math.max(0, hNum))).padStart(2, '0');
+        if (!isNaN(mNum)) curM = String(Math.min(59, Math.max(0, mNum))).padStart(2, '0');
+      }
+
+      let hHtml = '';
+      for (let h = 0; h < 24; h++) {
+        const hStr = String(h).padStart(2, '0');
+        const isSel = (hStr === curH);
+        hHtml += `<div class="native-time-item ${isSel ? 'selected' : ''}" data-h="${hStr}">${hStr}</div>`;
+      }
+
+      let mHtml = '';
+      for (let m = 0; m < 60; m++) {
+        const mStr = String(m).padStart(2, '0');
+        const isSel = (mStr === curM);
+        mHtml += `<div class="native-time-item ${isSel ? 'selected' : ''}" data-m="${mStr}">${mStr}</div>`;
+      }
+
+      popupEl.innerHTML = `
+        <div class="native-time-col" id="${popupId}-col-h">${hHtml}</div>
+        <div class="native-time-col" id="${popupId}-col-m">${mHtml}</div>
+      `;
+
+      popupEl.querySelectorAll('[data-h]').forEach(item => {
+        item.onclick = (e) => {
+          e.stopPropagation();
+          curH = item.dataset.h;
+          inputEl.value = `${curH}:${curM}`;
+          renderPicker();
+          scrollSelectedIntoView();
+          if (typeof onChangeCallback === 'function') onChangeCallback();
+        };
+      });
+
+      popupEl.querySelectorAll('[data-m]').forEach(item => {
+        item.onclick = (e) => {
+          e.stopPropagation();
+          curM = item.dataset.m;
+          inputEl.value = `${curH}:${curM}`;
+          popupEl.classList.add('d-none');
+          if (typeof onChangeCallback === 'function') onChangeCallback();
+        };
+      });
+    }
+
+    function scrollSelectedIntoView() {
+      setTimeout(() => {
+        const selH = popupEl.querySelector('[data-h].selected');
+        const selM = popupEl.querySelector('[data-m].selected');
+        if (selH) selH.scrollIntoView({ block: 'center' });
+        if (selM) selM.scrollIntoView({ block: 'center' });
+      }, 20);
+    }
+
+    function togglePopup(e) {
+      if (e) e.stopPropagation();
+      document.querySelectorAll('.native-time-picker-popup').forEach(p => {
+        if (p !== popupEl) p.classList.add('d-none');
+      });
+      const isHidden = popupEl.classList.contains('d-none');
+      if (isHidden) {
+        renderPicker();
+        popupEl.classList.remove('d-none');
+        scrollSelectedIntoView();
+      } else {
+        popupEl.classList.add('d-none');
+      }
+    }
+
+    inputEl.onclick = togglePopup;
+    inputEl.oninput = () => {
+      if (typeof onChangeCallback === 'function') onChangeCallback();
+    };
+
+    const clockBtn = document.querySelector(`.time-clock-btn[data-target="${inputId}"]`);
+    if (clockBtn) clockBtn.onclick = togglePopup;
+
+    document.addEventListener('click', (e) => {
+      if (!popupEl.contains(e.target) && e.target !== inputEl && (!clockBtn || !clockBtn.contains(e.target))) {
+        popupEl.classList.add('d-none');
+      }
+    });
+  }
+
+  // Khởi tạo bộ chọn giờ Native 24h
+  setupNative24hPicker('ot-start', 'picker-ot-start', () => updateOTCalcPreview());
+  setupNative24hPicker('ot-end', 'picker-ot-end', () => updateOTCalcPreview());
+
+  // ── Modal xem Lịch sử / Chi tiết OT theo ngày ──
+  window.openOTDayHistoryModal = async (dateStr) => {
+    const DOW_NAMES = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+    const parts = dateStr.split('-');
+    const dObj = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    const dowStr = DOW_NAMES[dObj.getDay()];
+    const titleDate = `${dowStr}, ${parts[2]}/${parts[1]}/${parts[0]}`;
+
+    document.getElementById('modal-ot-day-title').innerHTML = `
+      <i class="bi bi-calendar-check text-danger me-2"></i>Lịch sử OT ngày ${titleDate}
+    `;
+
+    const records = await api('GET', `/overtime/my?month=${curMonth}&year=${curYear}`);
+    const dayRecs = records.filter(r => r.work_date === dateStr);
+    const bodyEl = document.getElementById('modal-ot-day-body');
+
+    if (dayRecs.length === 0) {
+      bodyEl.innerHTML = `<div class="text-center text-muted py-4">Chưa có đăng ký OT nào trong ngày này.</div>`;
+    } else {
+      let totalRaw = 0;
+      let totalWeighted = 0;
+      let html = '<div class="d-flex flex-column gap-2">';
+      dayRecs.forEach(r => {
+        totalRaw += r.raw_hours;
+        totalWeighted += r.weighted_hours;
+        const isNight = (r.factor === 2.1 || r.factor === 2.7 || r.factor === 3.9);
+        const shiftBadge = isNight
+          ? `<span class="badge" style="background:#1e293b;color:#f8fafc;font-size:0.72rem"><i class="bi bi-moon-stars-fill text-warning me-1"></i>Ban đêm</span>`
+          : `<span class="badge" style="background:#fef3c7;color:#92400e;border:1px solid #fde68a;font-size:0.72rem"><i class="bi bi-sun-fill text-warning me-1"></i>Ban ngày</span>`;
+
+        let actionBtns = '';
+        if (r.status !== 'Approved') {
+          actionBtns = `
+            <div class="mt-2 d-flex gap-2 justify-content-end">
+              <button class="btn btn-sm btn-outline-secondary py-0" onclick="bootstrap.Modal.getOrCreateInstance(document.getElementById('modal-ot-day-history')).hide(); openOTEditModal(${r.id});">
+                <i class="bi bi-pencil me-1"></i>Sửa
+              </button>
+              <button class="btn btn-sm btn-outline-danger py-0" onclick="bootstrap.Modal.getOrCreateInstance(document.getElementById('modal-ot-day-history')).hide(); deleteOT(${r.id});">
+                <i class="bi bi-trash me-1"></i>Xóa
+              </button>
+            </div>
+          `;
+        }
+
+        const rejectInfo = (r.status === 'Rejected' && r.reject_reason)
+          ? `<div class="mt-1 small text-danger"><i class="bi bi-exclamation-circle me-1"></i><strong>Lý do từ chối:</strong> ${r.reject_reason}</div>`
+          : '';
+
+        html += `
+        <div class="p-3 rounded border" style="background:#f8fafc">
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <span class="fw-bold text-dark fs-6">
+              <i class="bi bi-clock me-1 text-primary"></i>${formatTime24h(r.start_time)} – ${formatTime24h(r.end_time)}
+            </span>
+            <span>${otBadge(r.status)}</span>
+          </div>
+          <div class="d-flex align-items-center gap-2 mb-2">
+            ${shiftBadge}
+            <span class="badge bg-primary-subtle text-primary border border-primary-subtle">Hệ số ${r.factor}x</span>
+            <span class="fw-semibold text-primary small">${r.raw_hours}h thực tế → ${r.weighted_hours}h quy đổi</span>
+          </div>
+          <div class="small text-muted mb-1">
+            <strong>Lý do:</strong> ${r.reason || '<em>(Không có ghi chú)</em>'}
+          </div>
+          ${rejectInfo}
+          ${actionBtns}
+        </div>`;
+      });
+      html += `
+        <div class="p-2 rounded mt-2 d-flex justify-content-between small fw-bold" style="background:rgba(30,90,200,0.08);border:1px solid rgba(30,90,200,0.15)">
+          <span>Tổng trong ngày:</span>
+          <span class="text-primary">${totalRaw.toFixed(1)}h thực tế → ${totalWeighted.toFixed(2)}h quy đổi</span>
+        </div>
+      </div>`;
+      bodyEl.innerHTML = html;
+    }
+
+    document.getElementById('btn-add-more-ot-day').onclick = () => {
+      bootstrap.Modal.getOrCreateInstance(document.getElementById('modal-ot-day-history')).hide();
+      openOTRegisterModal(dateStr);
+    };
+
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('modal-ot-day-history')).show();
+  };
+
   // ── Modal đăng ký ──
   window.openOTRegisterModal = (dateStr) => {
     document.getElementById('ot-edit-id').value = '';
     document.getElementById('modal-ot-title').textContent = 'Đăng ký OT';
     document.getElementById('btn-save-ot').textContent = 'Đăng ký';
-    document.getElementById('ot-date').value = dateStr;
+
+    const targetDate = dateStr || new Date().toISOString().split('T')[0];
+    document.getElementById('ot-date').value = targetDate;
+    if (document.getElementById('ot-end-date')) {
+      document.getElementById('ot-end-date').value = '';
+    }
 
     // Đặt giờ mặc định theo loại ngày
-    const dObj = new Date(dateStr + 'T00:00:00');
+    const dObj = new Date(targetDate + 'T00:00:00');
     const dow = dObj.getDay(); // 0=CN, 6=T7
     const isWeekend = dow === 0 || dow === 6;
     document.getElementById('ot-start').value = isWeekend ? '08:00' : '18:30';
     document.getElementById('ot-end').value = '';
+
     document.getElementById('ot-reason').value = '';
     document.getElementById('ot-is-holiday').checked = false;
     document.getElementById('ot-calc-preview').classList.add('d-none');
@@ -234,8 +467,13 @@ async function renderRegisterOT(area) {
     document.getElementById('modal-ot-title').textContent = 'Sửa đăng ký OT';
     document.getElementById('btn-save-ot').textContent = 'Cập nhật';
     document.getElementById('ot-date').value = r.work_date;
-    document.getElementById('ot-start').value = r.start_time;
-    document.getElementById('ot-end').value = r.end_time;
+    if (document.getElementById('ot-end-date')) {
+      document.getElementById('ot-end-date').value = '';
+    }
+
+    document.getElementById('ot-start').value = formatTime24h(r.start_time);
+    document.getElementById('ot-end').value = formatTime24h(r.end_time);
+
     document.getElementById('ot-is-holiday').checked = (r.factor >= 3.0);
     document.getElementById('ot-reason').value = r.reason || '';
     document.getElementById('ot-time-warning').classList.add('d-none');
@@ -258,10 +496,19 @@ async function renderRegisterOT(area) {
     } catch (e) { toast(e.message, 'error'); }
   };
 
-  // ── Calc preview (gọi /preview API) ──
+  // ── Calc preview (hỗ trợ phân tách theo nhiều ngày & nhiều khung giờ hệ số, ban ngày / ban đêm) ──
   let previewTimer = null;
+
+  function formatDateYMD(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
   async function updateOTCalcPreview() {
     const dStr = document.getElementById('ot-date').value;
+    const endDateStr = document.getElementById('ot-end-date')?.value || '';
     const s = document.getElementById('ot-start').value;
     const e = document.getElementById('ot-end').value;
     const isHoliday = document.getElementById('ot-is-holiday').checked;
@@ -271,103 +518,205 @@ async function renderRegisterOT(area) {
 
     if (!s || !e || !dStr) { preview.classList.add('d-none'); return; }
 
-    const [sh, sm] = s.split(':').map(Number);
-    const [eh, em] = e.split(':').map(Number);
-    const startMin = sh * 60 + sm;
-    const endMin = eh * 60 + em;
-    const dObj = new Date(dStr + 'T00:00:00');
-    const dow = dObj.getDay();
-    const isWeekend = dow === 0 || dow === 6;
+    const dateList = [];
+    let cur = new Date(dStr + 'T00:00:00');
+    const endD = (endDateStr && endDateStr > dStr) ? new Date(endDateStr + 'T00:00:00') : new Date(dStr + 'T00:00:00');
+    while (cur <= endD) {
+      dateList.push(formatDateYMD(cur));
+      cur.setDate(cur.getDate() + 1);
+    }
 
-    // Cảnh báo thời gian không hợp lệ
+    const isMultiDay = (dateList.length > 1);
+
     warning.classList.add('d-none');
-    if (!isWeekend && startMin < 18 * 60 + 30) {
-      warningTxt.textContent = 'T2–T6: Giờ bắt đầu phải từ 18:30 trở đi!';
-      warning.classList.remove('d-none');
-      preview.classList.add('d-none');
-      return;
-    }
-    if (endMin <= startMin) {
-      warningTxt.textContent = 'Giờ kết thúc phải lớn hơn giờ bắt đầu!';
-      warning.classList.remove('d-none');
-      preview.classList.add('d-none');
-      return;
-    }
 
-    // Debounce gọi API preview
     clearTimeout(previewTimer);
     previewTimer = setTimeout(async () => {
       try {
-        const data = await api('POST', '/overtime/preview', {
-          work_date: dStr,
-          start_time: s,
-          end_time: e,
-          is_holiday: isHoliday,
+        let totalRawAll = 0;
+        let totalWeightedAll = 0;
+        let totalDayRaw = 0;
+        let totalNightRaw = 0;
+        const DOW_NAMES = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+
+        const previewsData = await Promise.all(dateList.map((dt, idx) => {
+          const parts = dt.split('-');
+          const dObj = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+          const dow = dObj.getDay();
+          const isWk = (dow === 0 || dow === 6);
+
+          let dtStart = s;
+          let dtEnd = e;
+
+          if (isMultiDay) {
+            if (idx === 0) {
+              dtStart = s;
+              dtEnd = '08:00';
+            } else if (idx === dateList.length - 1) {
+              dtStart = (isWk || isHoliday) ? s : '18:30';
+              dtEnd = e;
+            } else {
+              dtStart = (isWk || isHoliday) ? '08:00' : '18:30';
+              dtEnd = '08:00';
+            }
+          }
+
+          return api('POST', '/overtime/preview', {
+            work_date: dt,
+            start_time: dtStart,
+            end_time: dtEnd,
+            is_holiday: isHoliday,
+          });
+        }));
+
+        const allSegs = [];
+        previewsData.forEach(data => {
+          (data.segments || []).forEach(seg => allSegs.push(seg));
         });
-        const segHtml = data.segments.map(seg => `
-          <div class="d-flex justify-content-between small mb-1">
-            <span class="text-muted">${seg.start_time} – ${seg.end_time}</span>
-            <span>
-              <span class="badge" style="background:rgba(30,90,200,.12);color:#1a5abf;border:1px solid rgba(30,90,200,.25)">${seg.factor}x</span>
-              <strong class="ms-1">${seg.raw_hours}h → ${seg.weighted_hours}h quy đổi</strong>
-            </span>
-          </div>`).join('');
-        document.getElementById('ot-segments-preview').innerHTML = segHtml;
-        document.getElementById('ot-raw-preview').textContent = data.total_raw_hours + ' giờ';
-        document.getElementById('ot-weighted-preview').textContent = data.total_weighted_hours + ' giờ';
+
+        const segsByDate = {};
+        allSegs.forEach(seg => {
+          const wDate = (typeof seg.work_date === 'string') ? seg.work_date : (seg.work_date ? seg.work_date.toString() : dStr);
+          if (!segsByDate[wDate]) segsByDate[wDate] = [];
+          segsByDate[wDate].push(seg);
+        });
+
+        let html = '';
+        const sortedDates = Object.keys(segsByDate).sort();
+        sortedDates.forEach(dtStr => {
+          const parts = dtStr.split('-');
+          const dObj = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+          const dowStr = DOW_NAMES[dObj.getDay()];
+          const dateSegs = segsByDate[dtStr];
+
+          const segStr = dateSegs.map(seg => {
+            const isNight = (seg.shift_type === 'night' || seg.factor === 2.1 || seg.factor === 2.7 || seg.factor === 3.9);
+            if (isNight) {
+              totalNightRaw += seg.raw_hours;
+            } else {
+              totalDayRaw += seg.raw_hours;
+            }
+            totalRawAll += seg.raw_hours;
+            totalWeightedAll += seg.weighted_hours;
+
+            const shiftBadge = isNight
+              ? `<span class="badge" style="background:#1e293b;color:#f8fafc;font-size:0.72rem"><i class="bi bi-moon-stars-fill text-warning me-1"></i>Ban đêm</span>`
+              : `<span class="badge" style="background:#fef3c7;color:#92400e;border:1px solid #fde68a;font-size:0.72rem"><i class="bi bi-sun-fill text-warning me-1"></i>Ban ngày</span>`;
+
+            return `
+            <div class="d-flex justify-content-between align-items-center small py-1 border-bottom border-light">
+              <span class="text-secondary">
+                <i class="bi bi-clock me-1"></i>${seg.start_time} – ${seg.end_time}
+                <span class="ms-1">${shiftBadge}</span>
+              </span>
+              <span>
+                <span class="badge" style="background:rgba(30,90,200,.12);color:#1a5abf;border:1px solid rgba(30,90,200,.25)">Hệ số ${seg.factor}x</span>
+                <strong class="ms-1 text-primary">${seg.raw_hours}h → ${seg.weighted_hours}h</strong>
+              </span>
+            </div>`;
+          }).join('');
+
+          html += `
+          <div class="mb-2 p-2 rounded" style="background:#fff;border:1px solid #e2e8f0">
+            <div class="fw-bold small text-dark mb-1">
+              <i class="bi bi-calendar-event me-1 text-danger"></i>${dowStr}, ${parts[2]}/${parts[1]}/${parts[0]}
+            </div>
+            ${segStr}
+          </div>`;
+        });
+
+        document.getElementById('ot-segments-preview').innerHTML = html;
+        document.getElementById('ot-raw-preview').innerHTML = `${totalRawAll.toFixed(1)}h <small class="text-muted fw-normal">(☀️ Ngày: ${totalDayRaw.toFixed(1)}h | 🌙 Đêm: ${totalNightRaw.toFixed(1)}h)</small>`;
+        document.getElementById('ot-weighted-preview').textContent = `${totalWeightedAll.toFixed(2)}h quy đổi (${dateList.length} ngày)`;
         preview.classList.remove('d-none');
       } catch (err) {
         preview.classList.add('d-none');
       }
-    }, 400);
+    }, 350);
   }
 
+  document.getElementById('ot-date').addEventListener('change', updateOTCalcPreview);
+  document.getElementById('ot-end-date')?.addEventListener('change', updateOTCalcPreview);
   document.getElementById('ot-start').addEventListener('change', updateOTCalcPreview);
   document.getElementById('ot-end').addEventListener('change', updateOTCalcPreview);
-  document.getElementById('ot-is-holiday').addEventListener('change', updateOTCalcPreview);
+  document.getElementById('ot-is-holiday').addEventListener('change', () => {
+    const isHoliday = document.getElementById('ot-is-holiday').checked;
+    const sElem = document.getElementById('ot-start');
+    if (isHoliday && sElem.value === '18:30') {
+      sElem.value = '08:00';
+    }
+    updateOTCalcPreview();
+  });
 
   // ── Save OT ──
   document.getElementById('btn-save-ot').onclick = async () => {
     const editId = document.getElementById('ot-edit-id').value;
-    const dateStr = document.getElementById('ot-date').value;
+    const startDateStr = document.getElementById('ot-date').value;
+    const endDateStr = document.getElementById('ot-end-date')?.value || '';
     const startTime = document.getElementById('ot-start').value;
     const endTime = document.getElementById('ot-end').value;
     const isHoliday = document.getElementById('ot-is-holiday').checked;
 
-    if (!startTime || !endTime) {
-      toast('Vui lòng nhập giờ bắt đầu và kết thúc.', 'error'); return;
+    if (!startDateStr || !startTime || !endTime) {
+      toast('Vui lòng điền đầy đủ ngày và giờ OT.', 'error'); return;
     }
 
-    // Front-end validation
-    const dObj = new Date(dateStr + 'T00:00:00');
-    const dow = dObj.getDay();
-    const isWeekend = dow === 0 || dow === 6;
-    const [sh, sm] = startTime.split(':').map(Number);
-    const [eh, em] = endTime.split(':').map(Number);
-
-    if (!isWeekend && (sh * 60 + sm) < 18 * 60 + 30) {
-      toast('Thứ 2–6: Giờ bắt đầu OT phải từ 18:30 trở đi.', 'error'); return;
-    }
-    if ((eh * 60 + em) <= (sh * 60 + sm)) {
-      toast('Thời gian kết thúc phải lớn hơn thời gian bắt đầu.', 'error'); return;
+    const dateList = [];
+    let cur = new Date(startDateStr + 'T00:00:00');
+    const endD = (!editId && endDateStr && endDateStr > startDateStr) ? new Date(endDateStr + 'T00:00:00') : new Date(startDateStr + 'T00:00:00');
+    while (cur <= endD) {
+      dateList.push(formatDateYMD(cur));
+      cur.setDate(cur.getDate() + 1);
     }
 
-    const body = {
-      start_time: startTime,
-      end_time: endTime,
-      is_holiday: isHoliday,
-      reason: document.getElementById('ot-reason').value.trim() || null,
-    };
+    const isMultiDay = (dateList.length > 1);
+    const baseReason = document.getElementById('ot-reason').value.trim() || null;
 
     try {
       if (editId) {
-        await api('PUT', `/overtime/${editId}`, body);
+        await api('PUT', `/overtime/${editId}`, {
+          start_time: startTime,
+          end_time: endTime,
+          is_holiday: isHoliday,
+          reason: baseReason,
+        });
         toast('Đã cập nhật đăng ký OT. Trạng thái chuyển về Chờ duyệt.', 'success');
       } else {
-        body.work_date = dateStr;
-        const result = await api('POST', '/overtime/', body);
-        if (result.segments === 2) {
-          toast(`Đăng ký OT thành công! Đã tách thành 2 khung giờ tại 22:00 (${result.records[0].start_time}–22:00 và 22:00–${result.records[1].end_time}).`, 'success');
+        let totalCreated = 0;
+        for (let idx = 0; idx < dateList.length; idx++) {
+          const dt = dateList[idx];
+          const parts = dt.split('-');
+          const dObj = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+          const dow = dObj.getDay();
+          const isWk = (dow === 0 || dow === 6);
+
+          let dtStart = startTime;
+          let dtEnd = endTime;
+
+          if (isMultiDay) {
+            if (idx === 0) {
+              dtStart = startTime;
+              dtEnd = '08:00';
+            } else if (idx === dateList.length - 1) {
+              dtStart = (isWk || isHoliday) ? startTime : '18:30';
+              dtEnd = endTime;
+            } else {
+              dtStart = (isWk || isHoliday) ? '08:00' : '18:30';
+              dtEnd = '08:00';
+            }
+          }
+
+          await api('POST', '/overtime/', {
+            work_date: dt,
+            start_time: dtStart,
+            end_time: dtEnd,
+            is_holiday: isHoliday,
+            reason: baseReason,
+          });
+          totalCreated += 1;
+        }
+        if (dateList.length > 1) {
+          toast(`Đăng ký OT thành công! Đã tự động phân tách cho ${dateList.length} ngày (từ ${startDateStr.split('-').reverse().join('/')} đến ${endDateStr.split('-').reverse().join('/')}).`, 'success');
         } else {
           toast('Đăng ký OT thành công!', 'success');
         }
@@ -504,27 +853,41 @@ async function renderManageOT(area) {
 
   function renderListTab(records) {
     selectedIds.clear();
+    const DOW_NAMES = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
     const tbody = records.length === 0
       ? `<tr><td colspan="9" class="text-center text-muted py-4">Không có dữ liệu.</td></tr>`
-      : records.map(r => `
+      : records.map(r => {
+        let dateFormatted = '—';
+        if (r.work_date) {
+          const parts = r.work_date.split('-');
+          const dObj = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+          const dowStr = DOW_NAMES[dObj.getDay()];
+          dateFormatted = `${dowStr}, ${parts[2]}/${parts[1]}/${parts[0]}`;
+        }
+        return `
         <tr data-ot-id="${r.id}">
           <td class="text-center">
             ${r.status === 'Pending' ? `<input type="checkbox" class="form-check-input ot-check" data-id="${r.id}">` : ''}
           </td>
-          <td class="text-center small">${r.work_date ? r.work_date.split('-').reverse().join('/') : '—'}</td>
+          <td class="text-center small fw-semibold">${dateFormatted}</td>
           <td><code style="font-size:0.78rem;color:#475569;background:#f1f5f9;padding:2px 6px;border-radius:4px">${r.employee_code}</code></td>
           <td class="fw-semibold" style="color:#1e293b">${r.full_name}</td>
           <td class="text-muted small">${r.project || '—'}</td>
-          <td class="text-center">${r.start_time} – ${r.end_time}<br><small class="text-muted">${r.raw_hours}h</small></td>
+          <td class="text-center">${formatTime24h(r.start_time)} – ${formatTime24h(r.end_time)}<br><small class="text-muted">${r.raw_hours}h</small></td>
           <td class="text-center"><span class="badge bg-secondary">${r.factor}x</span></td>
           <td>${otBadge(r.status)}${r.reject_reason ? `<br><small class="text-danger">${r.reject_reason}</small>` : ''}</td>
-          <td class="text-center">
+          <td class="text-center text-nowrap">
             ${r.status === 'Pending' ? `
-            <button class="btn btn-sm btn-success py-0 px-2 me-1" onclick="adminApproveOT(${r.id})">✓</button>
-            <button class="btn btn-sm btn-danger py-0 px-2" onclick="openRejectModal(${r.id})">✗</button>
-            ` : `<button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="viewOTDetail(${r.id})"><i class="bi bi-eye"></i></button>`}
+            <button class="btn btn-sm btn-success py-0 px-2 me-1" onclick="adminApproveOT(${r.id})" title="Duyệt">✓</button>
+            <button class="btn btn-sm btn-danger py-0 px-2 me-1" onclick="openRejectModal(${r.id})" title="Từ chối">✗</button>
+            ` : `
+            <button class="btn btn-sm btn-warning py-0 px-2 me-1 text-dark" onclick="adminResetPendingOT(${r.id})" title="Trả về Chưa duyệt"><i class="bi bi-arrow-counterclockwise"></i></button>
+            `}
+            <button class="btn btn-sm btn-outline-secondary py-0 px-2 me-1" onclick="viewOTDetail(${r.id})" title="Xem chi tiết"><i class="bi bi-eye"></i></button>
+            <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="adminDeleteOT(${r.id})" title="Xóa OT"><i class="bi bi-trash"></i></button>
           </td>
-        </tr>`).join('');
+        </tr>`;
+      }).join('');
 
     document.getElementById('ot-tab-content').innerHTML = `
     ${buildBulkBar()}
@@ -534,7 +897,7 @@ async function renderManageOT(area) {
           <thead class="table-light">
             <tr>
               <th style="width:40px"><input type="checkbox" class="form-check-input" id="ot-check-all" title="Chọn tất cả Pending"></th>
-              <th>Ngày</th><th>MNV</th><th>Họ tên</th><th>Dự án</th>
+              <th>Ngày OT</th><th>MNV</th><th>Họ tên</th><th>Dự án</th>
               <th class="text-center">Giờ</th><th class="text-center">Hệ số</th>
               <th>Trạng thái</th><th class="text-center">Thao tác</th>
             </tr>
@@ -777,6 +1140,37 @@ async function renderManageOT(area) {
     } catch (e) { toast(e.message, 'error'); }
   };
 
+  window.adminResetPendingOT = async (id) => {
+    const ok = await showConfirm({
+      title: 'Đặt lại trạng thái OT',
+      message: 'Xác nhận chuyển trạng thái yêu cầu OT này về Chưa duyệt (Pending)?',
+      okText: 'Trả về Chưa duyệt',
+      type: 'warning'
+    });
+    if (!ok) return;
+    try {
+      await api('POST', `/overtime/admin/${id}/reset-pending`);
+      toast('Đã chuyển OT về trạng thái Chưa duyệt.', 'success');
+      await reload();
+    } catch (e) { toast(e.message, 'error'); }
+  };
+
+  window.adminDeleteOT = async (id) => {
+    const ok = await showConfirm({
+      title: 'Xóa yêu cầu OT',
+      message: 'Xác nhận xóa yêu cầu OT này? (Hành động này không thể hoàn tác)',
+      okText: 'Xóa OT',
+      type: 'danger'
+    });
+    if (!ok) return;
+    try {
+      await api('DELETE', `/overtime/admin/${id}`);
+      toast('Đã xóa yêu cầu OT.', 'success');
+      if (activeTab === 'list') await reload();
+      else await reloadSummary();
+    } catch (e) { toast(e.message, 'error'); }
+  };
+
   window.openRejectModal = (id) => {
     document.getElementById('reject-ot-id').value = id;
     document.getElementById('reject-reason-text').value = '';
@@ -800,14 +1194,24 @@ async function renderManageOT(area) {
     const records = await api('GET', `/overtime/admin/list?${params}`);
     const r = records.find(x => x.id === id);
     if (!r) return;
+
+    const DOW_NAMES = ['Chủ nhật', 'Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy'];
+    let dateFormatted = r.work_date;
+    if (r.work_date) {
+      const parts = r.work_date.split('-');
+      const dObj = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+      const dowStr = DOW_NAMES[dObj.getDay()];
+      dateFormatted = `${dowStr}, ${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+
     document.getElementById('ot-detail-body').innerHTML = `
     <div class="row g-3">
       <div class="col-6"><div class="text-muted small">Nhân viên</div><div class="fw-semibold">${r.full_name}</div></div>
       <div class="col-6"><div class="text-muted small">Mã NV</div><div class="fw-semibold">${r.employee_code}</div></div>
-      <div class="col-6"><div class="text-muted small">Ngày OT</div><div class="fw-semibold">${r.work_date}</div></div>
+      <div class="col-6"><div class="text-muted small">Ngày OT</div><div class="fw-semibold">${dateFormatted}</div></div>
       <div class="col-6"><div class="text-muted small">Dự án</div><div class="fw-semibold">${r.project || '—'}</div></div>
-      <div class="col-4"><div class="text-muted small">Bắt đầu</div><div class="fw-bold fs-5">${r.start_time}</div></div>
-      <div class="col-4"><div class="text-muted small">Kết thúc</div><div class="fw-bold fs-5">${r.end_time}</div></div>
+      <div class="col-4"><div class="text-muted small">Bắt đầu</div><div class="fw-bold fs-5">${formatTime24h(r.start_time)}</div></div>
+      <div class="col-4"><div class="text-muted small">Kết thúc</div><div class="fw-bold fs-5">${formatTime24h(r.end_time)}</div></div>
       <div class="col-4"><div class="text-muted small">Số giờ</div><div class="fw-bold fs-5 text-danger">${r.raw_hours}h</div></div>
       <div class="col-6"><div class="text-muted small">Hệ số</div><div class="fw-semibold">${r.factor}x</div></div>
       <div class="col-6"><div class="text-muted small">Giờ quy đổi</div><div class="fw-bold text-danger">${r.weighted_hours}h</div></div>
@@ -815,7 +1219,21 @@ async function renderManageOT(area) {
       <div class="col-12"><div class="text-muted small">Trạng thái</div><div>${otBadge(r.status)}</div></div>
       ${r.reject_reason ? `<div class="col-12"><div class="text-muted small">Lý do từ chối</div><div class="text-danger">${r.reject_reason}</div></div>` : ''}
     </div>`;
-    document.getElementById('ot-detail-footer').innerHTML = `<button class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>`;
+
+    let actionBtns = `<button class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>`;
+    if (r.status === 'Pending') {
+      actionBtns = `
+        <button class="btn btn-success me-1" onclick="bootstrap.Modal.getInstance(document.getElementById('modal-ot-detail')).hide(); adminApproveOT(${r.id})"><i class="bi bi-check-lg me-1"></i>Duyệt OT</button>
+        <button class="btn btn-danger me-1" onclick="bootstrap.Modal.getInstance(document.getElementById('modal-ot-detail')).hide(); openRejectModal(${r.id})"><i class="bi bi-x-lg me-1"></i>Từ chối</button>
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>`;
+    } else {
+      actionBtns = `
+        <button class="btn btn-warning me-1 text-dark fw-semibold" onclick="bootstrap.Modal.getInstance(document.getElementById('modal-ot-detail')).hide(); adminResetPendingOT(${r.id})"><i class="bi bi-arrow-counterclockwise me-1"></i>Trả về Chưa duyệt</button>
+        <button class="btn btn-outline-danger me-1" onclick="bootstrap.Modal.getInstance(document.getElementById('modal-ot-detail')).hide(); adminDeleteOT(${r.id})"><i class="bi bi-trash me-1"></i>Xóa OT</button>
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>`;
+    }
+
+    document.getElementById('ot-detail-footer').innerHTML = actionBtns;
     bootstrap.Modal.getOrCreateInstance(document.getElementById('modal-ot-detail')).show();
   };
 

@@ -597,6 +597,7 @@
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+          <button class="btn btn-warning me-1 d-none" id="btn-edit-employee-mode"><i class="bi bi-pencil-square me-1"></i>Chỉnh sửa</button>
           <button class="btn btn-primary" id="btn-save-employee"><i class="bi bi-check-lg me-1"></i>Lưu</button>
         </div>
       </div>
@@ -673,18 +674,32 @@
         <div class="modal-body">
           <form id="form-ot-register">
             <input type="hidden" id="ot-edit-id" />
-            <div class="mb-3">
-              <label class="form-label fw-semibold">Ngày</label>
-              <input id="ot-date" type="date" class="form-control" readonly />
-            </div>
             <div class="row g-3 mb-3">
               <div class="col-6">
-                <label class="form-label fw-semibold">Giờ bắt đầu</label>
-                <input id="ot-start" type="time" class="form-control" step="300" />
+                <label class="form-label fw-semibold">Từ ngày *</label>
+                <input id="ot-date" type="date" class="form-control" />
               </div>
               <div class="col-6">
-                <label class="form-label fw-semibold">Giờ kết thúc</label>
-                <input id="ot-end" type="time" class="form-control" step="300" />
+                <label class="form-label fw-semibold">Đến ngày <small class="text-muted">(tùy chọn)</small></label>
+                <input id="ot-end-date" type="date" class="form-control" placeholder="Nếu đăng ký nhiều ngày" />
+              </div>
+            </div>
+            <div class="row g-3 mb-3">
+              <div class="col-6 position-relative">
+                <label class="form-label fw-semibold">Giờ bắt đầu *</label>
+                <div class="input-time-native-wrap">
+                  <input id="ot-start" type="text" class="form-control" placeholder="18:30" maxlength="5" />
+                  <span class="time-clock-btn" data-target="ot-start"><i class="bi bi-clock"></i></span>
+                </div>
+                <div id="picker-ot-start" class="native-time-picker-popup d-none"></div>
+              </div>
+              <div class="col-6 position-relative">
+                <label class="form-label fw-semibold">Giờ kết thúc *</label>
+                <div class="input-time-native-wrap">
+                  <input id="ot-end" type="text" class="form-control" placeholder="22:00" maxlength="5" />
+                  <span class="time-clock-btn" data-target="ot-end"><i class="bi bi-clock"></i></span>
+                </div>
+                <div id="picker-ot-end" class="native-time-picker-popup d-none"></div>
               </div>
             </div>
             <!-- Cảnh báo giờ OT -->
@@ -728,6 +743,29 @@
         <div class="modal-footer">
           <button class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
           <button class="btn btn-danger" id="btn-save-ot"><i class="bi bi-check-lg me-1"></i>Đăng ký</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════ MODAL XEM LỊCH SỬ / CHI TIẾT OT THEO NGÀY ═══════════════════════ -->
+  <div class="modal fade" id="modal-ot-day-history" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content glass-modal shadow-lg border-0">
+        <div class="modal-header border-bottom border-light">
+          <h5 class="modal-title fw-bold" id="modal-ot-day-title">
+            <i class="bi bi-calendar-check text-danger me-2"></i>Lịch sử OT ngày
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-3" id="modal-ot-day-body">
+          <!-- Danh sách ca OT trong ngày sẽ render vào đây -->
+        </div>
+        <div class="modal-footer border-top border-light d-flex justify-content-between">
+          <button class="btn btn-outline-danger btn-sm" id="btn-add-more-ot-day">
+            <i class="bi bi-plus-lg me-1"></i>Đăng ký thêm OT ngày này
+          </button>
+          <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Đóng</button>
         </div>
       </div>
     </div>

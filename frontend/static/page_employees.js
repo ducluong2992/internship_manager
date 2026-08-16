@@ -271,6 +271,30 @@ async function openEmployeeModal(emp) {
   // Toggle borrow section
   handleStaffCategoryChange();
 
+  // Mode: Khóa form trước, yêu cầu bấm "Chỉnh sửa" mới cho phép lưu
+  const formInputs = document.querySelectorAll('#form-employee input, #form-employee select');
+  const btnEditMode = document.getElementById('btn-edit-employee-mode');
+  const btnSave = document.getElementById('btn-save-employee');
+
+  if (emp) {
+    formInputs.forEach(el => el.disabled = true);
+    if (btnEditMode) {
+      btnEditMode.classList.remove('d-none');
+      btnEditMode.onclick = () => {
+        formInputs.forEach(el => {
+          if (el.id !== 'emp-code') el.disabled = false;
+        });
+        btnEditMode.classList.add('d-none');
+        if (btnSave) btnSave.classList.remove('d-none');
+      };
+    }
+    if (btnSave) btnSave.classList.add('d-none');
+  } else {
+    formInputs.forEach(el => el.disabled = false);
+    if (btnEditMode) btnEditMode.classList.add('d-none');
+    if (btnSave) btnSave.classList.remove('d-none');
+  }
+
   bootstrap.Modal.getOrCreateInstance(document.getElementById('modal-employee')).show();
 }
 
