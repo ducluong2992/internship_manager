@@ -161,28 +161,77 @@ def split_segments(start_min: int, end_min: int, is_holiday: bool, is_weekend: b
     return segments
 
 
-def validate_ot_time(start: str, end: str, work_date: date, is_holiday: bool = False):
-    """Validate thời gian OT theo nghiệp vụ:
-    - Nếu giờ kết thúc <= giờ bắt đầu: Hỗ trợ OT xuyên đêm (qua 24:00)
-    - Thứ 2 đến Thứ 6 (không phải ngày lễ): bắt đầu từ 18:30 trở đi
-    - Thứ 7, Chủ Nhật hoặc Ngày lễ: bắt đầu tính OT mọi lúc
+def generate_continuous_segments(
+    start_date: date,
+    end_date: Optional[date],
+    start_time: str,
+    end_time: str,
+    is_holiday: bool
+) -> list:
     """
+    Sinh các đoạn OT từ start_date start_time đến end_date end_time liên tục.
+    Tự động trừ đi giờ làm việc chính thức (08:00 - 18:30 vào T2-T6).
+    """
+    start_min = parse_time_minutes(start_time)
+    end_min = parse_time_minutes(end_time)
+
+    if end_date is None or end_date <= start_date:
+        if end_min <= start_min:
+            end_min += 24 * 60
+        is_wk = start_date.weekday() in (5, 6)
+        return split_segments(start_min, end_min, is_holiday, is_wk, start_date)
+
+    cur = start_date
+    date_list = []
+    while cur <= end_date:
+        date_list.append(cur)
+        cur = date.fromordinal(cur.toordinal() + 1)
+
+    raw_segs = []
+    for idx, dt in enumerate(date_list):
+        is_wk = dt.weekday() in (5, 6)
+        reg_start = 8 * 60         # 08:00
+        reg_end = 18 * 60 + 30     # 18:30
+
+        if idx == 0:
+            raw_segs.append((dt, start_min, 1440))
+        elif idx == len(date_list) - 1:
+            early_end = min(end_min, reg_start)
+            if early_end > 0:
+                raw_segs.append((dt, 0, early_end))
+            resume_min = reg_start if (is_wk or is_holiday) else reg_end
+            if end_min > resume_min:
+                raw_segs.append((dt, resume_min, end_min))
+        else:
+            raw_segs.append((dt, 0, reg_start))
+            resume_min = reg_start if (is_wk or is_holiday) else reg_end
+            raw_segs.append((dt, resume_min, 1440))
+
+    all_segments = []
+    for dt, s, e in raw_segs:
+        is_wk = dt.weekday() in (5, 6)
+        all_segments.extend(split_segments(s, e, is_holiday, is_wk, dt))
+
+    return all_segments
+
+
+def validate_ot_time(start: str, end: str, work_date: date, is_holiday: bool = False):
+    """Validate thời gian OT theo nghiệp vụ"""
     try:
         start_min = parse_time_minutes(start)
         end_min = parse_time_minutes(end)
     except Exception:
         raise HTTPException(status_code=400, detail="Định dạng giờ không hợp lệ. Dùng HH:MM")
 
-    # Nếu qua đêm (ví dụ 20:00 -> 02:00), cộng thêm 24 giờ
     if end_min <= start_min:
         end_min += 24 * 60
 
     is_weekend = work_date.weekday() in (5, 6)
     if not is_weekend and not is_holiday:
-        if start_min < 18 * 60 + 30:
+        if start_min >= 8 * 60 and start_min < 18 * 60 + 30:
             raise HTTPException(
                 status_code=400,
-                detail="Thời gian bắt đầu OT các ngày từ Thứ 2 đến Thứ 6 (không phải ngày lễ) phải từ 18:30 trở đi."
+                detail="Từ 08:00 đến 18:30 là giờ làm việc chính thức (T2-T6). OT chỉ tính ngoài giờ hành chính."
             )
 
     raw = calc_raw_hours(start_min, end_min)
@@ -280,13 +329,21 @@ def create_overtime(
     if body.work_date.year < now.year or (body.work_date.year == now.year and body.work_date.month < now.month):
         raise HTTPException(status_code=400, detail="Không thể đăng ký OT cho các tháng trong quá khứ.")
 
-    start_min, end_min, _ = validate_ot_time(body.start_time, body.end_time, body.work_date, body.is_holiday)
+    segments = generate_continuous_segments(
+        body.work_date,
+        body.end_date,
+        body.start_time,
+        body.end_time,
+        body.is_holiday
+    )
+    if not segments:
+        raise HTTPException(status_code=400, detail="Không có khoảng thời gian OT hợp lệ.")
 
-    # Kiểm tra trùng cho toàn bộ khoảng [start, end]
-    check_overlap(db, current_user.id, body.work_date, start_min, end_min)
-
-    is_weekend = body.work_date.weekday() in (5, 6)
-    segments = split_segments(start_min, end_min, body.is_holiday, is_weekend, body.work_date)
+    # Kiểm tra trùng cho từng đoạn
+    for seg in segments:
+        seg_s_min = parse_time_minutes(seg["start_time"])
+        seg_e_min = 1440 if seg["end_time"] == "24:00" else parse_time_minutes(seg["end_time"])
+        check_overlap(db, current_user.id, seg["work_date"], seg_s_min, seg_e_min)
 
     created = []
     for seg in segments:
@@ -396,20 +453,22 @@ def preview_ot_split(
         end_min = parse_time_minutes(body.end_time)
     except Exception:
         raise HTTPException(status_code=400, detail="Định dạng giờ không hợp lệ.")
-    if end_min <= start_min:
-        end_min += 24 * 60
 
-    raw = calc_raw_hours(start_min, end_min)
-    if raw <= 0 or raw > 24:
-        raise HTTPException(status_code=400, detail="Tổng thời gian OT phải từ 0 đến 24 giờ.")
+    segments = generate_continuous_segments(
+        body.work_date,
+        body.end_date,
+        body.start_time,
+        body.end_time,
+        body.is_holiday
+    )
+    if not segments:
+        raise HTTPException(status_code=400, detail="Không có khoảng thời gian OT hợp lệ.")
 
-    is_weekend = body.work_date.weekday() in (5, 6)
-    segments = split_segments(start_min, end_min, body.is_holiday, is_weekend, body.work_date)
     return {
         "segments": segments,
         "total_raw_hours": round(sum(s["raw_hours"] for s in segments), 2),
         "total_weighted_hours": round(sum(s["weighted_hours"] for s in segments), 2),
-        "is_weekend": is_weekend,
+        "is_weekend": body.work_date.weekday() in (5, 6),
         "is_holiday": body.is_holiday,
     }
 

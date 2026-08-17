@@ -562,11 +562,6 @@ async function renderRegisterOT(area) {
 
     if (!s || !e || !dStr) { preview.classList.add('d-none'); return; }
 
-    const dateList = getOTDateList(dStr, endDateStr, s, e);
-    const sMin = parseTimeMinutesLocal(s);
-    const eMin = parseTimeMinutesLocal(e);
-    const isOvernight = (eMin <= sMin && sMin > 0);
-
     warning.classList.add('d-none');
 
     clearTimeout(previewTimer);
@@ -578,20 +573,15 @@ async function renderRegisterOT(area) {
         let totalNightRaw = 0;
         const DOW_NAMES = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
 
-        const previewsData = await Promise.all(dateList.map((dt) => {
-          return api('POST', '/overtime/preview', {
-            work_date: dt,
-            start_time: s,
-            end_time: e,
-            is_holiday: isHoliday,
-          });
-        }));
-
-        const allSegs = [];
-        previewsData.forEach(data => {
-          (data.segments || []).forEach(seg => allSegs.push(seg));
+        const data = await api('POST', '/overtime/preview', {
+          work_date: dStr,
+          end_date: endDateStr || null,
+          start_time: s,
+          end_time: e,
+          is_holiday: isHoliday,
         });
 
+        const allSegs = data.segments || [];
         const segsByDate = {};
         allSegs.forEach(seg => {
           const wDate = (typeof seg.work_date === 'string') ? seg.work_date : (seg.work_date ? seg.work_date.toString() : dStr);
@@ -643,13 +633,9 @@ async function renderRegisterOT(area) {
           </div>`;
         });
 
-        const shiftCountText = (dateList.length > 1)
-          ? `${dateList.length} ca`
-          : (isOvernight ? '1 ca qua đêm' : '1 ca');
-
         document.getElementById('ot-segments-preview').innerHTML = html;
         document.getElementById('ot-raw-preview').innerHTML = `${totalRawAll.toFixed(1)}h <small class="text-muted fw-normal">(☀️ Ngày: ${totalDayRaw.toFixed(1)}h | 🌙 Đêm: ${totalNightRaw.toFixed(1)}h)</small>`;
-        document.getElementById('ot-weighted-preview').textContent = `${totalWeightedAll.toFixed(2)}h quy đổi (${shiftCountText})`;
+        document.getElementById('ot-weighted-preview').textContent = `${totalWeightedAll.toFixed(2)}h quy đổi`;
         preview.classList.remove('d-none');
       } catch (err) {
         preview.classList.add('d-none');
@@ -683,7 +669,6 @@ async function renderRegisterOT(area) {
       toast('Vui lòng điền đầy đủ ngày và giờ OT.', 'error'); return;
     }
 
-    const dateList = editId ? [startDateStr] : getOTDateList(startDateStr, endDateStr, startTime, endTime);
     const baseReason = document.getElementById('ot-reason').value.trim() || null;
 
     try {
@@ -696,21 +681,16 @@ async function renderRegisterOT(area) {
         });
         toast('Đã cập nhật đăng ký OT. Trạng thái chuyển về Chờ duyệt.', 'success');
       } else {
-        for (let idx = 0; idx < dateList.length; idx++) {
-          const dt = dateList[idx];
-          await api('POST', '/overtime/', {
-            work_date: dt,
-            start_time: startTime,
-            end_time: endTime,
-            is_holiday: isHoliday,
-            reason: baseReason,
-          });
-        }
-        if (dateList.length > 1) {
-          toast(`Đăng ký OT thành công! Đã tạo ${dateList.length} ca OT từ ${startDateStr.split('-').reverse().join('/')} đến ${endDateStr.split('-').reverse().join('/')}.`, 'success');
-        } else {
-          toast('Đăng ký OT thành công!', 'success');
-        }
+        const res = await api('POST', '/overtime/', {
+          work_date: startDateStr,
+          end_date: endDateStr || null,
+          start_time: startTime,
+          end_time: endTime,
+          is_holiday: isHoliday,
+          reason: baseReason,
+        });
+        const segCount = res.segments || 1;
+        toast(`Đăng ký OT thành công! Đã tự động tạo ${segCount} đoạn OT theo hệ số quy định.`, 'success');
       }
       bootstrap.Modal.getOrCreateInstance(document.getElementById('modal-ot-register')).hide();
       await reloadOT();
