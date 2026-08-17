@@ -1705,6 +1705,112 @@ body {
   background: rgba(229, 57, 53, 0.02);
 }
 
+.ot-cal-today {
+  border: 2px solid #d5001c !important;
+  background: rgba(229, 57, 53, 0.08) !important;
+  box-shadow: 0 0 10px rgba(229, 57, 53, 0.25) !important;
+}
+
+.ot-cal-today .ot-cal-day {
+  color: #d5001c !important;
+  font-weight: 800 !important;
+}
+
+/* Native-Style 24h Time Picker (Pixel Perfect match to Chrome Time Picker without AM/PM) */
+.input-time-native-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-time-native-wrap input {
+  padding-right: 36px;
+  font-family: inherit;
+  font-size: 0.95rem;
+}
+
+.time-clock-btn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+  color: #64748b;
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  transition: color 0.15s;
+}
+
+.time-clock-btn:hover {
+  color: #0078d4;
+}
+
+.native-time-picker-popup {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 1080;
+  width: 140px;
+  height: 200px;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  display: flex;
+  overflow: hidden;
+}
+
+.native-time-col {
+  flex: 1;
+  height: 100%;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  display: flex;
+  flex-direction: column;
+  padding: 2px 0;
+  border-right: 1px solid #f1f5f9;
+}
+
+.native-time-col:last-child {
+  border-right: none;
+}
+
+.native-time-col::-webkit-scrollbar {
+  width: 4px;
+}
+
+.native-time-col::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 2px;
+}
+
+.native-time-item {
+  height: 32px;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+  color: #1e293b;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.1s;
+}
+
+.native-time-item:hover {
+  background: #cce8ff;
+}
+
+.native-time-item.selected {
+  background: #0078d4 !important;
+  color: #ffffff !important;
+  font-weight: 700;
+  outline: 1.5px solid #004880;
+}
+
 .ot-cal-day {
   font-size: 0.9rem;
   font-weight: 600;

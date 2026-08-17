@@ -5,6 +5,8 @@ async function renderManageAccounts(area, userType = 'intern') {
   let accounts = await api('GET', `/admin/accounts?user_type=${userType}`);
   let filter = '';
 
+  window._currentAccounts = accounts;
+
   function filtered() {
     return accounts.filter(a =>
     (a.full_name.toLowerCase().includes(filter) ||
@@ -14,6 +16,7 @@ async function renderManageAccounts(area, userType = 'intern') {
   }
 
   function render() {
+    window._renderCurrentAccounts = render;
     const searchEl = document.getElementById('account-search');
     const isFocused = document.activeElement && document.activeElement.id === 'account-search';
     const cursorStart = isFocused ? searchEl.selectionStart : null;
@@ -73,8 +76,10 @@ async function renderManageAccounts(area, userType = 'intern') {
 
     if (isFocused) {
       const newSearchEl = document.getElementById('account-search');
-      newSearchEl.focus();
-      newSearchEl.setSelectionRange(cursorStart, cursorEnd);
+      if (newSearchEl) {
+        newSearchEl.focus();
+        newSearchEl.setSelectionRange(cursorStart, cursorEnd);
+      }
     }
   }
   render();
@@ -138,7 +143,15 @@ window.toggleLockAccount = async (id, userType = 'intern') => {
   try {
     const r = await api('PATCH', `/admin/users/${id}/lock`);
     toast(r.message, 'info');
-    const targetPage = userType === 'employee' ? 'manage-emp-accounts' : 'manage-accounts';
-    navigate(targetPage);
+    if (window._currentAccounts) {
+      const target = window._currentAccounts.find(a => a.user_id === id);
+      if (target) target.account_status = r.account_status;
+    }
+    if (typeof window._renderCurrentAccounts === 'function') {
+      window._renderCurrentAccounts();
+    } else {
+      const targetPage = userType === 'employee' ? 'manage-emp-accounts' : 'manage-accounts';
+      navigate(targetPage);
+    }
   } catch (e) { toast(e.message, 'error'); }
 };

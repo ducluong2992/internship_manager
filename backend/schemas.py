@@ -369,6 +369,7 @@ class ChatResponse(BaseModel):
 
 class OvertimeCreate(BaseModel):
     work_date: date
+    end_date: Optional[date] = None
     start_time: str          # "HH:MM"
     end_time: str            # "HH:MM"
     is_holiday: bool = False # True nếu ngày lễ

@@ -18,9 +18,14 @@ async function renderProfile(area) {
   area.innerHTML = `
 <div class="section-header">
   <div class="section-title"><i class="bi bi-person-badge-fill text-info"></i> Hồ sơ cá nhân</div>
-  <button class="btn btn-primary btn-sm" id="btn-save-profile">
-    <i class="bi bi-floppy-fill me-1"></i>Lưu thay đổi
-  </button>
+  <div>
+    <button class="btn btn-warning btn-sm me-1" id="btn-edit-profile-mode">
+      <i class="bi bi-pencil-square me-1"></i>Chỉnh sửa
+    </button>
+    <button class="btn btn-primary btn-sm d-none" id="btn-save-profile">
+      <i class="bi bi-floppy-fill me-1"></i>Lưu thay đổi
+    </button>
+  </div>
 </div>
 
 <!-- Avatar / Info Card -->
@@ -63,39 +68,39 @@ async function renderProfile(area) {
   <div class="row g-3">
     <div class="col-md-4">
       <label class="form-label">Số điện thoại</label>
-      <input id="p-phone" class="form-control" value="${user.phone||''}" placeholder="0901..." />
+      <input id="p-phone" class="form-control" value="${user.phone||''}" placeholder="0901..." disabled />
     </div>
     <div class="col-md-4">
       <label class="form-label">CCCD</label>
-      <input id="p-cccd" class="form-control" value="${user.cccd||''}" placeholder="0123456789..." />
+      <input id="p-cccd" class="form-control" value="${user.cccd||''}" placeholder="0123456789..." disabled />
     </div>
     <div class="col-md-4">
       <label class="form-label">Giới tính</label>
-      <select id="p-gender" class="form-select">
+      <select id="p-gender" class="form-select" disabled>
         <option value="">-- Chọn --</option>
         ${['Nam','Nữ','Khác'].map(g=>`<option ${user.gender===g?'selected':''}>${g}</option>`).join('')}
       </select>
     </div>
     <div class="col-md-4">
       <label class="form-label">Ngày sinh</label>
-      <input id="p-birthday" type="date" class="form-control" value="${user.birthday||''}" />
+      <input id="p-birthday" type="date" class="form-control" value="${user.birthday||''}" disabled />
     </div>
     <div class="col-md-4">
       <label class="form-label">Dân tộc</label>
-      <input id="p-ethnicity" class="form-control" value="${user.ethnicity||''}" placeholder="Kinh, Tày..." />
+      <input id="p-ethnicity" class="form-control" value="${user.ethnicity||''}" placeholder="Kinh, Tày..." disabled />
     </div>
     <div class="col-md-4">
       <label class="form-label">Quê quán</label>
-      <input id="p-hometown" class="form-control" value="${user.hometown||''}" placeholder="Tỉnh/Thành phố..." />
+      <input id="p-hometown" class="form-control" value="${user.hometown||''}" placeholder="Tỉnh/Thành phố..." disabled />
     </div>
     <div class="col-md-6">
       <label class="form-label">Email Viettel</label>
-      <input id="p-viettel-email" type="email" class="form-control" value="${user.viettel_email||''}" placeholder="abc@viettel.com.vn" />
+      <input id="p-viettel-email" type="email" class="form-control" value="${user.viettel_email||''}" placeholder="abc@viettel.com.vn" disabled />
     </div>
     ${!isEmployee ? `
     <div class="col-md-6">
       <label class="form-label">Loại hình</label>
-      <select id="p-employment-type" class="form-select">
+      <select id="p-employment-type" class="form-select" disabled>
         <option value="Fulltime" ${(user.employment_type||'').toLowerCase()==='fulltime'?'selected':''}>Fulltime</option>
         <option value="Parttime" ${(user.employment_type||'').toLowerCase()==='parttime'?'selected':''}>Parttime</option>
       </select>
@@ -108,11 +113,11 @@ async function renderProfile(area) {
   <div class="row g-3">
     <div class="col-md-6">
       <label class="form-label">Tên ngân hàng</label>
-      <input id="p-bank-name" class="form-control" value="${user.bank_name||''}" placeholder="Vietcombank, BIDV, MB..." />
+      <input id="p-bank-name" class="form-control" value="${user.bank_name||''}" placeholder="Vietcombank, BIDV, MB..." disabled />
     </div>
     <div class="col-md-6">
       <label class="form-label">Số tài khoản</label>
-      <input id="p-bank-account" class="form-control" value="${user.bank_account||''}" placeholder="0123456789" />
+      <input id="p-bank-account" class="form-control" value="${user.bank_account||''}" placeholder="0123456789" disabled />
     </div>
   </div>
 </div>
@@ -165,10 +170,26 @@ ${isEmployee ? `
   </div>
 </div>`}`;
 
-  document.getElementById('btn-save-profile').onclick = async () => {
+  const editableIds = [
+    'p-phone', 'p-cccd', 'p-gender', 'p-birthday', 'p-ethnicity',
+    'p-hometown', 'p-viettel-email', 'p-employment-type', 'p-bank-name', 'p-bank-account'
+  ];
+
+  const btnEditMode = document.getElementById('btn-edit-profile-mode');
+  const btnSave = document.getElementById('btn-save-profile');
+
+  btnEditMode.onclick = () => {
+    editableIds.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.disabled = false;
+    });
+    btnEditMode.classList.add('d-none');
+    btnSave.classList.remove('d-none');
+  };
+
+  btnSave.onclick = async () => {
     const getV = id => document.getElementById(id)?.value?.trim() || null;
-    const btn = document.getElementById('btn-save-profile');
-    btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Đang lưu...';
+    btnSave.disabled = true; btnSave.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Đang lưu...';
     try {
       const payload = {
         phone: getV('p-phone'), cccd: getV('p-cccd'),
@@ -182,9 +203,16 @@ ${isEmployee ? `
       }
       await api('PUT', '/users/me', payload);
       toast('Cập nhật hồ sơ thành công', 'success');
+      // Lock inputs again after saving
+      editableIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.disabled = true;
+      });
+      btnSave.classList.add('d-none');
+      btnEditMode.classList.remove('d-none');
     } catch (e) { toast(e.message, 'error'); }
     finally {
-      btn.disabled = false; btn.innerHTML = '<i class="bi bi-floppy-fill me-1"></i>Lưu thay đổi';
+      btnSave.disabled = false; btnSave.innerHTML = '<i class="bi bi-floppy-fill me-1"></i>Lưu thay đổi';
     }
   };
 }
