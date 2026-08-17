@@ -506,6 +506,50 @@ async function renderRegisterOT(area) {
     return `${y}-${m}-${day}`;
   }
 
+  function parseTimeMinutesLocal(t) {
+    if (!t || !t.includes(':')) return 0;
+    const parts = t.split(':').map(Number);
+    return (parts[0] || 0) * 60 + (parts[1] || 0);
+  }
+
+  function getOTDateList(startDateStr, endDateStr, startTime, endTime) {
+    if (!startDateStr) return [];
+    if (!endDateStr || endDateStr <= startDateStr) {
+      return [startDateStr];
+    }
+    const sMin = parseTimeMinutesLocal(startTime);
+    const eMin = parseTimeMinutesLocal(endTime);
+    // Nếu endTime <= startTime: đây là ca làm việc qua đêm (VD: 18:30 -> 06:30 sáng hôm sau)
+    const isOvernight = (eMin <= sMin && sMin > 0);
+
+    const startD = new Date(startDateStr + 'T00:00:00');
+    const endD = new Date(endDateStr + 'T00:00:00');
+
+    if (isOvernight) {
+      // Nếu là ca qua đêm:
+      // - Nếu chọn Từ ngày 17/08 đến 18/08 (kết thúc sáng 18/08): Đây chỉ là 1 ca duy nhất bắt đầu tối 17/08
+      // - Nếu chọn Từ ngày 17/08 đến 20/08: Có 3 ca đêm: tối 17 -> sáng 18, tối 18 -> sáng 19, tối 19 -> sáng 20 (kết thúc sáng 20/08)
+      const list = [];
+      let cur = new Date(startD);
+      const lastStartD = new Date(endD);
+      lastStartD.setDate(lastStartD.getDate() - 1);
+      while (cur <= lastStartD) {
+        list.push(formatDateYMD(cur));
+        cur.setDate(cur.getDate() + 1);
+      }
+      return list.length > 0 ? list : [startDateStr];
+    } else {
+      // Ca trong ngày: mỗi ngày từ startDate đến endDate
+      const list = [];
+      let cur = new Date(startD);
+      while (cur <= endD) {
+        list.push(formatDateYMD(cur));
+        cur.setDate(cur.getDate() + 1);
+      }
+      return list;
+    }
+  }
+
   async function updateOTCalcPreview() {
     const dStr = document.getElementById('ot-date').value;
     const endDateStr = document.getElementById('ot-end-date')?.value || '';
@@ -518,15 +562,10 @@ async function renderRegisterOT(area) {
 
     if (!s || !e || !dStr) { preview.classList.add('d-none'); return; }
 
-    const dateList = [];
-    let cur = new Date(dStr + 'T00:00:00');
-    const endD = (endDateStr && endDateStr > dStr) ? new Date(endDateStr + 'T00:00:00') : new Date(dStr + 'T00:00:00');
-    while (cur <= endD) {
-      dateList.push(formatDateYMD(cur));
-      cur.setDate(cur.getDate() + 1);
-    }
-
-    const isMultiDay = (dateList.length > 1);
+    const dateList = getOTDateList(dStr, endDateStr, s, e);
+    const sMin = parseTimeMinutesLocal(s);
+    const eMin = parseTimeMinutesLocal(e);
+    const isOvernight = (eMin <= sMin && sMin > 0);
 
     warning.classList.add('d-none');
 
@@ -539,32 +578,11 @@ async function renderRegisterOT(area) {
         let totalNightRaw = 0;
         const DOW_NAMES = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
 
-        const previewsData = await Promise.all(dateList.map((dt, idx) => {
-          const parts = dt.split('-');
-          const dObj = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-          const dow = dObj.getDay();
-          const isWk = (dow === 0 || dow === 6);
-
-          let dtStart = s;
-          let dtEnd = e;
-
-          if (isMultiDay) {
-            if (idx === 0) {
-              dtStart = s;
-              dtEnd = '08:00';
-            } else if (idx === dateList.length - 1) {
-              dtStart = (isWk || isHoliday) ? s : '18:30';
-              dtEnd = e;
-            } else {
-              dtStart = (isWk || isHoliday) ? '08:00' : '18:30';
-              dtEnd = '08:00';
-            }
-          }
-
+        const previewsData = await Promise.all(dateList.map((dt) => {
           return api('POST', '/overtime/preview', {
             work_date: dt,
-            start_time: dtStart,
-            end_time: dtEnd,
+            start_time: s,
+            end_time: e,
             is_holiday: isHoliday,
           });
         }));
@@ -625,9 +643,13 @@ async function renderRegisterOT(area) {
           </div>`;
         });
 
+        const shiftCountText = (dateList.length > 1)
+          ? `${dateList.length} ca`
+          : (isOvernight ? '1 ca qua đêm' : '1 ca');
+
         document.getElementById('ot-segments-preview').innerHTML = html;
         document.getElementById('ot-raw-preview').innerHTML = `${totalRawAll.toFixed(1)}h <small class="text-muted fw-normal">(☀️ Ngày: ${totalDayRaw.toFixed(1)}h | 🌙 Đêm: ${totalNightRaw.toFixed(1)}h)</small>`;
-        document.getElementById('ot-weighted-preview').textContent = `${totalWeightedAll.toFixed(2)}h quy đổi (${dateList.length} ngày)`;
+        document.getElementById('ot-weighted-preview').textContent = `${totalWeightedAll.toFixed(2)}h quy đổi (${shiftCountText})`;
         preview.classList.remove('d-none');
       } catch (err) {
         preview.classList.add('d-none');
@@ -661,15 +683,7 @@ async function renderRegisterOT(area) {
       toast('Vui lòng điền đầy đủ ngày và giờ OT.', 'error'); return;
     }
 
-    const dateList = [];
-    let cur = new Date(startDateStr + 'T00:00:00');
-    const endD = (!editId && endDateStr && endDateStr > startDateStr) ? new Date(endDateStr + 'T00:00:00') : new Date(startDateStr + 'T00:00:00');
-    while (cur <= endD) {
-      dateList.push(formatDateYMD(cur));
-      cur.setDate(cur.getDate() + 1);
-    }
-
-    const isMultiDay = (dateList.length > 1);
+    const dateList = editId ? [startDateStr] : getOTDateList(startDateStr, endDateStr, startTime, endTime);
     const baseReason = document.getElementById('ot-reason').value.trim() || null;
 
     try {
@@ -682,41 +696,18 @@ async function renderRegisterOT(area) {
         });
         toast('Đã cập nhật đăng ký OT. Trạng thái chuyển về Chờ duyệt.', 'success');
       } else {
-        let totalCreated = 0;
         for (let idx = 0; idx < dateList.length; idx++) {
           const dt = dateList[idx];
-          const parts = dt.split('-');
-          const dObj = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-          const dow = dObj.getDay();
-          const isWk = (dow === 0 || dow === 6);
-
-          let dtStart = startTime;
-          let dtEnd = endTime;
-
-          if (isMultiDay) {
-            if (idx === 0) {
-              dtStart = startTime;
-              dtEnd = '08:00';
-            } else if (idx === dateList.length - 1) {
-              dtStart = (isWk || isHoliday) ? startTime : '18:30';
-              dtEnd = endTime;
-            } else {
-              dtStart = (isWk || isHoliday) ? '08:00' : '18:30';
-              dtEnd = '08:00';
-            }
-          }
-
           await api('POST', '/overtime/', {
             work_date: dt,
-            start_time: dtStart,
-            end_time: dtEnd,
+            start_time: startTime,
+            end_time: endTime,
             is_holiday: isHoliday,
             reason: baseReason,
           });
-          totalCreated += 1;
         }
         if (dateList.length > 1) {
-          toast(`Đăng ký OT thành công! Đã tự động phân tách cho ${dateList.length} ngày (từ ${startDateStr.split('-').reverse().join('/')} đến ${endDateStr.split('-').reverse().join('/')}).`, 'success');
+          toast(`Đăng ký OT thành công! Đã tạo ${dateList.length} ca OT từ ${startDateStr.split('-').reverse().join('/')} đến ${endDateStr.split('-').reverse().join('/')}.`, 'success');
         } else {
           toast('Đăng ký OT thành công!', 'success');
         }

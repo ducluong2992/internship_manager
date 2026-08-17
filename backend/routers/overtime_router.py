@@ -203,25 +203,48 @@ def check_overlap(
     end_min: int,
     exclude_ids: Optional[list] = None,
 ):
-    """Kiểm tra trùng khoảng thời gian OT trong cùng ngày"""
-    existing_q = db.query(models.OvertimeRequest).filter(
+    """Kiểm tra trùng khoảng thời gian OT trong cùng ngày và rạng sáng hôm sau nếu qua đêm"""
+    # 1. Kiểm tra đoạn trên work_date: [start_min, min(end_min, 1440)]
+    s1 = start_min
+    e1 = min(end_min, 1440)
+    existing_q1 = db.query(models.OvertimeRequest).filter(
         models.OvertimeRequest.user_id == user_id,
         models.OvertimeRequest.work_date == work_date,
         models.OvertimeRequest.status != "Rejected",
     )
     if exclude_ids:
-        existing_q = existing_q.filter(
-            models.OvertimeRequest.id.notin_(exclude_ids)
-        )
+        existing_q1 = existing_q1.filter(models.OvertimeRequest.id.notin_(exclude_ids))
 
-    for ot in existing_q.all():
+    for ot in existing_q1.all():
         ex_start = parse_time_minutes(ot.start_time)
-        ex_end = parse_time_minutes(ot.end_time)
-        if start_min < ex_end and end_min > ex_start:
+        ex_end = 1440 if ot.end_time == "24:00" else parse_time_minutes(ot.end_time)
+        if s1 < ex_end and e1 > ex_start:
             raise HTTPException(
                 status_code=400,
-                detail=f"Khoảng thời gian OT bị trùng với đăng ký đã có ({ot.start_time}–{ot.end_time})."
+                detail=f"Khoảng thời gian OT bị trùng với đăng ký đã có ngày {work_date.strftime('%d/%m/%Y')} ({ot.start_time}–{ot.end_time})."
             )
+
+    # 2. Nếu qua đêm (end_min > 1440), kiểm tra đoạn rạng sáng hôm sau trên next_date: [0, end_min - 1440]
+    if end_min > 1440:
+        next_date = work_date + timedelta(days=1)
+        s2 = 0
+        e2 = end_min - 1440
+        existing_q2 = db.query(models.OvertimeRequest).filter(
+            models.OvertimeRequest.user_id == user_id,
+            models.OvertimeRequest.work_date == next_date,
+            models.OvertimeRequest.status != "Rejected",
+        )
+        if exclude_ids:
+            existing_q2 = existing_q2.filter(models.OvertimeRequest.id.notin_(exclude_ids))
+
+        for ot in existing_q2.all():
+            ex_start = parse_time_minutes(ot.start_time)
+            ex_end = 1440 if ot.end_time == "24:00" else parse_time_minutes(ot.end_time)
+            if s2 < ex_end and e2 > ex_start:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Khoảng thời gian rạng sáng bị trùng với đăng ký đã có ngày {next_date.strftime('%d/%m/%Y')} ({ot.start_time}–{ot.end_time})."
+                )
 
 
 def enrich_ot(ot: models.OvertimeRequest) -> dict:
@@ -420,9 +443,10 @@ def update_overtime(
     check_overlap(db, current_user.id, ot.work_date, start_min, end_min, exclude_ids=[ot_id])
 
     is_weekend = ot.work_date.weekday() in (5, 6)
-    segments = split_segments(start_min, end_min, is_holiday, is_weekend)
+    segments = split_segments(start_min, end_min, is_holiday, is_weekend, ot.work_date)
 
     # Segment 1: Cập nhật bản ghi hiện tại
+    ot.work_date = segments[0]["work_date"]
     ot.start_time = segments[0]["start_time"]
     ot.end_time = segments[0]["end_time"]
     ot.factor = segments[0]["factor"]
@@ -433,21 +457,21 @@ def update_overtime(
     ot.status = "Pending"
     ot.reject_reason = None
 
-    # Segment 2 (nếu vượt ranh giới 22:00): Tạo bản ghi mới cho đoạn sau 22:00
-    if len(segments) == 2:
-        ot2 = models.OvertimeRequest(
+    # Các Segment bổ sung (nếu vượt ranh giới 22:00 hoặc 24:00): Tạo bản ghi mới
+    for seg in segments[1:]:
+        ot_extra = models.OvertimeRequest(
             user_id=current_user.id,
             project=current_user.project or ot.project,
-            work_date=ot.work_date,
-            start_time=segments[1]["start_time"],
-            end_time=segments[1]["end_time"],
-            raw_hours=segments[1]["raw_hours"],
-            factor=segments[1]["factor"],
-            weighted_hours=segments[1]["weighted_hours"],
+            work_date=seg["work_date"],
+            start_time=seg["start_time"],
+            end_time=seg["end_time"],
+            raw_hours=seg["raw_hours"],
+            factor=seg["factor"],
+            weighted_hours=seg["weighted_hours"],
             reason=body.reason if body.reason is not None else ot.reason,
             status="Pending",
         )
-        db.add(ot2)
+        db.add(ot_extra)
 
     db.commit()
     db.refresh(ot)
