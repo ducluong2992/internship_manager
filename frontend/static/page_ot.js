@@ -512,19 +512,42 @@ async function renderRegisterOT(area) {
     return (parts[0] || 0) * 60 + (parts[1] || 0);
   }
 
-  function getOTDateList(startDateStr, endDateStr) {
+  function getOTDateList(startDateStr, endDateStr, startTime, endTime) {
     if (!startDateStr) return [];
     if (!endDateStr || endDateStr <= startDateStr) {
       return [startDateStr];
     }
-    const list = [];
-    let cur = new Date(startDateStr + 'T00:00:00');
+    const sMin = parseTimeMinutesLocal(startTime);
+    const eMin = parseTimeMinutesLocal(endTime);
+    // Nếu endTime <= startTime: ca làm việc qua đêm (VD: 18:30 -> 06:30)
+    const isOvernight = (eMin <= sMin && sMin > 0);
+
+    const startD = new Date(startDateStr + 'T00:00:00');
     const endD = new Date(endDateStr + 'T00:00:00');
-    while (cur <= endD) {
-      list.push(formatDateYMD(cur));
-      cur.setDate(cur.getDate() + 1);
+
+    if (isOvernight) {
+      // Với ca qua đêm (VD: 18:30 ngày 18 đến 06:30 ngày 19):
+      // - Nếu chọn Từ ngày 18 đến ngày 19 (hoặc 18 đến 18) -> Chỉ là 1 ca 12 tiếng duy nhất bắt đầu tối 18 kết thúc sáng 19!
+      // - Nếu chọn Từ ngày 18 đến ngày 21 -> 3 ca đêm: tối 18->sáng 19, tối 19->sáng 20, tối 20->sáng 21 (kết thúc đúng sáng 21, không sang ngày 22)
+      const list = [];
+      let cur = new Date(startD);
+      const lastStartD = new Date(endD);
+      lastStartD.setDate(lastStartD.getDate() - 1);
+      while (cur <= lastStartD) {
+        list.push(formatDateYMD(cur));
+        cur.setDate(cur.getDate() + 1);
+      }
+      return list.length > 0 ? list : [startDateStr];
+    } else {
+      // Ca trong ngày (VD: 18:30 -> 21:30): Mỗi ngày từ startDate đến endDate là 1 ca
+      const list = [];
+      let cur = new Date(startD);
+      while (cur <= endD) {
+        list.push(formatDateYMD(cur));
+        cur.setDate(cur.getDate() + 1);
+      }
+      return list;
     }
-    return list;
   }
 
   async function updateOTCalcPreview() {
@@ -539,7 +562,7 @@ async function renderRegisterOT(area) {
 
     if (!s || !e || !dStr) { preview.classList.add('d-none'); return; }
 
-    const dateList = getOTDateList(dStr, endDateStr);
+    const dateList = getOTDateList(dStr, endDateStr, s, e);
     const sMin = parseTimeMinutesLocal(s);
     const eMin = parseTimeMinutesLocal(e);
     const isOvernight = (eMin <= sMin && sMin > 0);
@@ -660,7 +683,7 @@ async function renderRegisterOT(area) {
       toast('Vui lòng điền đầy đủ ngày và giờ OT.', 'error'); return;
     }
 
-    const dateList = editId ? [startDateStr] : getOTDateList(startDateStr, endDateStr);
+    const dateList = editId ? [startDateStr] : getOTDateList(startDateStr, endDateStr, startTime, endTime);
     const baseReason = document.getElementById('ot-reason').value.trim() || null;
 
     try {
