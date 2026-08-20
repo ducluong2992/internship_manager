@@ -45,63 +45,69 @@ async function renderManageEmployees(area) {
 
     const renderFilter = (colName, uniqueValues, activeSet, varName) => {
       const isActive = activeSet.size > 0;
+      const isAllChecked = activeSet.size === 0;
       let html = `<th class="dropdown">
-        ${colName} 
-        <i class="bi bi-funnel-fill ms-1 dropdown-toggle ${isActive ? 'text-primary' : 'text-muted'}" data-bs-toggle="dropdown" style="cursor:pointer; font-size: 0.85rem;" data-bs-auto-close="outside"></i>
-        <ul class="dropdown-menu shadow p-2" style="min-width: 220px; max-height: 300px; overflow-y: auto; font-weight: normal;">
-          <li>
-            <label class="dropdown-item d-flex align-items-center">
-              <input type="checkbox" class="form-check-input me-2" onchange="toggleAllEmpFilter('${varName}', this.checked)" ${activeSet.size === 0 ? 'checked' : ''}> 
-              <span class="fst-italic text-muted">(Chọn tất cả)</span>
-            </label>
-          </li>
-          <li><hr class="dropdown-divider"></li>`;
+        <div class="d-inline-flex align-items-center">
+          <span>${colName}</span>
+          <span class="filter-icon-btn ${isActive ? 'active' : ''}" data-bs-toggle="dropdown" data-bs-auto-close="outside" title="Lọc ${colName}">
+            <i class="bi bi-funnel"></i>
+          </span>
+          <ul class="dropdown-menu table-filter-menu shadow-sm" style="min-width: 180px; max-height: 280px; overflow-y: auto;">
+            <li>
+              <label class="dropdown-item d-flex align-items-center" style="cursor:pointer">
+                <input type="checkbox" class="form-check-input me-2" onchange="toggleAllEmpFilter('${varName}', this.checked)" ${isAllChecked ? 'checked' : ''}> 
+                <span class="filter-text-all">(Tất cả)</span>
+              </label>
+            </li>
+            <li><hr class="dropdown-divider my-1"></li>`;
       
       for (const val of uniqueValues) {
-        const checked = activeSet.size === 0 || activeSet.has(val);
-        // encode quotes
+        const checked = activeSet.has(val);
         const safeVal = val.replace(/'/g, "\\'").replace(/"/g, '&quot;');
         html += `<li>
-            <label class="dropdown-item d-flex align-items-center">
+            <label class="dropdown-item d-flex align-items-center" style="cursor:pointer">
               <input type="checkbox" class="form-check-input me-2" value="${safeVal}" onchange="toggleEmpFilter('${varName}', this.value, this.checked)" ${checked ? 'checked' : ''}>
-              ${safeVal}
+              <span>${safeVal}</span>
             </label>
           </li>`;
       }
-      html += `</ul></th>`;
+      html += `</ul></div></th>`;
       return html;
     };
 
     area.innerHTML = `
 <div class="section-header">
-  <div class="section-title"><i class="bi bi-briefcase-fill text-danger"></i> Danh sách nhân viên</div>
+  <div class="section-title"><i class="bi bi-people-fill text-danger"></i> Danh sách nhân viên</div>
   <div class="d-flex gap-2 flex-wrap">
-    <button class="btn btn-outline-success btn-sm" onclick="downloadEmployeeTemplate()">
+    <button class="btn btn-outline-secondary btn-sm" onclick="downloadEmployeeTemplate()">
       <i class="bi bi-download me-1"></i>Tải mẫu Excel
     </button>
     <div class="dropdown d-inline-block">
-      <button class="btn btn-success btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
+      <button class="btn btn-outline-danger btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
         <i class="bi bi-upload me-1"></i>Nhập dữ liệu
       </button>
       <ul class="dropdown-menu shadow">
         <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); document.getElementById('emp-import-file').click()">
-          <i class="bi bi-file-earmark-excel me-2 text-success"></i>Nhập từ Excel</a></li>
+          <i class="bi bi-file-earmark-excel me-2 text-danger"></i>Nhập từ Excel</a></li>
         <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); promptEmployeeImportLink()">
           <i class="bi bi-link-45deg me-2 text-primary"></i>Nhập từ link sheet</a></li>
       </ul>
     </div>
     <input type="file" id="emp-import-file" class="d-none" accept=".xlsx" onchange="handleEmployeeImportExcel(event)" />
-    <button class="btn btn-outline-primary btn-sm" onclick="exportEmployees()">
+    <button class="btn btn-outline-success btn-sm" onclick="exportEmployees()">
       <i class="bi bi-file-earmark-arrow-down me-1"></i>Xuất Excel
     </button>
-    <button class="btn btn-primary btn-sm" id="btn-add-employee">
-      <i class="bi bi-person-plus-fill me-1"></i>Thêm nhân viên
+    <button class="btn btn-danger btn-sm" id="btn-add-employee">
+      <i class="bi bi-person-plus-fill me-1"></i>Thêm mới
     </button>
   </div>
 </div>
 
 <div class="filter-bar mb-3">
   <input class="form-control" id="emp-search" placeholder="Tìm tên, mã NV, dự án, vị trí..." value="${filter}" style="max-width:300px">
+  <button class="btn btn-outline-secondary btn-sm" id="btn-reset-emp-filter" title="Khôi phục bộ lọc">
+    <i class="bi bi-arrow-counterclockwise me-1"></i>Khôi phục bộ lọc
+  </button>
   <span class="ms-auto small text-muted align-self-center">
     <strong>${list.length}</strong> nhân viên hiển thị
   </span>
@@ -127,7 +133,7 @@ async function renderManageEmployees(area) {
             <strong>${e.full_name}</strong><br>
             <small class="text-muted">${e.viettel_email || '—'}</small>
           </td>
-          <td>${e.position_name || e.position || '—'}</td>
+          <td>${(e.position_name || e.position) ? `<span class="role-pill">${e.position_name || e.position}</span>` : '—'}</td>
           <td>${e.project || '—'}</td>
           <td>${e.direct_manager || '—'}</td>
           <td>${badgeEmpStatus(e.employment_status)}</td>
@@ -149,6 +155,13 @@ async function renderManageEmployees(area) {
 
     document.getElementById('btn-add-employee').onclick = () => openEmployeeModal(null);
     document.getElementById('emp-search').addEventListener('input', e => { filter = e.target.value.toLowerCase(); render(); });
+    document.getElementById('btn-reset-emp-filter').onclick = () => {
+      filter = '';
+      window.empFilterPosition = new Set();
+      window.empFilterStatus = new Set();
+      window.empFilterCat = new Set();
+      render();
+    };
 
     if (isFocused) {
       const el = document.getElementById('emp-search');
@@ -157,38 +170,10 @@ async function renderManageEmployees(area) {
     }
   }
 
-  // Global functions for toggling filters
   window.toggleEmpFilter = (varName, val, isChecked) => {
     const activeSet = window[varName];
-    if (activeSet.size === 0) {
-      // If it was "All", and we uncheck one, we must add all others to the set.
-      // But it's easier to just do it via UI logic: 
-      // Actually, standard behavior: if 'All' is selected (empty set), and user clicks one item to uncheck it, 
-      // it means they want to select everything EXCEPT that item.
-      // Alternatively, if they check an item, it doesn't make sense if All was checked.
-      // Let's implement this simpler logic:
-      // If the set was empty (meaning All is selected), we populate the set with all available items first.
-    }
-    
-    // Better logic:
-    // If it's empty, it means all are logically checked. 
-    // To handle this, we populate the set with all values when they uncheck for the first time.
-    if (activeSet.size === 0 && !isChecked) {
-        const allVals = varName === 'empFilterPosition' ? [...new Set(employees.map(e => e.position_name || e.position || '—'))] :
-                        varName === 'empFilterStatus' ? [...new Set(employees.map(e => e.employment_status || 'Thử việc'))] :
-                        [...new Set(employees.map(e => e.staff_category || 'NS trung tâm'))];
-        allVals.forEach(v => activeSet.add(v));
-    }
-
     if (isChecked) {
       activeSet.add(val);
-      // If all are checked now, reset to empty set (All)
-      const allVals = varName === 'empFilterPosition' ? [...new Set(employees.map(e => e.position_name || e.position || '—'))] :
-                      varName === 'empFilterStatus' ? [...new Set(employees.map(e => e.employment_status || 'Thử việc'))] :
-                      [...new Set(employees.map(e => e.staff_category || 'NS trung tâm'))];
-      if (activeSet.size === allVals.length) {
-          activeSet.clear();
-      }
     } else {
       activeSet.delete(val);
     }
@@ -197,10 +182,6 @@ async function renderManageEmployees(area) {
 
   window.toggleAllEmpFilter = (varName, isChecked) => {
     window[varName].clear();
-    // If unchecked, it means none are selected. But to allow none, we could set a dummy value.
-    if (!isChecked) {
-        window[varName].add('__NONE__');
-    }
     render();
   };
 
@@ -213,18 +194,18 @@ function badgeEmpStatus(s) {
   const text = s || 'Thử việc';
   const lower = text.toLowerCase();
   if (lower.includes('chuyển trung tâm')) {
-    return `<span class="custom-badge" style="background:rgba(156,39,176,.15);color:#9c27b0;border:1px solid rgba(156,39,176,.3)"><i class="bi bi-arrow-right-circle-fill" style="font-size:9px"></i> ${text}</span>`;
+    return `<span class="custom-badge" style="background:rgba(156,39,176,.15);color:#9c27b0;border:1px solid rgba(156,39,176,.3)">${text}</span>`;
   }
   if (lower.includes('chính thức')) {
-    return `<span class="custom-badge" style="background:rgba(63,185,80,.15);color:var(--success);border:1px solid rgba(63,185,80,.3)"><i class="bi bi-patch-check-fill" style="font-size:9px"></i> ${text}</span>`;
+    return `<span class="custom-badge" style="background:rgba(63,185,80,.15);color:var(--success);border:1px solid rgba(63,185,80,.3)">${text}</span>`;
   }
-  return `<span class="custom-badge" style="background:rgba(255,193,7,.15);color:#d39e00;border:1px solid rgba(255,193,7,.3)"><i class="bi bi-hourglass-split" style="font-size:9px"></i> ${text}</span>`;
+  return `<span class="custom-badge" style="background:rgba(255,193,7,.15);color:#d39e00;border:1px solid rgba(255,193,7,.3)">${text}</span>`;
 }
 
 function badgeStaffCat(c) {
-  if (c === 'Cho mượn') return `<span class="custom-badge" style="background:rgba(229,57,53,.12);color:var(--danger);border:1px solid rgba(229,57,53,.3)"><i class="bi bi-arrow-left-right" style="font-size:9px"></i> Cho mượn</span>`;
-  if (c === 'Onsite') return `<span class="custom-badge" style="background:rgba(88,166,255,.15);color:var(--info);border:1px solid rgba(88,166,255,.3)"><i class="bi bi-geo-alt-fill" style="font-size:9px"></i> Onsite</span>`;
-  return `<span class="custom-badge" style="background:rgba(88,166,255,.1);color:var(--info);border:1px solid rgba(88,166,255,.2)"><i class="bi bi-building" style="font-size:9px"></i> NS trung tâm</span>`;
+  if (c === 'Cho mượn') return `<span class="custom-badge" style="background:rgba(229,57,53,.12);color:var(--danger);border:1px solid rgba(229,57,53,.3)">Cho mượn</span>`;
+  if (c === 'Onsite') return `<span class="custom-badge" style="background:rgba(88,166,255,.15);color:var(--info);border:1px solid rgba(88,166,255,.3)">Onsite</span>`;
+  return `<span class="custom-badge" style="background:rgba(88,166,255,.1);color:var(--info);border:1px solid rgba(88,166,255,.2)">NS trung tâm</span>`;
 }
 
 // ─── Open modal ───────────────────────────────────────────────────────────────
@@ -290,6 +271,30 @@ async function openEmployeeModal(emp) {
   // Toggle borrow section
   handleStaffCategoryChange();
 
+  // Mode: Khóa form trước, yêu cầu bấm "Chỉnh sửa" mới cho phép lưu
+  const formInputs = document.querySelectorAll('#form-employee input, #form-employee select');
+  const btnEditMode = document.getElementById('btn-edit-employee-mode');
+  const btnSave = document.getElementById('btn-save-employee');
+
+  if (emp) {
+    formInputs.forEach(el => el.disabled = true);
+    if (btnEditMode) {
+      btnEditMode.classList.remove('d-none');
+      btnEditMode.onclick = () => {
+        formInputs.forEach(el => {
+          if (el.id !== 'emp-code') el.disabled = false;
+        });
+        btnEditMode.classList.add('d-none');
+        if (btnSave) btnSave.classList.remove('d-none');
+      };
+    }
+    if (btnSave) btnSave.classList.add('d-none');
+  } else {
+    formInputs.forEach(el => el.disabled = false);
+    if (btnEditMode) btnEditMode.classList.add('d-none');
+    if (btnSave) btnSave.classList.remove('d-none');
+  }
+
   bootstrap.Modal.getOrCreateInstance(document.getElementById('modal-employee')).show();
 }
 
@@ -354,7 +359,13 @@ document.getElementById('btn-save-employee').addEventListener('click', async () 
 // ─── Delete employee ──────────────────────────────────────────────────────────
 
 window.deleteEmployee = async (id, name) => {
-  if (!confirm(`⚠️ Xác nhận XÓA nhân viên "${name}"?\n\nHành động này không thể hoàn tác.`)) return;
+  const ok = await showConfirm({
+    title: 'Xóa thông tin nhân viên',
+    message: `Xác nhận XÓA nhân viên "${name}"?\n\nHành động này không thể hoàn tác.`,
+    okText: 'Xóa nhân viên',
+    type: 'danger'
+  });
+  if (!ok) return;
   try {
     const r = await api('DELETE', `/employees/${id}`);
     toast(r.message, 'success');
@@ -402,12 +413,21 @@ window.handleEmployeeImportExcel = async function (event) {
 };
 
 window.promptEmployeeImportLink = async function () {
-  const url = prompt("Nhập đường dẫn Google Sheets\n(File cần được chia sẻ ở chế độ 'Bất kỳ ai có đường liên kết đều có thể xem'):");
+  const fn = window.showPrompt || showPrompt;
+  const savedUrl = localStorage.getItem('last_emp_sheet_url') || localStorage.getItem('last_sheet_url') || '';
+  const url = await fn({
+    title: 'Nhập đường dẫn Google Sheets',
+    message: 'Lưu ý: File Google Sheets cần được chia sẻ ở chế độ "Bất kỳ ai có đường liên kết đều có thể xem"',
+    placeholder: 'https://docs.google.com/spreadsheets/d/...',
+    defaultValue: savedUrl
+  });
   if (!url) return;
   if (!url.includes('docs.google.com/spreadsheets')) {
     toast('Đường dẫn không hợp lệ', 'error');
     return;
   }
+  localStorage.setItem('last_emp_sheet_url', url);
+  localStorage.setItem('last_sheet_url', url);
   toast('Đang xử lý dữ liệu từ link...', 'info');
   try {
     const res = await api('POST', '/employees/import-link', { url });
@@ -428,7 +448,13 @@ function showImportResult(data) {
   const detail = lines.join('\n');
   toast(data.message, data.success > 0 ? 'success' : 'info');
   if (data.renamed?.length || data.skipped) {
-    setTimeout(() => alert('Kết quả import:\n\n' + detail), 300);
+    showConfirm({
+      title: 'Chi tiết kết quả import',
+      message: detail,
+      okText: 'Đã hiểu',
+      cancelText: 'Đóng',
+      type: 'info'
+    });
   }
 }
 

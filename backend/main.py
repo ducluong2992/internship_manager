@@ -1,6 +1,13 @@
+import warnings
+warnings.filterwarnings('ignore', category=UserWarning, module='openpyxl')
+
+# pyrefly: ignore [missing-import]
 from fastapi import FastAPI
+# pyrefly: ignore [missing-import]
 from fastapi.middleware.cors import CORSMiddleware
+# pyrefly: ignore [missing-import]
 from fastapi.staticfiles import StaticFiles
+# pyrefly: ignore [missing-import]
 from fastapi.responses import FileResponse
 import models
 from database import engine, SessionLocal
@@ -87,8 +94,11 @@ seed_admin()
 
 app = FastAPI(title="Intern & Employee Management API", version="2.0.0")
 
+# pyrefly: ignore [missing-import]
 from fastapi.exceptions import RequestValidationError
+# pyrefly: ignore [missing-import]
 from fastapi.responses import JSONResponse
+# pyrefly: ignore [missing-import]
 from fastapi import Request
 
 @app.exception_handler(RequestValidationError)
@@ -122,21 +132,27 @@ app.include_router(ai_config_router.router)
 app.include_router(chat_router.router)
 app.include_router(overtime_router.router)
 
-# Serve frontend
+# Serve frontend (Cấu hình no-cache tuyệt đối để trình duyệt luôn nạp mã mới)
 frontend_dir = os.path.join(os.path.dirname(__file__), "..", "frontend")
 if os.path.exists(frontend_dir):
     app.mount("/static", StaticFiles(directory=os.path.join(frontend_dir, "static")), name="static")
 
+    NO_CACHE_HEADERS = {
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0"
+    }
+
     @app.get("/")
     def serve_index():
-        return FileResponse(os.path.join(frontend_dir, "index.html"))
+        return FileResponse(os.path.join(frontend_dir, "index.html"), headers=NO_CACHE_HEADERS)
 
     @app.get("/{path:path}")
     def serve_spa(path: str):
         fp = os.path.join(frontend_dir, path)
-        if os.path.exists(fp):
-            return FileResponse(fp)
-        return FileResponse(os.path.join(frontend_dir, "index.html"))
+        if os.path.exists(fp) and not os.path.isdir(fp):
+            return FileResponse(fp, headers=NO_CACHE_HEADERS)
+        return FileResponse(os.path.join(frontend_dir, "index.html"), headers=NO_CACHE_HEADERS)
 
 if __name__ == "__main__":
     import uvicorn

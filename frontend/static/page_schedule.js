@@ -124,8 +124,14 @@ ${warnHtml}
       await renderCalendar();
     };
 
-    document.getElementById('btn-clear-sched').onclick = () => {
-      if (!confirm('Xóa toàn bộ ca đã chọn?')) return;
+    document.getElementById('btn-clear-sched').onclick = async () => {
+      const ok = await showConfirm({
+        title: 'Xóa ca đã chọn',
+        message: 'Xóa toàn bộ ca đã chọn trong lịch đăng ký?',
+        okText: 'Xóa ca',
+        type: 'warning'
+      });
+      if (!ok) return;
       shiftMap = {};
       renderCalendar();
     };

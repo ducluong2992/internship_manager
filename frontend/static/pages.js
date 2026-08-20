@@ -19,30 +19,30 @@ function getWorkdays(y, m) {
 function pad2(n) { return String(n).padStart(2, '0'); }
 function toDateStr(y, m, d) { return `${y}-${pad2(m)}-${pad2(d)}`; }
 function badgeStatus(s) {
-  if (s === 'Working') return `<span class="custom-badge badge-working"><i class="bi bi-circle-fill" style="font-size:7px"></i> Đang làm</span>`;
-  if (s === 'Lên chính thức') return `<span class="custom-badge" style="background:rgba(156,39,176,.15);color:#9c27b0;border:1px solid rgba(156,39,176,.3)"><i class="bi bi-star-fill" style="font-size:9px"></i> Lên chính thức</span>`;
-  if (s === 'Chuyển trung tâm') return `<span class="custom-badge" style="background:rgba(33,150,243,.15);color:#1565c0;border:1px solid rgba(33,150,243,.35)"><i class="bi bi-arrow-right-circle-fill" style="font-size:9px"></i> Chuyển TT</span>`;
-  return `<span class="custom-badge badge-resigned"><i class="bi bi-circle-fill" style="font-size:7px"></i> Đã nghỉ</span>`;
+  if (s === 'Working') return `<span class="custom-badge badge-working">Đang làm</span>`;
+  if (s === 'Lên chính thức') return `<span class="custom-badge badge-purple">Lên chính thức</span>`;
+  if (s === 'Chuyển trung tâm') return `<span class="custom-badge badge-blue">Chuyển TT</span>`;
+  return `<span class="custom-badge badge-resigned">Đã nghỉ</span>`;
 }
 function badgeShift(s) {
-  if (s === 'SC') return `<span class="custom-badge" style="background:rgba(63,185,80,.18);color:#276221;border:1px solid rgba(63,185,80,.35);font-weight:700">SC</span>`;
-  if (s === 'S')  return `<span class="custom-badge" style="background:rgba(255,193,7,.2);color:#9c5700;border:1px solid rgba(255,193,7,.4);font-weight:700">S</span>`;
-  if (s === 'C')  return `<span class="custom-badge" style="background:rgba(88,166,255,.2);color:#0d47a1;border:1px solid rgba(88,166,255,.4);font-weight:700">C</span>`;
+  if (s === 'SC') return `<span class="custom-badge badge-working">SC</span>`;
+  if (s === 'S')  return `<span class="custom-badge badge-blue">S</span>`;
+  if (s === 'C')  return `<span class="custom-badge badge-yellow">C</span>`;
   return `<span style="opacity:.3">—</span>`;
 }
 function badgeEmpType(t) {
-  if ((t||'').toLowerCase().includes('mượn')) return `<span class="custom-badge" style="background:rgba(255,152,0,.15);color:#e65100;border:1px solid rgba(255,152,0,.3)"><i class="bi bi-arrow-left-right" style="font-size:9px"></i> Đi mượn</span>`;
-  return `<span class="custom-badge" style="background:rgba(88,166,255,.12);color:#0d47a1;border:1px solid rgba(88,166,255,.25)"><i class="bi bi-building" style="font-size:9px"></i> TTS Trung tâm</span>`;
+  if ((t||'').toLowerCase().includes('mượn')) return `<span class="custom-badge badge-yellow">Đi mượn</span>`;
+  return `<span class="custom-badge badge-blue">TTS Trung tâm</span>`;
 }
 function badgeEmpKind(k) {
-  if ((k||'').toLowerCase() === 'parttime') return `<span class="custom-badge" style="background:rgba(255,193,7,.15);color:#9c5700;border:1px solid rgba(255,193,7,.3)">Part-time</span>`;
-  return `<span class="custom-badge" style="background:rgba(63,185,80,.12);color:#276221;border:1px solid rgba(63,185,80,.28)">Full-time</span>`;
+  if ((k||'').toLowerCase() === 'parttime') return `<span class="custom-badge badge-yellow">Part-time</span>`;
+  return `<span class="custom-badge badge-working">Full-time</span>`;
 }
 
 function badgePeriod(s) {
   return s === 'open'
-    ? `<span class="custom-badge badge-open"><i class="bi bi-unlock-fill" style="font-size:9px"></i> Mở</span>`
-    : `<span class="custom-badge badge-closed"><i class="bi bi-lock-fill" style="font-size:9px"></i> Đóng</span>`;
+    ? `<span class="custom-badge badge-open">Mở</span>`
+    : `<span class="custom-badge badge-closed">Đóng</span>`;
 }
 
 // ═══════════════════════════════════════════
@@ -82,7 +82,73 @@ async function renderDashboard(area) {
     api('GET', '/admin/periods'),
     api('GET', '/admin/stats'),
   ]);
+
+  // ── OT Pending helpers (dashboard-scoped) ──
+  async function loadOTPending() {
+    try {
+      const now2 = new Date();
+      const params = new URLSearchParams({ month: now2.getMonth() + 1, year: now2.getFullYear(), status: 'Pending' });
+      return await api('GET', `/overtime/admin/list?${params}`);
+    } catch { return []; }
+  }
+
+  function renderOTPendingSection(pending) {
+    if (!pending || pending.length === 0) {
+      return `<tr><td colspan="6" class="text-center text-muted py-3"><i class="bi bi-check-circle me-2 text-success"></i>Không có yêu cầu OT nào đang chờ duyệt.</td></tr>`;
+    }
+    return pending.map(r => `
+      <tr>
+        <td><code style="font-size:0.78rem;color:#475569;background:#f1f5f9;padding:2px 6px;border-radius:4px">${r.employee_code}</code></td>
+        <td class="fw-semibold" style="color:#1e293b">${r.full_name}</td>
+        <td class="text-muted small">${r.project || '—'}</td>
+        <td class="text-center small">${r.work_date ? r.work_date.split('-').reverse().join('/') : '—'}</td>
+        <td class="text-center small">${r.start_time} – ${r.end_time}<br><small class="text-muted">${r.raw_hours}h</small></td>
+        <td class="text-center" style="white-space:nowrap">
+          <button class="btn btn-sm btn-success py-0 px-2 me-1" title="Duyệt nhanh" onclick="dashboardApproveOT(${r.id})">
+            <i class="bi bi-check-lg"></i> Duyệt
+          </button>
+          <button class="btn btn-sm btn-outline-danger py-0 px-2" title="Từ chối" onclick="dashboardRejectOT(${r.id})">
+            <i class="bi bi-x-lg"></i> Từ chối
+          </button>
+        </td>
+      </tr>`).join('');
+  }
   const now = new Date();
+  const otPending = await loadOTPending();
+
+  // Calculations for progress bars & cards
+  const totalEmployees = stats.total_employees || 0;
+  const activeInterns = stats.working || 0; // Chỉ lấy TỔNG SỐ TTS ACTIVE
+  const totalStructure = totalEmployees + activeInterns; // Cơ cấu nhân sự hoạt động
+
+  // 1. Cơ cấu Nhân sự
+  const pctEmp = totalStructure > 0 ? Math.round((totalEmployees / totalStructure) * 100) : 0;
+  const pctInternActive = totalStructure > 0 ? Math.round((activeInterns / totalStructure) * 100) : 0;
+
+  // 2. Nhân sự trong Dự án / Không trong Dự án (Chỉ lấy của Nhân viên)
+  const empInProj = stats.emp_in_project != null ? stats.emp_in_project : (users.filter(u => u.project && u.project.trim() !== '' && u.project !== '—').length);
+  const empNoProj = stats.emp_no_project != null ? stats.emp_no_project : Math.max(0, totalEmployees - empInProj);
+  const pctEmpInProj = totalEmployees > 0 ? Math.round((empInProj / totalEmployees) * 100) : 0;
+  const pctEmpNoProj = totalEmployees > 0 ? Math.round((empNoProj / totalEmployees) * 100) : 0;
+
+  // 3. Nhân sự theo Loại Nhân sự (Chỉ lấy của Nhân viên)
+  const empTT = stats.emp_trung_tam || 0;
+  const empOnsite = stats.emp_onsite || 0;
+  const empBorrow = stats.emp_cho_muon || 0;
+  const pctEmpTT = totalEmployees > 0 ? Math.round((empTT / totalEmployees) * 100) : 0;
+  const pctEmpOnsite = totalEmployees > 0 ? Math.round((empOnsite / totalEmployees) * 100) : 0;
+  const pctEmpBorrow = totalEmployees > 0 ? Math.round((empBorrow / totalEmployees) * 100) : 0;
+
+  const renderStatBar = (label, count, total, percent, colors) => `
+    <div class="mb-3">
+      <div class="d-flex justify-content-between align-items-center mb-1">
+        <span class="fw-semibold text-secondary small">${label}</span>
+        <span class="fw-bold small text-dark">${count}/${total} <span class="text-muted fw-normal">(${percent}%)</span></span>
+      </div>
+      <div class="progress" style="height: 10px; border-radius: 6px; background: #e2e8f0;">
+        <div class="progress-bar" role="progressbar" style="width: ${percent}%; background: linear-gradient(90deg, ${colors[0]}, ${colors[1]}); border-radius: 6px;" aria-valuenow="${percent}" aria-valuemin="0" aria-valuemax="100"></div>
+      </div>
+    </div>`;
 
   area.innerHTML = `
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -92,80 +158,116 @@ async function renderDashboard(area) {
 
 <!-- 1. KEY METRICS -->
 <div class="row g-3 mb-4">
-  <div class="col-6 col-md-3">
-    <div class="glass-card p-3 d-flex align-items-center gap-3 h-100 border-start border-danger border-4">
-      <div class="stat-icon" style="width:48px;height:48px;font-size:1.2rem;background:rgba(229,57,53,0.1);color:#e53935;"><i class="bi bi-people-fill"></i></div>
-      <div>
-        <div class="text-muted small fw-semibold text-uppercase">Tổng Nhân Sự</div>
-        <div class="fs-4 fw-bold lh-1">${stats.total_interns + stats.total_employees}</div>
-        <div class="small text-muted mt-1">${stats.total_employees} NV | ${stats.total_interns} TTS</div>
+  <div class="col-12 col-sm-6 col-xl-3">
+    <div class="viettel-stat-card card-red-1 shadow-sm">
+      <div class="stat-title">TỔNG SỐ TTS ACTIVE</div>
+      <div class="d-flex align-items-baseline">
+        <span class="stat-number">${activeInterns}</span>
+        <span class="stat-unit">nhân sự</span>
       </div>
     </div>
   </div>
-  <div class="col-6 col-md-3">
-    <div class="glass-card p-3 d-flex align-items-center gap-3 h-100 border-start border-danger border-4">
-      <div class="stat-icon" style="width:48px;height:48px;font-size:1.2rem;background:rgba(229,57,53,0.1);color:#e53935;"><i class="bi bi-briefcase-fill"></i></div>
-      <div>
-        <div class="text-muted small fw-semibold text-uppercase">Loại Nhân Viên</div>
-        <div class="fs-4 fw-bold lh-1">${stats.emp_trung_tam} <span class="fs-6 text-muted fw-normal">NS TTâm</span></div>
-        <div class="small text-muted mt-1">${stats.emp_cho_muon} Cho mượn | ${stats.emp_onsite} Onsite</div>
+  <div class="col-12 col-sm-6 col-xl-3">
+    <div class="viettel-stat-card card-red-2 shadow-sm">
+      <div class="stat-title">NV THỬ VIỆC / HỌC VIỆC</div>
+      <div class="d-flex align-items-baseline">
+        <span class="stat-number">${stats.emp_probation || 0}</span>
+        <span class="stat-unit">nhân sự</span>
       </div>
     </div>
   </div>
-  <div class="col-6 col-md-3">
-    <div class="glass-card p-3 d-flex align-items-center gap-3 h-100 border-start border-danger border-4">
-      <div class="stat-icon" style="width:48px;height:48px;font-size:1.2rem;background:rgba(229,57,53,0.1);color:#e53935;"><i class="bi bi-person-badge-fill"></i></div>
-      <div>
-        <div class="text-muted small fw-semibold text-uppercase">Nguồn TTS</div>
-        <div class="fs-4 fw-bold lh-1">${stats.intern_count} <span class="fs-6 text-muted fw-normal">Thực tập</span></div>
-        <div class="small text-muted mt-1">${stats.borrowed_count} Đi mượn</div>
+  <div class="col-12 col-sm-6 col-xl-3">
+    <div class="viettel-stat-card card-red-3 shadow-sm">
+      <div class="stat-title">NV ONSITE / DỰ ÁN</div>
+      <div class="d-flex align-items-baseline">
+        <span class="stat-number">${empOnsite}</span>
+        <span class="stat-unit">nhân sự</span>
       </div>
     </div>
   </div>
-  <div class="col-6 col-md-3">
-    <div class="glass-card p-3 d-flex align-items-center gap-3 h-100 border-start border-danger border-4">
-      <div class="stat-icon" style="width:48px;height:48px;font-size:1.2rem;background:rgba(229,57,53,0.1);color:#e53935;"><i class="bi bi-person-check-fill"></i></div>
-      <div>
-        <div class="text-muted small fw-semibold text-uppercase">TTS Đang Làm</div>
-        <div class="fs-4 fw-bold lh-1">${stats.working}</div>
-        <div class="small text-muted mt-1 text-danger"><i class="bi bi-arrow-down-right"></i> ${stats.resigned} đã nghỉ</div>
+  <div class="col-12 col-sm-6 col-xl-3">
+    <div class="viettel-stat-card card-red-4 shadow-sm">
+      <div class="stat-title">NV ĐÃ NGHỈ VIỆC / SẮP OUT</div>
+      <div class="d-flex align-items-baseline">
+        <span class="stat-number">${stats.emp_resigned || 0}</span>
+        <span class="stat-unit">nhân sự</span>
       </div>
     </div>
   </div>
 </div>
 
-<!-- 2. CHARTS -->
+<!-- 2. PROGRESS BAR STATS (3 TYPES) -->
 <div class="row g-4 mb-4">
   <div class="col-md-4">
     <div class="glass-card p-4 h-100 d-flex flex-column">
       <h6 class="fw-bold mb-3"><i class="bi bi-pie-chart-fill text-danger me-2"></i>Cơ cấu Nhân sự</h6>
-      <div class="flex-grow-1 position-relative" style="min-height:220px;">
-        <canvas id="chart-users"></canvas>
+      <div class="flex-grow-1 d-flex flex-column justify-content-center pt-2">
+        ${renderStatBar('Nhân viên', totalEmployees, totalStructure, pctEmp, ['#3B82F6', '#1D4ED8'])}
+        ${renderStatBar('Thực tập sinh (Active)', activeInterns, totalStructure, pctInternActive, ['#06B6D4', '#0284C7'])}
       </div>
     </div>
   </div>
   <div class="col-md-4">
     <div class="glass-card p-4 h-100 d-flex flex-column">
-      <h6 class="fw-bold mb-3"><i class="bi bi-bar-chart-fill text-danger me-2"></i>Phân loại Nhân viên</h6>
-      <div class="flex-grow-1 position-relative" style="min-height:220px;">
-        <canvas id="chart-emp-type"></canvas>
+      <h6 class="fw-bold mb-3"><i class="bi bi-briefcase-fill text-danger me-2"></i>Nhân viên trong / không trong Dự án</h6>
+      <div class="flex-grow-1 d-flex flex-column justify-content-center pt-2">
+        ${renderStatBar('Đang trong dự án', empInProj, totalEmployees, pctEmpInProj, ['#10B981', '#047857'])}
+        ${renderStatBar('Không trong dự án', empNoProj, totalEmployees, pctEmpNoProj, ['#F59E0B', '#B45309'])}
       </div>
     </div>
   </div>
   <div class="col-md-4">
     <div class="glass-card p-4 h-100 d-flex flex-column">
-      <h6 class="fw-bold mb-3"><i class="bi bi-bar-chart-steps text-danger me-2"></i>Phân loại Thực tập sinh</h6>
-      <div class="flex-grow-1 position-relative" style="min-height:220px;">
-        <canvas id="chart-intern-type"></canvas>
+      <h6 class="fw-bold mb-3"><i class="bi bi-diagram-3-fill text-danger me-2"></i>Nhân viên theo Loại Nhân sự</h6>
+      <div class="flex-grow-1 d-flex flex-column justify-content-center pt-2">
+        ${renderStatBar('NS Trung tâm', empTT, totalEmployees, pctEmpTT, ['#8B5CF6', '#6D28D9'])}
+        ${renderStatBar('Onsite / Dự án', empOnsite, totalEmployees, pctEmpOnsite, ['#EC4899', '#BE185D'])}
+        ${renderStatBar('Cho mượn / Đi mượn', empBorrow, totalEmployees, pctEmpBorrow, ['#F97316', '#C2410C'])}
       </div>
     </div>
+  </div>
 </div>
 
-<!-- 3. TODAY WORKERS -->
+<!-- 3. OT PENDING APPROVAL -->
 <div class="row mb-4">
   <div class="col-12">
     <div class="glass-card p-4">
-      <h6 class="fw-bold mb-3"><i class="bi bi-calendar-check-fill text-success me-2"></i>TTS đi làm hôm nay</h6>
+      <div class="d-flex align-items-center justify-content-between mb-3">
+        <h6 class="fw-bold mb-0">
+          <i class="bi bi-clock-history text-warning me-2"></i>
+          Yêu cầu OT đang chờ duyệt
+          ${otPending.length > 0 ? `<span class="badge ms-2" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;font-size:0.72rem;border-radius:20px;padding:3px 10px">${otPending.length}</span>` : ''}
+        </h6>
+        <a href="#" class="btn btn-sm btn-outline-danger px-3" onclick="navigate('manage-ot');return false;">
+          <i class="bi bi-arrow-right me-1"></i>Xem tất cả
+        </a>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0" id="dashboard-ot-pending-table">
+          <thead class="table-light">
+            <tr>
+              <th>Mã NV</th>
+              <th>Họ và tên</th>
+              <th>Dự án</th>
+              <th class="text-center">Ngày OT</th>
+              <th class="text-center">Giờ OT</th>
+              <th class="text-center">Thao tác nhanh</th>
+            </tr>
+          </thead>
+          <tbody id="dashboard-ot-pending-tbody">
+            ${renderOTPendingSection(otPending)}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 4. TODAY WORKERS -->
+<div class="row mb-4">
+  <div class="col-12">
+    <div class="glass-card p-4">
+      <h6 class="fw-bold mb-3"><i class="bi bi-calendar-check-fill text-success me-2"></i>TTS đi làm hôm nay - ${pad2(now.getDate())}/${pad2(now.getMonth() + 1)}/${now.getFullYear()}</h6>
       <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
           <thead class="table-light">
@@ -178,12 +280,12 @@ async function renderDashboard(area) {
           <tbody>
             ${stats.today_workers && stats.today_workers.length > 0 ? stats.today_workers.map(w => `
               <tr>
-                <td><span class="badge bg-secondary">${w.employee_code}</span></td>
+                <td><code>${w.employee_code}</code></td>
                 <td class="fw-medium">${w.full_name}</td>
                 <td>
-                  ${w.shift === 'S' ? '<span class="badge bg-info text-dark">Sáng</span>' : ''}
-                  ${w.shift === 'C' ? '<span class="badge bg-warning text-dark">Chiều</span>' : ''}
-                  ${w.shift === 'SC' ? '<span class="badge bg-success">Cả ngày</span>' : ''}
+                  ${w.shift === 'S' ? '<span class="custom-badge badge-blue">Sáng</span>' : ''}
+                  ${w.shift === 'C' ? '<span class="custom-badge badge-yellow">Chiều</span>' : ''}
+                  ${w.shift === 'SC' ? '<span class="custom-badge badge-working">Cả ngày</span>' : ''}
                 </td>
               </tr>
             `).join('') : '<tr><td colspan="3" class="text-center text-muted py-3">Không có ai đăng ký lịch làm hôm nay.</td></tr>'}
@@ -192,83 +294,68 @@ async function renderDashboard(area) {
       </div>
     </div>
   </div>
-</div>`;
+</div>
+`;
 
-  // Colors: Modern Palette
-  const c1 = '#4F46E5';
-  const c2 = '#06B6D4';
-  const c3 = '#EC4899';
-  const c4 = '#8B5CF6';
-  const c5 = '#10B981';
-  const c6 = '#F59E0B';
-
-  // Draw Charts
-  const cUsers = document.getElementById('chart-users');
-  if (cUsers) {
-    new Chart(cUsers, {
-      type: 'pie',
-      data: {
-        labels: ['Nhân viên', 'Thực tập sinh'],
-        datasets: [{
-          data: [stats.total_employees, stats.total_interns],
-          backgroundColor: [c1, c2],
-          borderWidth: 0,
-          hoverOffset: 4
-        }]
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8 } } }
-      }
+  // ── Dashboard: register global approve/reject helpers ──
+  window.dashboardApproveOT = async (id) => {
+    const ok = await showConfirm({
+      title: 'Duyệt yêu cầu OT',
+      message: 'Xác nhận duyệt yêu cầu OT này?',
+      okText: 'Duyệt OT',
+      type: 'warning'
     });
-  }
+    if (!ok) return;
+    try {
+      await api('POST', `/overtime/admin/${id}/approve`);
+      toast('Đã duyệt OT!', 'success');
+      // Refresh only the OT pending table
+      const now2 = new Date();
+      const params = new URLSearchParams({ month: now2.getMonth() + 1, year: now2.getFullYear(), status: 'Pending' });
+      const updated = await api('GET', `/overtime/admin/list?${params}`);
+      const tbody = document.getElementById('dashboard-ot-pending-tbody');
+      if (tbody) tbody.innerHTML = renderOTPendingSection(updated);
+      // Update badge
+      const badge = document.querySelector('#dashboard-ot-pending-table')?.closest('.glass-card')?.querySelector('.badge');
+      if (badge) {
+        if (updated.length > 0) { badge.textContent = updated.length; }
+        else { badge.style.display = 'none'; }
+      }
+    } catch (e) { toast(e.message, 'error'); }
+  };
 
-  const cEmp = document.getElementById('chart-emp-type');
-  if (cEmp) {
-    new Chart(cEmp, {
-      type: 'bar',
-      data: {
-        labels: ['NS Trung tâm', 'Cho mượn', 'Onsite'],
-        datasets: [{
-          label: 'Số lượng',
-          data: [stats.emp_trung_tam, stats.emp_cho_muon, stats.emp_onsite],
-          backgroundColor: [c1, c3, c4],
-          borderRadius: 4
-        }]
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: {
-          x: { grid: { display: false } },
-          y: { beginAtZero: true, border: { display: false }, ticks: { precision: 0, stepSize: 1 } }
+  window.dashboardRejectOT = (id) => {
+    document.getElementById('reject-ot-id').value = id;
+    document.getElementById('reject-reason-text').value = '';
+    const modalEl = document.getElementById('modal-ot-reject');
+    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+
+    // Clone the button to wipe all previous event listeners/onclick
+    const oldBtn = document.getElementById('btn-confirm-reject');
+    const newBtn = oldBtn.cloneNode(true);
+    oldBtn.parentNode.replaceChild(newBtn, oldBtn);
+
+    newBtn.onclick = async () => {
+      const reason = document.getElementById('reject-reason-text').value.trim();
+      if (!reason) { toast('Vui lòng nhập lý do từ chối.', 'error'); return; }
+      try {
+        await api('POST', `/overtime/admin/${id}/reject`, { reject_reason: reason });
+        toast('Đã từ chối OT.', 'success');
+        modal.hide();
+        // Refresh table
+        const now2 = new Date();
+        const params = new URLSearchParams({ month: now2.getMonth() + 1, year: now2.getFullYear(), status: 'Pending' });
+        const updated = await api('GET', `/overtime/admin/list?${params}`);
+        const tbody = document.getElementById('dashboard-ot-pending-tbody');
+        if (tbody) tbody.innerHTML = renderOTPendingSection(updated);
+        // Update badge
+        const badge = document.querySelector('#dashboard-ot-pending-table')?.closest('.glass-card')?.querySelector('.badge');
+        if (badge) {
+          if (updated.length > 0) { badge.textContent = updated.length; }
+          else { badge.style.display = 'none'; }
         }
-      }
-    });
-  }
-
-  const cIntern = document.getElementById('chart-intern-type');
-  if (cIntern) {
-    new Chart(cIntern, {
-      type: 'bar',
-      data: {
-        labels: ['Thực tập', 'Đi mượn'],
-        datasets: [{
-          label: 'Số lượng',
-          data: [stats.intern_count, stats.borrowed_count],
-          backgroundColor: [c5, c6],
-          borderRadius: 4
-        }]
-      },
-      options: {
-        indexAxis: 'y', // Horizontal bar
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: {
-          x: { beginAtZero: true, border: { display: false }, ticks: { precision: 0, stepSize: 1 } },
-          y: { grid: { display: false } }
-        }
-      }
-    });
-  }
+      } catch (e) { toast(e.message, 'error'); }
+    };
+    modal.show();
+  };
 }

@@ -9,11 +9,12 @@
     content="Hệ thống quản lý thực tập sinh và nhân sự nội bộ Viettel – quản lý hồ sơ, đăng ký lịch và theo dõi nhân sự." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+  <link
+    href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Inter:wght@300;400;500;600;700;800&display=swap"
     rel="stylesheet" />
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" />
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
-  <link href="static/style.css?v=5.2" rel="stylesheet" />
+  <link href="static/style.css?v=3.2" rel="stylesheet" />
 </head>
 
 <body>
@@ -26,7 +27,7 @@
         <div class="shape shape-2"></div>
         <div class="shape shape-3"></div>
       </div>
-      <div class="login-card glass-card">
+      <div class="login-card">
         <div class="login-logo">
           <!-- <div class="logo-icon"><i class="bi bi-building-fill-gear"></i></div> -->
           <div>
@@ -35,7 +36,7 @@
           </div>
         </div>
         <form id="form-login" autocomplete="off">
-          <div class="mb-4">
+          <div class="mb-3">
             <label class="form-label fw-semibold">Tên đăng nhập</label>
             <div class="input-icon-wrap">
               <i class="bi bi-person-fill input-icon"></i>
@@ -43,7 +44,7 @@
                 required />
             </div>
           </div>
-          <div class="mb-4">
+          <div class="mb-3">
             <label class="form-label fw-semibold">Mật khẩu</label>
             <div class="input-icon-wrap">
               <i class="bi bi-lock-fill input-icon"></i>
@@ -54,7 +55,7 @@
             </div>
           </div>
           <div id="login-error" class="alert alert-danger d-none py-2 small"></div>
-          <button type="submit" class="btn btn-primary btn-login w-100">
+          <button type="submit" class="btn btn-primary btn-login w-100 mt-1">
             <span class="btn-text"><i class="bi bi-box-arrow-in-right me-2"></i>Đăng nhập</span>
             <span class="btn-spinner d-none"><span class="spinner-border spinner-border-sm"></span></span>
           </button>
@@ -102,7 +103,7 @@
                 <i class="bi bi-people-fill"></i><span>Danh sách TTS</span>
               </a>
               <a href="#" class="nav-item py-2" data-page="admin-schedule" id="nav-admin-schedule">
-                <i class="bi bi-table"></i><span>Bảng lịch</span>
+                <i class="bi bi-table"></i><span>Lịch Thực tập</span>
               </a>
             </div>
           </div>
@@ -119,7 +120,7 @@
                 <i class="bi bi-person-badge-fill"></i><span>Danh sách nhân viên</span>
               </a>
               <a href="#" class="nav-item py-2" data-page="manage-emp-accounts" id="nav-manage-emp-accounts">
-                <i class="bi bi-person-lines-fill"></i><span>Tài khoản đăng nhập</span>
+                <i class="bi bi-person-lines-fill"></i><span>Quản lý tài khoản</span>
               </a>
               <a href="#" class="nav-item py-2" data-page="manage-ot" id="nav-manage-ot">
                 <i class="bi bi-clock-history"></i><span>Quản lý OT</span>
@@ -297,6 +298,116 @@
         <div class="modal-footer">
           <button class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
           <button class="btn btn-primary" id="btn-save-user"><i class="bi bi-check-lg me-1"></i>Lưu</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Đối chiếu Import Link Google Sheet cho Thực tập sinh -->
+  <div class="modal fade" id="modal-import-reconcile" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-scrollable" style="max-width: 620px;">
+      <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; overflow: hidden; font-size: 13px;">
+        <div class="modal-header text-white py-2 px-3" style="background: #d5001c !important;">
+          <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-arrow-repeat fs-6"></i>
+            <h6 class="modal-title fw-bold mb-0 text-white fs-6" id="modal-reconcile-title">Kết quả đối chiếu dữ liệu
+              Thực tập sinh</h6>
+          </div>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"
+            style="font-size: 10px;"></button>
+        </div>
+
+        <div class="modal-body p-3 bg-light">
+          <!-- Warnings container for Excel cell format issues -->
+          <div id="reconcile-warnings-container"></div>
+
+          <!-- Summary count pills bar -->
+          <div class="d-flex flex-wrap gap-2 mb-3 p-2 bg-white rounded-2 border">
+            <div class="stat-pill border bg-light text-dark d-flex align-items-center gap-2 px-2 py-1 rounded-2"
+              style="flex: 1; min-width: 120px;">
+              <i class="bi bi-pencil-square text-secondary"></i>
+              <div>
+                <div class="text-muted" style="font-size: 11px;">Thay đổi thông tin</div>
+                <div class="fw-bold" id="rec-count-updated" style="font-size: 13px;">0</div>
+              </div>
+            </div>
+            <div class="stat-pill border bg-light text-dark d-flex align-items-center gap-2 px-2 py-1 rounded-2"
+              style="flex: 1; min-width: 120px;">
+              <i class="bi bi-person-plus text-secondary"></i>
+              <div>
+                <div class="text-muted" style="font-size: 11px;">Thêm mới</div>
+                <div class="fw-bold" id="rec-count-added" style="font-size: 13px;">0</div>
+              </div>
+            </div>
+            <div class="stat-pill border bg-light text-dark d-flex align-items-center gap-2 px-2 py-1 rounded-2"
+              style="flex: 1; min-width: 120px;">
+              <i class="bi bi-person-x text-secondary"></i>
+              <div>
+                <div class="text-muted" style="font-size: 11px;">Chỉ có trên Web</div>
+                <div class="fw-bold" id="rec-count-removed" style="font-size: 13px;">0</div>
+              </div>
+            </div>
+            <div class="stat-pill border bg-light text-dark d-flex align-items-center gap-2 px-2 py-1 rounded-2"
+              style="flex: 1; min-width: 120px;">
+              <i class="bi bi-check-circle text-secondary"></i>
+              <div>
+                <div class="text-muted" style="font-size: 11px;">Không thay đổi</div>
+                <div class="fw-bold" id="rec-count-unchanged" style="font-size: 13px;">0</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 1: TTS Thay đổi thông tin -->
+          <div class="reconcile-section mb-3" id="section-rec-updated">
+            <div
+              class="section-card-header bg-white border rounded-top p-2 px-3 d-flex align-items-center justify-content-between">
+              <span class="fw-bold text-dark" style="font-size: 13px;">Thực tập sinh thay đổi thông tin</span>
+              <span class="badge bg-light text-dark border fw-normal" id="badge-count-updated"
+                style="font-size: 11px;">0 người</span>
+            </div>
+            <div class="p-2 bg-white border border-top-0 rounded-bottom">
+              <div id="list-rec-updated" class="d-flex flex-column gap-2"></div>
+            </div>
+          </div>
+
+          <!-- Section 2: TTS Thêm mới -->
+          <div class="reconcile-section mb-3" id="section-rec-added">
+            <div
+              class="section-card-header bg-white border rounded-top p-2 px-3 d-flex align-items-center justify-content-between">
+              <span class="fw-bold text-dark" style="font-size: 13px;">Thực tập sinh thêm mới</span>
+              <span class="badge bg-light text-dark border fw-normal" id="badge-count-added" style="font-size: 11px;">0
+                người</span>
+            </div>
+            <div class="p-2 bg-white border border-top-0 rounded-bottom">
+              <div id="list-rec-added" class="d-flex flex-column gap-2"></div>
+            </div>
+          </div>
+
+          <!-- Section 3: TTS Chỉ có trên Web -->
+          <div class="reconcile-section mb-2" id="section-rec-removed">
+            <div
+              class="section-card-header bg-white border rounded-top p-2 px-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
+              <span class="fw-bold text-dark" style="font-size: 13px;">Thực tập sinh chỉ có trên Web</span>
+              <div class="d-flex align-items-center gap-1">
+                <button type="button" class="btn btn-sm btn-light border py-0 px-2 text-dark" style="font-size: 11px;"
+                  onclick="setAllRemovedChoice('keep')">Giữ lại tất cả</button>
+                <button type="button" class="btn btn-sm btn-light border py-0 px-2 text-danger" style="font-size: 11px;"
+                  onclick="setAllRemovedChoice('delete')">Xóa tất cả</button>
+                <span class="badge bg-light text-dark border fw-normal ms-1" id="badge-count-removed"
+                  style="font-size: 11px;">0 người</span>
+              </div>
+            </div>
+            <div class="p-2 bg-white border border-top-0 rounded-bottom">
+              <div id="list-rec-removed" class="d-flex flex-column gap-2"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer bg-light border-top px-3 py-2">
+          <button type="button" class="btn btn-sm btn-outline-secondary px-3" data-bs-dismiss="modal"
+            style="font-size: 12px;">Hủy bỏ</button>
+          <button type="button" class="btn btn-sm btn-danger px-3 fw-bold shadow-sm" id="btn-confirm-reconcile"
+            style="font-size: 12px; background: #d5001c !important;">Xác nhận & Cập nhật</button>
         </div>
       </div>
     </div>
@@ -486,6 +597,7 @@
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+          <button class="btn btn-warning me-1 d-none" id="btn-edit-employee-mode"><i class="bi bi-pencil-square me-1"></i>Chỉnh sửa</button>
           <button class="btn btn-primary" id="btn-save-employee"><i class="bi bi-check-lg me-1"></i>Lưu</button>
         </div>
       </div>
@@ -562,18 +674,32 @@
         <div class="modal-body">
           <form id="form-ot-register">
             <input type="hidden" id="ot-edit-id" />
-            <div class="mb-3">
-              <label class="form-label fw-semibold">Ngày</label>
-              <input id="ot-date" type="date" class="form-control" readonly />
-            </div>
             <div class="row g-3 mb-3">
               <div class="col-6">
-                <label class="form-label fw-semibold">Giờ bắt đầu</label>
-                <input id="ot-start" type="time" class="form-control" step="300" />
+                <label class="form-label fw-semibold">Từ ngày *</label>
+                <input id="ot-date" type="date" class="form-control" />
               </div>
               <div class="col-6">
-                <label class="form-label fw-semibold">Giờ kết thúc</label>
-                <input id="ot-end" type="time" class="form-control" step="300" />
+                <label class="form-label fw-semibold">Đến ngày <small class="text-muted">(tùy chọn)</small></label>
+                <input id="ot-end-date" type="date" class="form-control" placeholder="Nếu đăng ký nhiều ngày" />
+              </div>
+            </div>
+            <div class="row g-3 mb-3">
+              <div class="col-6 position-relative">
+                <label class="form-label fw-semibold">Giờ bắt đầu *</label>
+                <div class="input-time-native-wrap">
+                  <input id="ot-start" type="text" class="form-control" placeholder="18:30" maxlength="5" />
+                  <span class="time-clock-btn" data-target="ot-start"><i class="bi bi-clock"></i></span>
+                </div>
+                <div id="picker-ot-start" class="native-time-picker-popup d-none"></div>
+              </div>
+              <div class="col-6 position-relative">
+                <label class="form-label fw-semibold">Giờ kết thúc *</label>
+                <div class="input-time-native-wrap">
+                  <input id="ot-end" type="text" class="form-control" placeholder="22:00" maxlength="5" />
+                  <span class="time-clock-btn" data-target="ot-end"><i class="bi bi-clock"></i></span>
+                </div>
+                <div id="picker-ot-end" class="native-time-picker-popup d-none"></div>
               </div>
             </div>
             <!-- Cảnh báo giờ OT -->
@@ -622,6 +748,29 @@
     </div>
   </div>
 
+  <!-- ═══════════════════════ MODAL XEM LỊCH SỬ / CHI TIẾT OT THEO NGÀY ═══════════════════════ -->
+  <div class="modal fade" id="modal-ot-day-history" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content glass-modal shadow-lg border-0">
+        <div class="modal-header border-bottom border-light">
+          <h5 class="modal-title fw-bold" id="modal-ot-day-title">
+            <i class="bi bi-calendar-check text-danger me-2"></i>Lịch sử OT ngày
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-3" id="modal-ot-day-body">
+          <!-- Danh sách ca OT trong ngày sẽ render vào đây -->
+        </div>
+        <div class="modal-footer border-top border-light d-flex justify-content-between">
+          <button class="btn btn-outline-danger btn-sm" id="btn-add-more-ot-day">
+            <i class="bi bi-plus-lg me-1"></i>Đăng ký thêm OT ngày này
+          </button>
+          <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Đóng</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ═══════════════════════ OT DETAIL MODAL (Admin) ═══════════════════════ -->
   <div class="modal fade" id="modal-ot-detail" tabindex="-1">
     <div class="modal-dialog">
@@ -661,12 +810,69 @@
     </div>
   </div>
 
-  <!-- Toast -->
-  <div class="toast-container position-fixed bottom-0 end-0 p-3">
-    <div id="app-toast" class="toast align-items-center border-0" role="alert">
-      <div class="d-flex">
-        <div class="toast-body" id="toast-msg"></div>
-        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+  <!-- Toast (Góc dưới bên trái) -->
+  <div class="toast-container position-fixed bottom-0 start-0 p-3" style="z-index: 1095;">
+    <div id="app-toast" class="toast align-items-center border-0 shadow-lg" role="alert" aria-live="assertive"
+      aria-atomic="true">
+      <div class="d-flex align-items-center">
+        <div class="toast-icon-wrap ps-3 me-1" id="toast-icon">
+          <i class="bi bi-check-circle-fill fs-5"></i>
+        </div>
+        <div class="toast-body fs-6 fw-medium py-3 pe-2" id="toast-msg"></div>
+        <button type="button" class="btn-close me-3 m-auto" data-bs-dismiss="toast"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm Modal (Chính giữa màn hình) -->
+  <div class="modal fade" id="app-confirm-modal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static"
+    style="z-index: 1090 !important;">
+    <div class="modal-dialog modal-dialog-centered" style="z-index: 1091 !important;">
+      <div class="modal-content confirm-modal-content border-0 shadow-lg"
+        style="background: #ffffff !important; opacity: 1 !important; z-index: 1092 !important;">
+        <div class="modal-body text-center p-4">
+          <div class="confirm-icon-wrap mx-auto mb-3" id="confirm-modal-icon-bg">
+            <i class="bi bi-exclamation-triangle-fill" id="confirm-modal-icon"></i>
+          </div>
+          <h5 class="fw-bold mb-2 text-dark" id="confirm-modal-title">Xác nhận thao tác</h5>
+          <p class="text-secondary mb-4 fs-6 px-2" id="confirm-modal-message">Bạn có chắc chắn muốn thực hiện thao tác
+            này không?</p>
+          <div class="d-flex justify-content-center gap-3">
+            <button type="button" class="btn btn-light px-4 py-2 rounded-3 fw-semibold text-secondary"
+              id="confirm-modal-cancel-btn">Hủy bỏ</button>
+            <button type="button" class="btn btn-danger px-4 py-2 rounded-3 fw-semibold" id="confirm-modal-ok-btn">Xác
+              nhận</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Prompt Modal (Nhập dữ liệu ở chính giữa màn hình) -->
+  <div class="modal fade" id="app-prompt-modal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static"
+    style="z-index: 1090 !important;">
+    <div class="modal-dialog modal-dialog-centered" style="z-index: 1091 !important;">
+      <div class="modal-content confirm-modal-content border-0 shadow-lg"
+        style="background: #ffffff !important; opacity: 1 !important; z-index: 1092 !important;">
+        <div class="modal-body p-4">
+          <div class="text-center mb-3">
+            <div class="confirm-icon-wrap confirm-icon-info mx-auto mb-3">
+              <i class="bi bi-link-45deg" id="prompt-modal-icon"></i>
+            </div>
+            <h5 class="fw-bold mb-2 text-dark" id="prompt-modal-title">Nhập thông tin</h5>
+            <p class="text-secondary mb-3 fs-6" id="prompt-modal-message">Vui lòng nhập đường dẫn bên dưới:</p>
+          </div>
+          <div class="mb-4">
+            <input type="text" id="prompt-modal-input" class="form-control form-control-lg fs-6 rounded-3 shadow-sm"
+              placeholder="https://docs.google.com/spreadsheets/d/..." autocomplete="off">
+          </div>
+          <div class="d-flex justify-content-center gap-3">
+            <button type="button" class="btn btn-light px-4 py-2 rounded-3 fw-semibold text-secondary"
+              id="prompt-modal-cancel-btn">Hủy bỏ</button>
+            <button type="button" class="btn btn-danger px-4 py-2 rounded-3 fw-semibold" id="prompt-modal-ok-btn">Xác
+              nhận</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -692,9 +898,12 @@
   </div>
 
   <!-- Chat Assistant Widget -->
-  <div id="chat-widget" class="chat-widget-container d-none">
-    <button id="chat-toggle-btn" class="chat-toggle-btn">
-      <i class="bi bi-robot"></i>
+  <div id="chat-widget" class="chat-widget-container"
+    style="position: fixed !important; bottom: 24px !important; right: 24px !important; z-index: 99999 !important; display: block !important;">
+    <button id="chat-toggle-btn" class="chat-toggle-btn" title="Trợ lý AI Viettel"
+      style="width: 58px !important; height: 58px !important; border-radius: 50% !important; background: linear-gradient(135deg, #e53935, #c62828) !important; color: #ffffff !important; border: 2px solid #ffffff !important; box-shadow: 0 6px 24px rgba(229,57,53,0.5) !important; cursor: pointer !important; display: flex !important; align-items: center !important; justify-content: center !important;">
+      <i class="bi bi-robot"
+        style="font-size: 26px !important; color: #ffffff !important; line-height: 1 !important;"></i>
     </button>
     <div id="chat-window" class="chat-window d-none glass-modal">
       <div class="chat-header">
@@ -702,7 +911,9 @@
           <i class="bi bi-robot me-2 text-primary fs-5"></i>
           <span class="fw-bold">Trợ lý AI</span>
         </div>
-        <button id="chat-close-btn" class="btn-close"></button>
+        <button id="chat-close-btn" class="chat-close-btn-styled" title="Đóng hội thoại">
+          <i class="bi bi-x-lg"></i>
+        </button>
       </div>
       <div class="chat-body" id="chat-body">
         <div class="chat-message ai-message">
@@ -720,19 +931,19 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="static/pages.js?v=5.5"></script>
-  <script src="static/page_users.js?v=5.5"></script>
-  <script src="static/page_periods.js?v=5.5"></script>
-  <script src="static/page_admin_schedule.js?v=5.5"></script>
-  <script src="static/page_profile.js?v=5.5"></script>
-  <script src="static/page_schedule.js?v=5.5"></script>
-  <script src="static/page_accounts.js?v=5.5"></script>
-  <script src="static/page_employees.js?v=5.5"></script>
-  <script src="static/page_documents.js?v=5.5"></script>
-  <script src="static/page_ai_config.js?v=5.5"></script>
-  <script src="static/chat.js?v=5.5"></script>
-  <script src="static/page_ot.js?v=5.5"></script>
-  <script src="static/app.js?v=5.5"></script>
+  <script src="static/pages.js?v=5.2"></script>
+  <script src="static/page_users.js?v=5.0"></script>
+  <script src="static/page_periods.js?v=5.0"></script>
+  <script src="static/page_admin_schedule.js?v=5.0"></script>
+  <script src="static/page_profile.js?v=5.0"></script>
+  <script src="static/page_schedule.js?v=5.0"></script>
+  <script src="static/page_accounts.js?v=5.0"></script>
+  <script src="static/page_employees.js?v=5.0"></script>
+  <script src="static/page_documents.js?v=5.0"></script>
+  <script src="static/page_ai_config.js?v=5.0"></script>
+  <script src="static/chat.js?v=5.0"></script>
+  <script src="static/page_ot.js?v=5.4"></script>
+  <script src="static/app.js?v=5.4"></script>
 </body>
 
 </html>

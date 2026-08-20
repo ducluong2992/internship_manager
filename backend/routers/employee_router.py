@@ -11,6 +11,8 @@ from pydantic import BaseModel
 import urllib.request
 import re
 import unicodedata
+import warnings
+warnings.filterwarnings('ignore', category=UserWarning, module='openpyxl')
 
 from database import get_db
 import models, schemas, auth

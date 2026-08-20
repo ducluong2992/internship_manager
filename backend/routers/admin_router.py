@@ -1,3 +1,6 @@
+import warnings
+warnings.filterwarnings('ignore', category=UserWarning, module='openpyxl')
+
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
@@ -7,10 +10,11 @@ from io import BytesIO
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 import calendar
-from datetime import date
+from datetime import date, datetime, timedelta
 from pydantic import BaseModel
 import urllib.request
 import re
+import unicodedata
 
 from database import get_db
 import models, schemas, auth
@@ -20,32 +24,49 @@ router = APIRouter(prefix="/admin", tags=["Admin"])
 
 # ─── User Management ──────────────────────────────────────────────────────────
 
-import unicodedata
-from datetime import datetime
-
 def remove_accents(input_str):
     s = input_str.replace('đ', 'd').replace('Đ', 'D')
     nfkd_form = unicodedata.normalize('NFKD', s)
     return u"".join([c for c in nfkd_form if not unicodedata.combining(c)])
 
 
-def parse_excel_date(val):
+def parse_excel_date(val, field_name="Ngày", row_idx=None, emp_name=None):
     if not val:
-        return None
+        return None, None
     if isinstance(val, datetime):
-        return val.date()
+        return val.date(), None
     if isinstance(val, date):
-        return val
+        return val, None
+    if isinstance(val, (int, float)):
+        try:
+            if 1000 <= val <= 100000:
+                return (datetime(1899, 12, 30) + timedelta(days=val)).date(), None
+            else:
+                context = f" (Dòng {row_idx} - {emp_name})" if row_idx and emp_name else ""
+                return None, f"Ô '{field_name}' có giá trị số '{val}' bị đặt sai định dạng Date trong Excel{context}."
+        except Exception:
+            return None, None
     if isinstance(val, str):
         val_str = val.strip()
         if not val_str:
-            return None
+            return None, None
+        try:
+            num = float(val_str)
+            if 1000 <= num <= 100000:
+                return (datetime(1899, 12, 30) + timedelta(days=num)).date(), None
+            elif num > 100000:
+                context = f" (Dòng {row_idx} - {emp_name})" if row_idx and emp_name else ""
+                return None, f"Ô '{field_name}' chứa chuỗi số '{val_str}' bị đặt sai định dạng Date trong Excel{context}."
+        except ValueError:
+            pass
         for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%Y/%m/%d", "%d/%m/%y"):
             try:
-                return datetime.strptime(val_str, fmt).date()
+                return datetime.strptime(val_str, fmt).date(), None
             except ValueError:
                 pass
-    return None
+        context = f" (Dòng {row_idx} - {emp_name})" if row_idx and emp_name else ""
+        return None, f"Ô '{field_name}' ('{val_str}') sai định dạng ngày (cần dạng DD/MM/YYYY){context}."
+    return None, None
 
 
 @router.get("/users", response_model=List[schemas.UserResponse])
@@ -506,37 +527,19 @@ def import_schedule_link(
         
     return process_schedule_import(ws, period_id, period.month, period.year, db)
 
-@router.post("/users/import-link")
-def import_users_from_link(
-    data: ImportLinkRequest,
-    db: Session = Depends(get_db),
-    _: models.User = Depends(auth.require_admin),
-):
-    match = re.search(r'/d/([a-zA-Z0-9-_]+)', data.url)
-    if not match:
-        raise HTTPException(status_code=400, detail="Đường dẫn Google Sheets không hợp lệ")
-    sheet_id = match.group(1)
-    export_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=xlsx"
-    
-    try:
-        req = urllib.request.Request(export_url)
-        with urllib.request.urlopen(req) as response:
-            content = response.read()
-            wb = openpyxl.load_workbook(filename=BytesIO(content), data_only=True)
-            ws = wb.active
-    except Exception:
-        raise HTTPException(status_code=400, detail="Không thể tải hoặc đọc dữ liệu từ link. Hãy chắc chắn link đã được chia sẻ công khai 'Bất kỳ ai có liên kết'.")
-        
-    return process_import_users(ws, db)
+class ConfirmImportRequest(BaseModel):
+    updates: List[dict] = []
+    additions: List[dict] = []
+    delete_ids: List[int] = []
 
-def process_import_users(ws, db: Session):
+
+def parse_intern_sheet_rows(ws):
     rows = list(ws.iter_rows(values_only=True))
     if not rows:
-        return {"message": "File Excel không có dữ liệu", "success": 0, "created": 0, "updated": 0}
+        return []
         
     header_row = [str(cell).strip().lower() if cell is not None else "" for cell in rows[0]]
     
-    # Dynamic header mapping
     col_map = {}
     for idx, h in enumerate(header_row):
         if not h:
@@ -589,18 +592,14 @@ def process_import_users(ws, db: Session):
             return row[idx]
         return None
 
-    created_count = 0
-    updated_count = 0
-    
-    # Iterate data rows (starting from index 1)
-    for row in rows[1:]:
+    parsed = []
+    format_warnings = []
+
+    for row_idx, row in enumerate(rows[1:], start=2):
         if not row:
             continue
-            
         full_name = get_str(row, "full_name", 0)
         emp_code = get_str(row, "employee_code", 1)
-        
-        # Skip empty rows or rows missing required fields
         if not full_name or not emp_code:
             continue
 
@@ -618,7 +617,9 @@ def process_import_users(ws, db: Session):
         viettel_email = get_str(row, "viettel_email", 5)
 
         raw_birthday = get_raw(row, "birthday", 6)
-        birthday = parse_excel_date(raw_birthday)
+        birthday, warn_b = parse_excel_date(raw_birthday, "Ngày sinh", row_idx, full_name)
+        if warn_b:
+            format_warnings.append(warn_b)
 
         hometown = get_str(row, "hometown", 7)
         phone = get_str(row, "phone", 8)
@@ -628,7 +629,9 @@ def process_import_users(ws, db: Session):
         project = get_str(row, "project", 12)
 
         raw_join_date = get_raw(row, "join_date", 13)
-        join_date = parse_excel_date(raw_join_date)
+        join_date, warn_j = parse_excel_date(raw_join_date, "Ngày vào làm", row_idx, full_name)
+        if warn_j:
+            format_warnings.append(warn_j)
 
         raw_allowance = get_str(row, "allowance", 14)
         allowance = "Không"
@@ -640,6 +643,8 @@ def process_import_users(ws, db: Session):
         employee_type = "TTS Trung tâm"
         if raw_emp_type and "mượn" in raw_emp_type.lower():
             employee_type = "Đi mượn"
+        elif raw_emp_type:
+            employee_type = raw_emp_type
 
         raw_status = get_str(row, "working_status", 16)
         working_status = "Working"
@@ -654,63 +659,258 @@ def process_import_users(ws, db: Session):
             else:
                 working_status = raw_status
 
-        existing = db.query(models.User).filter(models.User.employee_code == emp_code).first()
+        parsed.append({
+            "employee_code": emp_code,
+            "full_name": full_name,
+            "role": role_str,
+            "position": position_str,
+            "gender": gender,
+            "ethnicity": ethnicity,
+            "viettel_email": viettel_email,
+            "birthday": str(birthday) if birthday else None,
+            "hometown": hometown,
+            "phone": phone,
+            "cccd": cccd,
+            "bank_name": bank_name,
+            "bank_account": bank_account,
+            "project": project,
+            "join_date": str(join_date) if join_date else None,
+            "allowance": allowance,
+            "employee_type": employee_type,
+            "working_status": working_status,
+        })
+    return parsed, format_warnings
+
+
+@router.post("/users/preview-import-link")
+def preview_import_link(
+    data: ImportLinkRequest,
+    db: Session = Depends(get_db),
+    _: models.User = Depends(auth.require_admin),
+):
+    match = re.search(r'/d/([a-zA-Z0-9-_]+)', data.url)
+    if not match:
+        raise HTTPException(status_code=400, detail="Đường dẫn Google Sheets không hợp lệ")
+    sheet_id = match.group(1)
+    export_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=xlsx"
+    
+    try:
+        req = urllib.request.Request(export_url)
+        with urllib.request.urlopen(req) as response:
+            content = response.read()
+            wb = openpyxl.load_workbook(filename=BytesIO(content), data_only=True)
+            ws = wb.active
+    except Exception:
+        raise HTTPException(status_code=400, detail="Không thể tải hoặc đọc dữ liệu từ link. Hãy chắc chắn link đã được chia sẻ công khai 'Bất kỳ ai có liên kết'.")
+        
+    parsed_rows, format_warnings = parse_intern_sheet_rows(ws)
+    if not parsed_rows:
+        raise HTTPException(status_code=400, detail="File hoặc link Google Sheet không có dữ liệu hợp lệ")
+
+    db_interns = db.query(models.User).filter(models.User.user_type == "intern").all()
+    db_by_code = {u.employee_code.lower(): u for u in db_interns if u.employee_code}
+    db_by_name = {u.full_name.lower(): u for u in db_interns if u.full_name}
+
+    field_labels = {
+        "full_name": "Họ và tên",
+        "position": "Vị trí",
+        "gender": "Giới tính",
+        "ethnicity": "Dân tộc",
+        "viettel_email": "Email Viettel",
+        "birthday": "Ngày sinh",
+        "hometown": "Quê quán",
+        "phone": "Số điện thoại",
+        "cccd": "Số CCCD",
+        "bank_name": "Ngân hàng",
+        "bank_account": "Số tài khoản",
+        "project": "Dự án",
+        "join_date": "Ngày vào làm",
+        "allowance": "Trợ cấp",
+        "employee_type": "Loại nhân sự",
+        "working_status": "Trạng thái",
+    }
+
+    updated = []
+    added = []
+    processed_db_ids = set()
+    unchanged_count = 0
+
+    for row_data in parsed_rows:
+        emp_code = row_data["employee_code"]
+        full_name = row_data["full_name"]
+
+        existing = db_by_code.get(emp_code.lower()) or db_by_name.get(full_name.lower())
+
         if existing:
-            existing.full_name = full_name
-            if position_str: existing.position = position_str
-            if role_str: existing.role = role_str
-            if gender: existing.gender = gender
-            if ethnicity: existing.ethnicity = ethnicity
-            if viettel_email: existing.viettel_email = viettel_email
-            if birthday: existing.birthday = birthday
-            if hometown: existing.hometown = hometown
-            if phone: existing.phone = phone
-            if cccd: existing.cccd = cccd
-            if bank_name: existing.bank_name = bank_name
-            if bank_account: existing.bank_account = bank_account
-            if project: existing.project = project
-            if join_date: existing.join_date = join_date
-            if allowance: existing.allowance = allowance
-            if employee_type: existing.employee_type = employee_type
-            if working_status: existing.working_status = working_status
-            updated_count += 1
+            processed_db_ids.add(existing.id)
+            changes = []
+            for field_key, field_name in field_labels.items():
+                db_val = getattr(existing, field_key, None)
+                if isinstance(db_val, (date, datetime)):
+                    db_val_str = str(db_val)
+                else:
+                    db_val_str = str(db_val).strip() if db_val is not None else ""
+
+                sheet_val = row_data.get(field_key)
+                sheet_val_str = str(sheet_val).strip() if sheet_val is not None else ""
+
+                if sheet_val_str and sheet_val_str != db_val_str:
+                    changes.append({
+                        "field_key": field_key,
+                        "field_name": field_name,
+                        "old_value": db_val_str if db_val_str else "—",
+                        "new_value": sheet_val_str,
+                    })
+
+            if changes:
+                updated.append({
+                    "id": existing.id,
+                    "employee_code": existing.employee_code,
+                    "full_name": existing.full_name,
+                    "changes": changes,
+                    "new_data": row_data
+                })
+            else:
+                unchanged_count += 1
         else:
-            user_data = {
+            added.append({
                 "employee_code": emp_code,
                 "full_name": full_name,
-                "role": role_str,
-                "user_type": "intern",
-                "gender": gender,
-                "ethnicity": ethnicity,
-                "viettel_email": viettel_email,
-                "birthday": birthday,
-                "hometown": hometown,
-                "phone": phone,
-                "cccd": cccd,
-                "bank_name": bank_name,
-                "bank_account": bank_account,
-                "project": project,
-                "position": position_str,
-                "join_date": join_date,
-                "allowance": allowance,
-                "employee_type": employee_type,
-                "working_status": working_status,
-                "employment_type": "Fulltime",
-                "account_status": 1
-            }
+                "position": row_data.get("position") or "—",
+                "project": row_data.get("project") or "—",
+                "viettel_email": row_data.get("viettel_email") or "—",
+                "phone": row_data.get("phone") or "—",
+                "new_data": row_data
+            })
+
+    removed = []
+    for u in db_interns:
+        if u.id not in processed_db_ids:
+            removed.append({
+                "id": u.id,
+                "employee_code": u.employee_code,
+                "full_name": u.full_name,
+                "position": u.position or "—",
+                "project": u.project or "—",
+                "working_status": u.working_status or "Working"
+            })
+
+    return {
+        "updated": updated,
+        "added": added,
+        "removed": removed,
+        "unchanged_count": unchanged_count,
+        "format_warnings": format_warnings
+    }
+
+
+@router.post("/users/confirm-import-link")
+def confirm_import_link(
+    req: ConfirmImportRequest,
+    db: Session = Depends(get_db),
+    _: models.User = Depends(auth.require_admin),
+):
+    updated_count = 0
+    added_count = 0
+    deleted_count = 0
+
+    # 1. Update existing interns
+    for item in req.updates:
+        user_id = item.get("id")
+        data = item.get("new_data", {})
+        if not user_id or not data:
+            continue
+        user = db.query(models.User).filter(models.User.id == user_id).first()
+        if user:
+            for k, v in data.items():
+                if k in ("birthday", "join_date") and v:
+                    v, _ = parse_excel_date(v)
+                if hasattr(user, k):
+                    setattr(user, k, v)
+            updated_count += 1
+
+    # 2. Add new interns
+    for item in req.additions:
+        data = item.get("new_data", {})
+        if not data or not data.get("employee_code") or not data.get("full_name"):
+            continue
+        # Check duplicate
+        existing = db.query(models.User).filter(models.User.employee_code == data["employee_code"]).first()
+        if existing:
+            continue
+
+        user_data = dict(data)
+        user_data["user_type"] = "intern"
+        user_data["employment_type"] = user_data.get("employment_type") or "Fulltime"
+        user_data["account_status"] = 1
+        if user_data.get("birthday"):
+            user_data["birthday"], _ = parse_excel_date(user_data["birthday"])
+        if user_data.get("join_date"):
+            user_data["join_date"], _ = parse_excel_date(user_data["join_date"])
+
+        user = models.User(**user_data)
+        db.add(user)
+        added_count += 1
+
+    # 3. Delete interns selected for deletion (Case 3: in web but not in sheet)
+    for uid in req.delete_ids:
+        user = db.query(models.User).filter(models.User.id == uid, models.User.user_type == "intern").first()
+        if user:
+            # Clean up schedules
+            db.query(models.Schedule).filter(models.Schedule.user_id == uid).delete()
+            db.delete(user)
+            deleted_count += 1
+
+    db.commit()
+
+    parts = []
+    if updated_count > 0:
+        parts.append(f"Cập nhật {updated_count} TTS")
+    if added_count > 0:
+        parts.append(f"Thêm mới {added_count} TTS")
+    if deleted_count > 0:
+        parts.append(f"Đã xóa {deleted_count} TTS")
+
+    msg = "Đồng bộ thành công: " + ", ".join(parts) if parts else "Đã hoàn tất đồng bộ (không thay đổi)."
+    return {"message": msg, "updated": updated_count, "added": added_count, "deleted": deleted_count}
+
+
+@router.post("/users/import-link")
+def import_users_from_link(
+    data: ImportLinkRequest,
+    db: Session = Depends(get_db),
+    admin: models.User = Depends(auth.require_admin),
+):
+    return preview_import_link(data, db, admin)
+
+
+def process_import_users(ws, db: Session):
+    # Retained for fallback direct Excel upload if needed
+    parsed_rows, _ = parse_intern_sheet_rows(ws)
+    created_count = 0
+    updated_count = 0
+    for row_data in parsed_rows:
+        emp_code = row_data["employee_code"]
+        existing = db.query(models.User).filter(models.User.employee_code == emp_code).first()
+        if existing:
+            for k, v in row_data.items():
+                if k in ("birthday", "join_date") and v:
+                    v, _ = parse_excel_date(v)
+                if hasattr(existing, k) and v is not None:
+                    setattr(existing, k, v)
+            updated_count += 1
+        else:
+            user_data = dict(row_data)
+            user_data["user_type"] = "intern"
+            if user_data.get("birthday"): user_data["birthday"], _ = parse_excel_date(user_data["birthday"])
+            if user_data.get("join_date"): user_data["join_date"], _ = parse_excel_date(user_data["join_date"])
             user = models.User(**user_data)
             db.add(user)
             created_count += 1
-            
-        db.flush()
-        
     db.commit()
-    return {
-        "message": f"Đã nạp {created_count + updated_count} thực tập sinh ({created_count} tạo mới, {updated_count} cập nhật).",
-        "success": created_count + updated_count,
-        "created": created_count,
-        "updated": updated_count
-    }
+    return {"message": f"Đã nhập {created_count} TTS mới, cập nhật {updated_count} TTS.", "success": created_count + updated_count}
+
+
 
 
 @router.patch("/users/{user_id}/lock")
@@ -725,6 +925,32 @@ def toggle_lock(
     user.account_status = 0 if user.account_status == 1 else 1
     db.commit()
     return {"account_status": user.account_status, "message": "Đã cập nhật trạng thái tài khoản"}
+
+
+@router.post("/users/lock-resigned-accounts")
+def lock_resigned_accounts(
+    user_type: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    _: models.User = Depends(auth.require_admin),
+):
+    query = db.query(models.User)
+    if user_type:
+        query = query.filter(models.User.user_type == user_type)
+
+    users = query.all()
+    locked_count = 0
+    for u in users:
+        st = ((u.working_status or "") + " " + (getattr(u, "employment_status", "") or "")).lower()
+        if any(k in st for k in ["resigned", "nghỉ", "đã nghỉ"]):
+            if u.account_status != 0:
+                u.account_status = 0
+                locked_count += 1
+
+    db.commit()
+    return {
+        "message": f"Đã khóa thành công {locked_count} tài khoản có trạng thái Đã nghỉ việc.",
+        "locked_count": locked_count
+    }
 
 
 @router.patch("/users/{user_id}/reset-password")
@@ -828,6 +1054,11 @@ def get_stats(
     emp_cho_muon = [u for u in employees if (u.staff_category or '').lower() in ["cho mượn", "đi mượn"]]
     emp_onsite = [u for u in employees if (u.staff_category or '').lower() in ["onsite"]]
     
+    emp_probation = [u for u in employees if (u.employment_status or '').lower() in ["thử việc", "thu viec", "học việc", "hoc viec"]]
+    emp_resigned = [u for u in employees if (u.employment_status or '').lower() in ["đã nghỉ việc", "da nghi viec", "nghỉ việc", "nghi viec"] or (u.working_status or '').lower() == "resigned"]
+    emp_in_project = [u for u in employees if u.project and u.project.strip() and u.project.strip() != '—']
+    emp_no_project = [u for u in employees if not (u.project and u.project.strip() and u.project.strip() != '—')]
+    
     today_date = now.date()
     today_schedules = (
         db.query(models.Schedule, models.User)
@@ -852,6 +1083,10 @@ def get_stats(
         "emp_trung_tam": len(emp_trung_tam),
         "emp_cho_muon": len(emp_cho_muon),
         "emp_onsite": len(emp_onsite),
+        "emp_probation": len(emp_probation),
+        "emp_resigned": len(emp_resigned),
+        "emp_in_project": len(emp_in_project),
+        "emp_no_project": len(emp_no_project),
         "total_periods": len(periods),
         "open_periods": len(open_periods),
         "today_workers": today_workers,

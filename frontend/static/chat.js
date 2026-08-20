@@ -11,15 +11,26 @@
   const chatInput = document.getElementById('chat-input');
   const chatBody = document.getElementById('chat-body');
 
-  // ── Toggle open/close ──
-  function toggleChat() {
-    chatWindow.classList.toggle('d-none');
-    if (!chatWindow.classList.contains('d-none')) {
-      chatInput.focus();
-    }
+  // ── Open / Close Chat ──
+  function openChat() {
+    chatWindow.classList.remove('d-none');
+    toggleBtn.style.setProperty('display', 'none', 'important');
+    chatInput.focus();
   }
-  toggleBtn.addEventListener('click', toggleChat);
-  closeBtn.addEventListener('click', toggleChat);
+
+  function closeChat() {
+    chatWindow.classList.add('d-none');
+    toggleBtn.style.setProperty('display', 'flex', 'important');
+  }
+
+  toggleBtn.addEventListener('click', openChat);
+  closeBtn.addEventListener('click', closeChat);
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !chatWindow.classList.contains('d-none')) {
+      closeChat();
+    }
+  });
 
   // ── Per-user storage key ──
   function storageKey() {
@@ -66,7 +77,9 @@
   // ── Init: load history for current user ──
   window.initChat = function () {
     // Show the widget
-    chatWidget.classList.remove('d-none');
+    chatWidget.style.setProperty('display', 'block', 'important');
+    toggleBtn.style.setProperty('display', 'flex', 'important');
+    chatWindow.classList.add('d-none');
 
     // Clear previous user's messages from DOM (keep the welcome bubble)
     chatBody.innerHTML = `
@@ -81,8 +94,9 @@
 
   // ── Destroy: hide widget & close window on logout ──
   window.destroyChat = function () {
-    chatWidget.classList.add('d-none');
+    chatWidget.style.setProperty('display', 'none', 'important');
     chatWindow.classList.add('d-none');
+    toggleBtn.style.setProperty('display', 'none', 'important');
   };
 
   // ── Send message ──

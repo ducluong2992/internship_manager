@@ -5,6 +5,8 @@ async function renderManageAccounts(area, userType = 'intern') {
   let accounts = await api('GET', `/admin/accounts?user_type=${userType}`);
   let filter = '';
 
+  window._currentAccounts = accounts;
+
   function filtered() {
     return accounts.filter(a =>
     (a.full_name.toLowerCase().includes(filter) ||
@@ -14,6 +16,7 @@ async function renderManageAccounts(area, userType = 'intern') {
   }
 
   function render() {
+    window._renderCurrentAccounts = render;
     const searchEl = document.getElementById('account-search');
     const isFocused = document.activeElement && document.activeElement.id === 'account-search';
     const cursorStart = isFocused ? searchEl.selectionStart : null;
@@ -22,8 +25,16 @@ async function renderManageAccounts(area, userType = 'intern') {
     const list = filtered();
     area.innerHTML = `
 <div class="section-header">
-  <div class="section-title"><i class="bi bi-person-lines-fill text-danger"></i> Tổng hợp tài khoản ${userType === 'intern' ? 'TTS' : 'Nhân viên'}</div>
-  <button class="btn btn-success btn-sm" onclick="exportAccounts('${userType}')"><i class="bi bi-file-earmark-excel-fill me-1"></i>Xuất Excel</button>
+  <div class="section-title"><i class="bi bi-person-lines-fill text-danger"></i> Quản lý tài khoản ${userType === 'intern' ? 'TTS' : 'Nhân viên'}</div>
+  <div class="d-flex gap-2">
+    ${userType === 'employee' ? `
+    <button class="btn btn-outline-danger btn-sm" onclick="lockAllResignedAccounts('employee')">
+      <i class="bi bi-lock-fill me-1"></i>Khóa TK NV nghỉ việc
+    </button>` : ''}
+    <button class="btn btn-outline-success btn-sm" onclick="exportAccounts('${userType}')">
+      <i class="bi bi-file-earmark-excel-fill me-1"></i>Xuất Excel
+    </button>
+  </div>
 </div>
 <div class="filter-bar mb-3">
   <input class="form-control" id="account-search" placeholder="Tìm kiếm tên, mã NV, tên đăng nhập..." value="${filter}" style="max-width:350px">
@@ -48,7 +59,7 @@ async function renderManageAccounts(area, userType = 'intern') {
         : '<span class="custom-badge badge-locked"><i class="bi bi-lock-fill"></i> Khóa</span>'}</td>
           <td>
             <button class="btn-icon ${a.account_status ? 'lock' : 'unlock'} me-1"
-              title="${a.account_status ? 'Khóa' : 'Mở khóa'}" onclick="toggleLockAccount(${a.user_id})">
+              title="${a.account_status ? 'Khóa' : 'Mở khóa'}" onclick="toggleLockAccount(${a.user_id}, '${userType}')">
               <i class="bi bi-${a.account_status ? 'lock-fill' : 'unlock-fill'}"></i>
             </button>
             <button class="btn-icon reset me-1" title="Đặt lại mật khẩu (123456)" onclick="resetAccountPwd(${a.user_id},'${a.username || a.full_name}')">
@@ -65,12 +76,35 @@ async function renderManageAccounts(area, userType = 'intern') {
 
     if (isFocused) {
       const newSearchEl = document.getElementById('account-search');
-      newSearchEl.focus();
-      newSearchEl.setSelectionRange(cursorStart, cursorEnd);
+      if (newSearchEl) {
+        newSearchEl.focus();
+        newSearchEl.setSelectionRange(cursorStart, cursorEnd);
+      }
     }
   }
   render();
 }
+
+window.lockAllResignedAccounts = async function (userType = 'intern') {
+  const label = userType === 'intern' ? 'Thực tập sinh' : 'Nhân viên';
+  const ok = await showConfirm({
+    title: 'Khóa tài khoản nhân sự đã nghỉ việc',
+    message: `Bạn có chắc chắn muốn khóa tất cả tài khoản ${label} có tình trạng "Đã nghỉ việc"?`,
+    okText: 'Khóa tất cả',
+    type: 'danger'
+  });
+  if (!ok) return;
+
+  try {
+    const query = userType ? `?user_type=${userType}` : '';
+    const res = await api('POST', `/admin/users/lock-resigned-accounts${query}`);
+    toast(res.message, 'success');
+    const targetPage = userType === 'employee' ? 'manage-emp-accounts' : 'manage-accounts';
+    navigate(targetPage);
+  } catch (err) {
+    toast(err.message || 'Lỗi khi khóa tài khoản', 'error');
+  }
+};
 
 window.exportAccounts = function (userType = 'intern') {
   fetch(API + `/admin/accounts/export?user_type=${userType}`, {
@@ -94,18 +128,30 @@ window.exportAccounts = function (userType = 'intern') {
 };
 
 window.resetAccountPwd = async (id, name) => {
-  if (!confirm(`Đặt lại mật khẩu về "123456" cho ${name}?`)) return;
+  const ok = await showConfirm({
+    title: 'Đặt lại mật khẩu',
+    message: `Đặt lại mật khẩu về "123456" cho ${name}?`,
+    okText: 'Đặt lại mật khẩu',
+    type: 'warning'
+  });
+  if (!ok) return;
   try { const r = await api('PATCH', `/admin/users/${id}/reset-password`); toast(r.message); }
   catch (e) { toast(e.message, 'error'); }
 };
 
-window.toggleLockAccount = async (id) => {
+window.toggleLockAccount = async (id, userType = 'intern') => {
   try {
     const r = await api('PATCH', `/admin/users/${id}/lock`);
     toast(r.message, 'info');
-    // We don't know userType here directly, but navigate will just reload current page anyway
-    // If the hash is manage-emp-accounts, we reload that
-    const currentPage = location.hash.replace('#', '') || 'dashboard';
-    navigate(currentPage);
+    if (window._currentAccounts) {
+      const target = window._currentAccounts.find(a => a.user_id === id);
+      if (target) target.account_status = r.account_status;
+    }
+    if (typeof window._renderCurrentAccounts === 'function') {
+      window._renderCurrentAccounts();
+    } else {
+      const targetPage = userType === 'employee' ? 'manage-emp-accounts' : 'manage-accounts';
+      navigate(targetPage);
+    }
   } catch (e) { toast(e.message, 'error'); }
 };
