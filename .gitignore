@@ -1,7 +1,38 @@
+# Java & Maven
+target/
+**/target/
+*.class
+*.jar
+*.war
+*.ear
+.mvn/
+
+# Database & Storage
+*.db
+*.sqlite3
+backend/chroma_db/
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# IDEs & System
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+*.DS_Store
+Thumbs.db
+
+# Logs & Temporary
+*.log
+err.txt
+test_res.json
+*.xlsx
+
+# Python (legacy ignore)
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 .pytest_cache/
-*.xlsx
-*.db

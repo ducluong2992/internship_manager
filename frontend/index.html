@@ -898,36 +898,77 @@
   </div>
 
   <!-- Chat Assistant Widget -->
-  <div id="chat-widget" class="chat-widget-container"
-    style="position: fixed !important; bottom: 24px !important; right: 24px !important; z-index: 99999 !important; display: block !important;">
-    <button id="chat-toggle-btn" class="chat-toggle-btn" title="Trợ lý AI Viettel"
-      style="width: 58px !important; height: 58px !important; border-radius: 50% !important; background: linear-gradient(135deg, #e53935, #c62828) !important; color: #ffffff !important; border: 2px solid #ffffff !important; box-shadow: 0 6px 24px rgba(229,57,53,0.5) !important; cursor: pointer !important; display: flex !important; align-items: center !important; justify-content: center !important;">
-      <i class="bi bi-robot"
-        style="font-size: 26px !important; color: #ffffff !important; line-height: 1 !important;"></i>
+  <div id="chat-widget" class="chat-widget-container">
+    <button id="chat-toggle-btn" class="chat-toggle-btn" title="Trợ lý AI Viettel">
+      <i class="bi bi-robot"></i>
     </button>
-    <div id="chat-window" class="chat-window d-none glass-modal">
+    <div id="chat-window" class="chat-window d-none glass-modal shadow-lg">
       <div class="chat-header">
-        <div class="d-flex align-items-center">
-          <i class="bi bi-robot me-2 text-primary fs-5"></i>
-          <span class="fw-bold">Trợ lý AI</span>
+        <div class="d-flex align-items-center gap-2">
+          <div class="chat-avatar-icon">
+            <i class="bi bi-robot"></i>
+          </div>
+          <div>
+            <div class="fw-bold fs-6 lh-1">Trợ lý AI</div>
+            <small class="chat-status-text"><span class="chat-online-dot"></span> Sẵn sàng</small>
+          </div>
         </div>
-        <button id="chat-close-btn" class="chat-close-btn-styled" title="Đóng hội thoại">
-          <i class="bi bi-x-lg"></i>
+        <div class="d-flex align-items-center gap-1">
+          <button id="chat-clear-btn" class="chat-header-btn" title="Xóa lịch sử hội thoại">
+            <i class="bi bi-trash3"></i>
+          </button>
+          <button id="chat-close-btn" class="chat-close-btn-styled" title="Đóng hội thoại">
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Model Selector & Test Key Toolbar -->
+      <div class="chat-toolbar">
+        <div class="d-flex align-items-center gap-1 flex-grow-1">
+          <i class="bi bi-cpu text-danger" style="font-size: 13px;"></i>
+          <select id="chat-model-select" class="form-select form-select-sm chat-model-dropdown" title="Chọn Model Gemini">
+            <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash Lite</option>
+            <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash Lite</option>
+          </select>
+        </div>
+        <button id="chat-test-key-btn" type="button" class="btn btn-sm chat-test-btn" title="Kiểm tra kết nối API Key & Model">
+          <i class="bi bi-lightning-charge-fill me-1"></i>Test Key
         </button>
       </div>
+
+      <!-- Test Key / Notification Banner -->
+      <div id="chat-banner" class="chat-banner d-none">
+        <div class="d-flex align-items-center justify-content-between">
+          <div id="chat-banner-text" class="chat-banner-content"></div>
+          <button type="button" class="btn-close btn-close-white ms-2" id="chat-banner-close"></button>
+        </div>
+      </div>
+
+      <!-- Chat Body -->
       <div class="chat-body" id="chat-body">
         <div class="chat-message ai-message">
           <div class="message-content">Xin chào! Tôi có thể giúp gì cho bạn?</div>
         </div>
       </div>
+
+      <!-- Quick prompts -->
+      <div class="chat-quick-actions" id="chat-quick-prompts">
+        <button type="button" class="chat-chip" data-prompt="Quy định và cách tính giờ làm thêm OT như thế nào?">⏰ Quy định OT</button>
+        <button type="button" class="chat-chip" data-prompt="Thời gian làm việc chuẩn của Trung tâm là gì?">📋 Giờ làm việc</button>
+        <button type="button" class="chat-chip" data-prompt="Hướng dẫn thủ tục xin nghỉ phép hoặc vắng mặt">🏖️ Nghỉ phép</button>
+      </div>
+
+      <!-- Chat Footer -->
       <div class="chat-footer">
         <form id="form-chat" class="d-flex gap-2 w-100">
-          <input type="text" id="chat-input" class="form-control" placeholder="Nhập câu hỏi..." autocomplete="off">
-          <button type="submit" class="btn btn-primary" id="chat-send-btn"><i class="bi bi-send"></i></button>
+          <input type="text" id="chat-input" class="form-control" placeholder="Nhập câu hỏi cho AI..." autocomplete="off">
+          <button type="submit" class="btn btn-danger" id="chat-send-btn" title="Gửi"><i class="bi bi-send-fill"></i></button>
         </form>
       </div>
     </div>
   </div>
+
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -940,10 +981,11 @@
   <script src="static/page_accounts.js?v=5.0"></script>
   <script src="static/page_employees.js?v=5.0"></script>
   <script src="static/page_documents.js?v=5.0"></script>
-  <script src="static/page_ai_config.js?v=5.0"></script>
-  <script src="static/chat.js?v=5.0"></script>
-  <script src="static/page_ot.js?v=5.4"></script>
-  <script src="static/app.js?v=5.4"></script>
+  <script src="static/page_ai_config.js?v=5.5"></script>
+  <script src="static/chat.js?v=5.5"></script>
+  <script src="static/page_ot.js?v=5.5"></script>
+  <script src="static/app.js?v=5.5"></script>
+
 </body>
 
 </html>

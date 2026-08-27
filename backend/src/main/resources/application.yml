@@ -1,0 +1,38 @@
+server:
+  port: 8000
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+spring:
+  application:
+    name: qlnv-backend
+  datasource:
+    driver-class-name: org.sqlite.JDBC
+    url: jdbc:sqlite:internship.db?date_string_format=yyyy-MM-dd
+  jpa:
+    database-platform: org.hibernate.community.dialect.SQLiteDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+  web:
+    resources:
+      static-locations: file:../frontend/static/,file:frontend/static/,file:../frontend/,file:frontend/
+      cache:
+        period: 0
+
+app:
+  jwt:
+    secret: "internship_secret_key_2024_viettel_super_secure_enterprise_key_123456"
+    expiration-ms: 28800000 # 8 hours
+  upload:
+    dir: uploads
