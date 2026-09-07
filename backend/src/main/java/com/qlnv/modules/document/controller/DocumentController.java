@@ -15,13 +15,13 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/documents")
+@RequestMapping({"/documents", "/api/documents"})
 @RequiredArgsConstructor
 public class DocumentController {
 
     private final DocumentService documentService;
 
-    @GetMapping
+    @GetMapping({"", "/"})
     public ResponseEntity<List<DocumentResponse>> getDocuments() {
         return ResponseEntity.ok(documentService.getAllDocuments());
     }

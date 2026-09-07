@@ -8,19 +8,19 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/chat")
+@RequestMapping({"/chat", "/api/chat"})
 @RequiredArgsConstructor
 public class ChatController {
 
     private final GeminiService geminiService;
 
-    @PostMapping
+    @PostMapping({"", "/"})
     public ResponseEntity<ChatDto.Response> chat(@RequestBody ChatDto.Request req) {
         return ResponseEntity.ok(geminiService.chat(req));
     }
 
     @PostMapping("/test-key")
-    public ResponseEntity<AIConfigDto.TestKeyResponse> testKey(@RequestBody AIConfigDto.TestKeyRequest req) {
-        return ResponseEntity.ok(geminiService.testApiKey(req.getApiKey()));
+    public ResponseEntity<AIConfigDto.TestKeyResponse> testKey(@RequestBody(required = false) AIConfigDto.TestKeyRequest req) {
+        return ResponseEntity.ok(geminiService.testApiKey(req));
     }
 }

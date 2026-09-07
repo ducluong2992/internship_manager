@@ -32,7 +32,7 @@ async function renderDocuments(area) {
         ${docs.length === 0 ? '<tr><td colspan="6" class="text-center text-muted py-4">Chưa có tài liệu nào</td></tr>' : 
           docs.map(d => `
           <tr data-id="${d.id}">
-            <td><strong>${d.filename}</strong></td>
+            <td><strong>${d.title || d.filename}</strong></td>
             <td>${d.uploaded_by || '—'}</td>
             <td>${fmtDateTime(d.created_at)}</td>
             <td>

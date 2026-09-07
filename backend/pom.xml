@@ -91,6 +91,13 @@
             <version>${poi.version}</version>
         </dependency>
 
+        <!-- Apache PDFBox for PDF Document Reading -->
+        <dependency>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox</artifactId>
+            <version>3.0.2</version>
+        </dependency>
+
         <!-- Lombok -->
         <dependency>
             <groupId>org.projectlombok</groupId>

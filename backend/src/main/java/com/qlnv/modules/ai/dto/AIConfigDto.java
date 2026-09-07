@@ -68,6 +68,8 @@ public class AIConfigDto {
     public static class TestKeyRequest {
         @JsonProperty("api_key")
         private String apiKey;
+
+        private String model;
     }
 
     @Getter
@@ -77,6 +79,8 @@ public class AIConfigDto {
     @Builder
     public static class TestKeyResponse {
         private Boolean valid;
+        private Boolean success;
         private String message;
+        private String preview;
     }
 }

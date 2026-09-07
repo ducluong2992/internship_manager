@@ -91,9 +91,18 @@ public class DocumentService {
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Không tìm thấy tài liệu"));
 
         try {
-            File f = new File(uploadDir, doc.getFilename());
-            if (f.exists()) {
-                f.delete();
+            File dir = new File(uploadDir);
+            if (doc.getFilename() != null) {
+                File f = new File(dir, doc.getFilename());
+                if (f.exists()) {
+                    f.delete();
+                }
+            }
+            if (doc.getId() != null && doc.getFilename() != null) {
+                File fPrefixed = new File(dir, doc.getId() + "_" + doc.getFilename());
+                if (fPrefixed.exists()) {
+                    fPrefixed.delete();
+                }
             }
         } catch (Exception e) {
             log.warn("Could not delete file from disk: " + doc.getFilename(), e);

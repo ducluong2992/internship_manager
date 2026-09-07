@@ -5,6 +5,7 @@ import lombok.*;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public class ChatDto {
 
@@ -15,6 +16,7 @@ public class ChatDto {
     @Builder
     public static class Request {
         private String message;
+        private String model;
 
         @JsonProperty("session_id")
         private String sessionId;
@@ -29,9 +31,13 @@ public class ChatDto {
     @AllArgsConstructor
     @Builder
     public static class Response {
+        private String answer;
         private String reply;
 
+        @JsonProperty("model_used")
+        private String modelUsed;
+
         @Builder.Default
-        private List<String> sources = new ArrayList<>();
+        private List<Map<String, Object>> sources = new ArrayList<>();
     }
 }
