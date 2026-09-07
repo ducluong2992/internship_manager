@@ -21,14 +21,14 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/overtime")
+@RequestMapping({"/overtime", "/overtime/"})
 @RequiredArgsConstructor
 public class OvertimeController {
 
     private final OvertimeService overtimeService;
     private final OvertimeExportService overtimeExportService;
 
-    @PostMapping
+    @PostMapping({"", "/"})
     public ResponseEntity<List<OvertimeResponseDto.Response>> createOvertime(
             @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody OvertimeRequestDto req) {

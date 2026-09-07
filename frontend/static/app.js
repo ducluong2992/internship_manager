@@ -2,7 +2,7 @@
    VIETTEL INTERN & EMPLOYEE MANAGEMENT — FRONTEND
    ═══════════════════════════════════════════════ */
 
-const API = 'http://localhost:8000';
+const API = (window.location.protocol.startsWith('http')) ? window.location.origin : 'http://localhost:8088';
 let STATE = { token: null, role: null, user_type: null, userId: null, fullName: null };
 
 // ── Persist session ──
@@ -27,6 +27,10 @@ function clearSession() { STATE = {}; localStorage.removeItem('intern_session');
 
 // ── API helper ──
 async function api(method, path, body) {
+  // Normalize path by stripping trailing slash for API endpoints
+  if (path && path.length > 1 && path.includes('/') && path.endsWith('/')) {
+    path = path.replace(/\/+$/, '');
+  }
   const opts = { method, headers: { 'Content-Type': 'application/json' } };
   if (STATE.token) opts.headers['Authorization'] = 'Bearer ' + STATE.token;
   if (body !== undefined) opts.body = JSON.stringify(body);

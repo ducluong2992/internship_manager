@@ -10,9 +10,9 @@ End If
 jarPath = """" & currentDir & "\backend\target\qlnv-backend-2.0.0.jar"""
 backendDir = currentDir & "\backend"
 
-cmd = javaCmd & " -jar " & jarPath
+cmd = javaCmd & " -jar " & jarPath & " --server.port=8088"
 
 WshShell.CurrentDirectory = backendDir
 WshShell.Run cmd, 0, False
 
-WScript.Echo "Máy chủ đã khởi chạy ngầm tại http://localhost:8000!" & vbCrLf & "Bạn có thể đóng cửa sổ này, chương trình vẫn tiếp tục hoạt động." & vbCrLf & "Để tắt chương trình, vui lòng chạy file stop.bat."
+WScript.Echo "Máy chủ đã khởi chạy ngầm tại http://localhost:8088!" & vbCrLf & "Bạn có thể đóng cửa sổ này, chương trình vẫn tiếp tục hoạt động." & vbCrLf & "Để tắt chương trình, vui lòng chạy file stop.bat."

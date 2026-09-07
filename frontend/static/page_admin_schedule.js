@@ -5,6 +5,18 @@ async function renderAdminSchedule(area) {
   const now = new Date();
   let selMonth = now.getMonth() + 1, selYear = now.getFullYear();
 
+  // Try to default to the latest existing period if current month has no period
+  try {
+    const periods = await api('GET', '/admin/periods');
+    if (periods && periods.length > 0) {
+      const hasCurrent = periods.some(p => p.month === selMonth && p.year === selYear);
+      if (!hasCurrent) {
+        selMonth = periods[0].month;
+        selYear = periods[0].year;
+      }
+    }
+  } catch {}
+
   async function load() {
     area.querySelector && area.querySelectorAll && null;
     const data = await api('GET', `/admin/schedule?month=${selMonth}&year=${selYear}`);
@@ -227,12 +239,18 @@ ${data.period ? `
       applyMinFilter();
     }
 
-    document.getElementById('btn-load-sched').onclick = async () => {
+    const btnLoad = document.getElementById('btn-load-sched');
+    btnLoad.onclick = async () => {
       selMonth = parseInt(document.getElementById('sel-month').value);
       selYear = parseInt(document.getElementById('sel-year').value);
       area.innerHTML = '<div class="d-flex justify-content-center py-5"><div class="spinner-border text-danger"></div></div>';
       await load();
     };
+
+    const selMonthEl = document.getElementById('sel-month');
+    const selYearEl = document.getElementById('sel-year');
+    if (selMonthEl) selMonthEl.onchange = () => btnLoad.click();
+    if (selYearEl) selYearEl.onchange = () => btnLoad.click();
 
     if (data.period) {
       document.getElementById('btn-export').onclick = async () => {

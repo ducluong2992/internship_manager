@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════════════════
 
 async function renderManageEmployees(area) {
-  let employees = await api('GET', '/employees/');
+  let employees = await api('GET', '/employees');
   let filter = '';
   
   // Use sets for multi-select filters. Empty set means no filter (show all).
@@ -211,7 +211,7 @@ function badgeStaffCat(c) {
 // ─── Open modal ───────────────────────────────────────────────────────────────
 
 window.openEditEmployee = async (id) => {
-  const employees = await api('GET', '/employees/');
+  const employees = await api('GET', '/employees');
   openEmployeeModal(employees.find(e => e.id === id));
 };
 
@@ -348,7 +348,7 @@ document.getElementById('btn-save-employee').addEventListener('click', async () 
     } else {
       const empCode = document.getElementById('emp-code').value.trim();
       if (!empCode) { toast('Vui lòng nhập mã nhân viên', 'error'); return; }
-      await api('POST', '/employees/', { employee_code: empCode, ...payload });
+      await api('POST', '/employees', { employee_code: empCode, ...payload });
       toast('Đã thêm nhân viên và tạo tài khoản tự động', 'success');
     }
     bootstrap.Modal.getInstance(document.getElementById('modal-employee')).hide();

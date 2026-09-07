@@ -315,21 +315,73 @@ public class UserService {
     public Map<String, Object> getStats() {
         long totalUsers = userRepository.count();
         List<User> all = userRepository.findAll();
-        long totalInterns = all.stream().filter(u -> "intern".equalsIgnoreCase(u.getUserType())).count();
-        long totalEmployees = all.stream().filter(u -> "employee".equalsIgnoreCase(u.getUserType())).count();
-        long workingInterns = all.stream().filter(u -> "intern".equalsIgnoreCase(u.getUserType()) && "Working".equalsIgnoreCase(u.getWorkingStatus())).count();
-        long resignedInterns = all.stream().filter(u -> "intern".equalsIgnoreCase(u.getUserType()) && "Resigned".equalsIgnoreCase(u.getWorkingStatus())).count();
-        long workingEmployees = all.stream().filter(u -> "employee".equalsIgnoreCase(u.getUserType()) && "Working".equalsIgnoreCase(u.getWorkingStatus())).count();
+
+        List<User> interns = all.stream().filter(u -> "intern".equalsIgnoreCase(u.getUserType())).collect(Collectors.toList());
+        List<User> employees = all.stream().filter(u -> "employee".equalsIgnoreCase(u.getUserType())).collect(Collectors.toList());
+
+        long workingInterns = interns.stream().filter(u -> "working".equalsIgnoreCase(u.getWorkingStatus())).count();
+        long resignedInterns = interns.stream().filter(u -> "resigned".equalsIgnoreCase(u.getWorkingStatus())).count();
+        long fulltime = interns.stream().filter(u -> "fulltime".equalsIgnoreCase(u.getEmploymentType())).count();
+        long parttime = interns.stream().filter(u -> "parttime".equalsIgnoreCase(u.getEmploymentType())).count();
+        long internCount = interns.stream().filter(u -> {
+            String et = u.getEmployeeType() != null ? u.getEmployeeType().toLowerCase() : "";
+            return et.contains("tts") || et.contains("intern") || et.contains("thực tập");
+        }).count();
+        long borrowedCount = interns.stream().filter(u -> {
+            String et = u.getEmployeeType() != null ? u.getEmployeeType().toLowerCase() : "";
+            return et.contains("mượn") || et.contains("borrowed");
+        }).count();
+
+        long empTrungTam = employees.stream().filter(u -> {
+            String sc = u.getStaffCategory() != null ? u.getStaffCategory().toLowerCase() : "";
+            return sc.contains("trung tâm");
+        }).count();
+        long empChoMuon = employees.stream().filter(u -> {
+            String sc = u.getStaffCategory() != null ? u.getStaffCategory().toLowerCase() : "";
+            return sc.contains("mượn");
+        }).count();
+        long empOnsite = employees.stream().filter(u -> {
+            String sc = u.getStaffCategory() != null ? u.getStaffCategory().toLowerCase() : "";
+            return sc.contains("onsite");
+        }).count();
+
+        long empProbation = employees.stream().filter(u -> {
+            String es = u.getEmploymentStatus() != null ? u.getEmploymentStatus().toLowerCase() : "";
+            return es.contains("thử việc") || es.contains("thu viec") || es.contains("học việc") || es.contains("hoc viec");
+        }).count();
+        long empResigned = employees.stream().filter(u -> {
+            String es = u.getEmploymentStatus() != null ? u.getEmploymentStatus().toLowerCase() : "";
+            String ws = u.getWorkingStatus() != null ? u.getWorkingStatus().toLowerCase() : "";
+            return es.contains("nghỉ việc") || es.contains("nghi viec") || "resigned".equals(ws);
+        }).count();
+
+        long empInProject = employees.stream().filter(u -> u.getProject() != null && !u.getProject().trim().isEmpty() && !"—".equals(u.getProject().trim())).count();
+        long empNoProject = Math.max(0, employees.size() - empInProject);
+
         long activeAccounts = all.stream().filter(u -> u.getAccountStatus() != null && u.getAccountStatus() == 1).count();
         long lockedAccounts = all.stream().filter(u -> u.getAccountStatus() != null && u.getAccountStatus() == 0).count();
 
         Map<String, Object> stats = new HashMap<>();
         stats.put("total_users", totalUsers);
-        stats.put("total_interns", totalInterns);
-        stats.put("total_employees", totalEmployees);
+        stats.put("total_interns", interns.size());
+        stats.put("total_employees", employees.size());
+        stats.put("working", workingInterns);
         stats.put("working_interns", workingInterns);
+        stats.put("resigned", resignedInterns);
         stats.put("resigned_interns", resignedInterns);
-        stats.put("working_employees", workingEmployees);
+        stats.put("fulltime", fulltime);
+        stats.put("parttime", parttime);
+        stats.put("intern_count", internCount);
+        stats.put("borrowed_count", borrowedCount);
+
+        stats.put("emp_trung_tam", empTrungTam);
+        stats.put("emp_cho_muon", empChoMuon);
+        stats.put("emp_onsite", empOnsite);
+        stats.put("emp_probation", empProbation);
+        stats.put("emp_resigned", empResigned);
+        stats.put("emp_in_project", empInProject);
+        stats.put("emp_no_project", empNoProject);
+
         stats.put("active_accounts", activeAccounts);
         stats.put("locked_accounts", lockedAccounts);
         return stats;

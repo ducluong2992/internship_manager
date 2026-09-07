@@ -681,7 +681,7 @@ async function renderRegisterOT(area) {
         });
         toast('Đã cập nhật đăng ký OT. Trạng thái chuyển về Chờ duyệt.', 'success');
       } else {
-        const res = await api('POST', '/overtime/', {
+        const res = await api('POST', '/overtime', {
           work_date: startDateStr,
           end_date: endDateStr || null,
           start_time: startTime,

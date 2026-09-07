@@ -20,21 +20,21 @@ public class ScheduleExcelService {
     private final ScheduleService scheduleService;
     private final SchedulePeriodRepository periodRepository;
 
-    public byte[] exportScheduleMatrix(Integer periodId, String project, String position, String keyword) {
-        Map<String, Object> matrix = scheduleService.getAdminScheduleMatrix(periodId, project, position, keyword);
-        SchedulePeriod period = (SchedulePeriod) matrix.get("period");
+    @SuppressWarnings("unchecked")
+    public byte[] exportScheduleMatrix(Integer periodId, Integer month, Integer year, String project, String position, String keyword) {
+        Map<String, Object> matrix = scheduleService.getAdminScheduleMatrix(periodId, month, year, project, position, keyword);
+        Map<String, Object> period = (Map<String, Object>) matrix.get("period");
         int daysInMonth = (int) matrix.get("days_in_month");
-        @SuppressWarnings("unchecked")
-        List<Map<String, Object>> users = (List<Map<String, Object>>) matrix.get("users");
+        List<Map<String, Object>> users = (List<Map<String, Object>>) matrix.get("rows");
 
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-            String sheetName = period != null ? "Lich_T" + period.getMonth() + "_" + period.getYear() : "Lich_Lam_Viec";
+            String sheetName = period != null ? "Lich_T" + period.get("month") + "_" + period.get("year") : "Lich_Lam_Viec";
             Sheet sheet = workbook.createSheet(sheetName);
 
             // Title row
             Row titleRow = sheet.createRow(0);
             Cell titleCell = titleRow.createCell(0);
-            titleCell.setCellValue("BẢNG TỔNG HỢP LỊCH LÀM VIỆC THÁNG " + (period != null ? period.getMonth() + "/" + period.getYear() : ""));
+            titleCell.setCellValue("BẢNG TỔNG HỢP LỊCH LÀM VIỆC THÁNG " + (period != null ? period.get("month") + "/" + period.get("year") : ""));
             
             // Header row
             Row headerRow = sheet.createRow(2);

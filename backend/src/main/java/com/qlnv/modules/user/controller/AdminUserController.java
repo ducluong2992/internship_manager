@@ -32,7 +32,7 @@ public class AdminUserController {
 
     // ─── Users (Interns / All) Management ───
 
-    @GetMapping("/users")
+    @GetMapping({"/users", "/users/"})
     public ResponseEntity<List<UserResponse>> getUsers(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false, name = "user_type") String userType,

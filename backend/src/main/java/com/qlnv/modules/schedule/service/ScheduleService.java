@@ -83,25 +83,31 @@ public class ScheduleService {
         return Map.of("message", "Đăng ký lịch thành công", "status", "success");
     }
 
-    public Map<String, Object> getAdminScheduleMatrix(Integer periodId, String project, String position, String keyword) {
-        SchedulePeriod period;
-        if (periodId != null) {
-            period = periodRepository.findById(periodId)
-                    .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Không tìm thấy kỳ lịch"));
+    public Map<String, Object> getAdminScheduleMatrix(Integer periodId, Integer month, Integer year, String project, String position, String keyword) {
+        SchedulePeriod period = null;
+        if (month != null && year != null) {
+            period = periodRepository.findByMonthAndYear(month, year).orElse(null);
+        } else if (periodId != null) {
+            period = periodRepository.findById(periodId).orElse(null);
         } else {
             period = periodRepository.findFirstByStatusOrderByIdDesc("open")
                     .orElseGet(() -> periodRepository.findAllByOrderByYearDescMonthDesc().stream().findFirst().orElse(null));
         }
 
         if (period == null) {
-            return Map.of("period", Map.of(), "days_in_month", 0, "users", Collections.emptyList());
+            Map<String, Object> emptyRes = new HashMap<>();
+            emptyRes.put("period", null);
+            emptyRes.put("rows", Collections.emptyList());
+            emptyRes.put("users", Collections.emptyList());
+            emptyRes.put("days_in_month", 0);
+            return emptyRes;
         }
 
-        int year = period.getYear();
-        int month = period.getMonth();
-        int daysInMonth = YearMonth.of(year, month).lengthOfMonth();
+        int pYear = period.getYear();
+        int pMonth = period.getMonth();
+        int daysInMonth = YearMonth.of(pYear, pMonth).lengthOfMonth();
 
-        List<User> allUsers = userRepository.findAll();
+        List<User> allUsers = userRepository.findByUserType("intern");
         if (keyword != null && !keyword.trim().isEmpty()) {
             String kw = keyword.trim().toLowerCase();
             allUsers = allUsers.stream().filter(u ->
@@ -116,47 +122,81 @@ public class ScheduleService {
             allUsers = allUsers.stream().filter(u -> position.equalsIgnoreCase(u.getPosition())).collect(Collectors.toList());
         }
 
+        allUsers.sort(Comparator.comparing(User::getEmployeeCode, Comparator.nullsLast(Comparator.naturalOrder())));
+
         // Fetch all schedules for this period
         List<Schedule> periodSchedules = scheduleRepository.findByPeriodId(period.getId());
+        Map<Integer, List<Schedule>> userSchedulesMap = new HashMap<>();
         Map<Integer, Map<Integer, String>> userDayShiftMap = new HashMap<>();
 
         for (Schedule s : periodSchedules) {
-            if (s.getWorkDay() != null) {
-                int day = s.getWorkDay().getDayOfMonth();
-                userDayShiftMap.computeIfAbsent(s.getUserId(), k -> new HashMap<>()).put(day, s.getShift());
+            if (s.getUserId() != null) {
+                userSchedulesMap.computeIfAbsent(s.getUserId(), k -> new ArrayList<>()).add(s);
+                if (s.getWorkDay() != null) {
+                    int day = s.getWorkDay().getDayOfMonth();
+                    userDayShiftMap.computeIfAbsent(s.getUserId(), k -> new HashMap<>()).put(day, s.getShift());
+                }
             }
         }
 
-        List<Map<String, Object>> userMatrix = new ArrayList<>();
+        List<Map<String, Object>> rows = new ArrayList<>();
         for (User u : allUsers) {
+            List<Schedule> uScheds = userSchedulesMap.getOrDefault(u.getId(), Collections.emptyList());
             Map<Integer, String> dayShifts = userDayShiftMap.getOrDefault(u.getId(), Collections.emptyMap());
+
+            List<Map<String, Object>> schedList = new ArrayList<>();
+            double totalSessions = 0;
+            int sCount = 0, cCount = 0, scCount = 0;
+
+            for (Schedule s : uScheds) {
+                Map<String, Object> sm = new HashMap<>();
+                sm.put("id", s.getId());
+                sm.put("work_day", s.getWorkDay() != null ? s.getWorkDay().toString() : "");
+                sm.put("shift", s.getShift());
+                schedList.add(sm);
+
+                if ("SC".equalsIgnoreCase(s.getShift())) {
+                    totalSessions += 1.0;
+                    scCount++;
+                } else if ("S".equalsIgnoreCase(s.getShift())) {
+                    totalSessions += 0.5;
+                    sCount++;
+                } else if ("C".equalsIgnoreCase(s.getShift())) {
+                    totalSessions += 0.5;
+                    cCount++;
+                }
+            }
+
             Map<String, Object> uMap = new HashMap<>();
             uMap.put("user_id", u.getId());
             uMap.put("employee_code", u.getEmployeeCode());
             uMap.put("full_name", u.getFullName());
-            uMap.put("project", u.getProject());
-            uMap.put("position", u.getPosition());
+            uMap.put("project", u.getProject() != null ? u.getProject() : "");
+            uMap.put("position", u.getPosition() != null ? u.getPosition() : "");
+            uMap.put("total_sessions", totalSessions);
+            uMap.put("schedules", schedList);
             uMap.put("shifts", dayShifts);
-
-            // Compute total shifts
-            int sCount = 0, cCount = 0, scCount = 0;
-            for (String shift : dayShifts.values()) {
-                if ("S".equalsIgnoreCase(shift)) sCount++;
-                else if ("C".equalsIgnoreCase(shift)) cCount++;
-                else if ("SC".equalsIgnoreCase(shift)) scCount++;
-            }
             uMap.put("total_s", sCount);
             uMap.put("total_c", cCount);
             uMap.put("total_sc", scCount);
             uMap.put("total_days", sCount + cCount + scCount);
 
-            userMatrix.add(uMap);
+            rows.add(uMap);
         }
 
         Map<String, Object> result = new HashMap<>();
-        result.put("period", period);
+        Map<String, Object> periodMap = new HashMap<>();
+        periodMap.put("id", period.getId());
+        periodMap.put("month", period.getMonth());
+        periodMap.put("year", period.getYear());
+        periodMap.put("status", period.getStatus());
+        periodMap.put("open_date", period.getOpenDate() != null ? period.getOpenDate().toString() : null);
+        periodMap.put("close_date", period.getCloseDate() != null ? period.getCloseDate().toString() : null);
+
+        result.put("period", periodMap);
         result.put("days_in_month", daysInMonth);
-        result.put("users", userMatrix);
+        result.put("rows", rows);
+        result.put("users", rows);
         return result;
     }
 }

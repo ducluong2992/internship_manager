@@ -35,10 +35,10 @@ Bạn có thể chọn 1 trong 2 cách sau:
 1. Trong thư mục gốc của dự án, **nhấp đúp chuột (Double Click) vào file `start.bat`**.
 2. Hệ thống sẽ tự động:
    - Kiểm tra JDK 17 & Maven.
-   - Biên dịch và khởi động máy chủ Spring Boot.
-   - Host toàn bộ Frontend và API Backend trên cùng cổng `8000`.
+   - Khởi động máy chủ Spring Boot.
+   - Host toàn bộ Frontend và API Backend trên cổng `8088`.
 3. Mở trình duyệt web và truy cập địa chỉ:
-   👉 **`http://localhost:8000`**
+   👉 **`http://localhost:8088`**
 
 *(Nếu muốn chạy ngầm ẩn cửa sổ đen: Nhấp đúp chuột vào `start_hidden.vbs`)*.
 
@@ -53,14 +53,14 @@ Bạn có thể chọn 1 trong 2 cách sau:
    ```bash
    mvn spring-boot:run
    ```
-   *(Hoặc nếu đã build ra file jar: `mvn clean package` sau đó chạy `java -jar target/qlnv-backend-2.0.0.jar`)*.
-3. Mở trình duyệt web và truy cập: **`http://localhost:8000`**.
+   *(Hoặc chạy trực tiếp file jar: `java -jar target/qlnv-backend-2.0.0.jar`)*.
+3. Mở trình duyệt web và truy cập: **`http://localhost:8088`**.
 
 ---
 
 ## 🛑 3. Cách tắt chương trình
 Khi không sử dụng nữa hoặc cần khởi động lại:
-* **Cách 1:** Nhấp đúp chuột vào file **`stop.bat`** (Tự động tìm và giải phóng cổng 8000).
+* **Cách 1:** Nhấp đúp chuột vào file **`stop.bat`** (Tự động tìm và giải phóng cổng 8088).
 * **Cách 2:** Nhấn tổ hợp phím **`Ctrl + C`** trên cửa sổ console đang chạy `start.bat`.
 
 ---

@@ -52,19 +52,23 @@ public class AdminScheduleController {
     @GetMapping("/schedule")
     public ResponseEntity<Map<String, Object>> getScheduleMatrix(
             @RequestParam(required = false, name = "period_id") Integer periodId,
+            @RequestParam(required = false) Integer month,
+            @RequestParam(required = false) Integer year,
             @RequestParam(required = false) String project,
             @RequestParam(required = false) String position,
             @RequestParam(required = false) String keyword) {
-        return ResponseEntity.ok(scheduleService.getAdminScheduleMatrix(periodId, project, position, keyword));
+        return ResponseEntity.ok(scheduleService.getAdminScheduleMatrix(periodId, month, year, project, position, keyword));
     }
 
     @GetMapping("/schedule/export")
     public ResponseEntity<byte[]> exportSchedule(
             @RequestParam(required = false, name = "period_id") Integer periodId,
+            @RequestParam(required = false) Integer month,
+            @RequestParam(required = false) Integer year,
             @RequestParam(required = false) String project,
             @RequestParam(required = false) String position,
             @RequestParam(required = false) String keyword) {
-        byte[] data = scheduleExcelService.exportScheduleMatrix(periodId, project, position, keyword);
+        byte[] data = scheduleExcelService.exportScheduleMatrix(periodId, month, year, project, position, keyword);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=Bang_tong_hop_lich_lam_viec.xlsx")
                 .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))

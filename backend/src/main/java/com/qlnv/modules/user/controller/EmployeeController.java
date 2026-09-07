@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/employees")
+@RequestMapping({"/employees", "/employees/"})
 @RequiredArgsConstructor
 public class EmployeeController {
 
@@ -41,7 +41,7 @@ public class EmployeeController {
         return ResponseEntity.ok(userService.getManagers());
     }
 
-    @GetMapping
+    @GetMapping({"", "/"})
     public ResponseEntity<List<UserResponse>> getEmployees(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String project,
@@ -59,7 +59,7 @@ public class EmployeeController {
         ));
     }
 
-    @PostMapping
+    @PostMapping({"", "/"})
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<UserResponse> createEmployee(@Valid @RequestBody UserRequestDto req) {
         return ResponseEntity.ok(userService.createUser(req, "employee"));
