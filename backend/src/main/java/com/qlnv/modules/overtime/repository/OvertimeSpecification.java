@@ -31,7 +31,7 @@ public class OvertimeSpecification {
             }
 
             if (project != null && !project.trim().isEmpty()) {
-                predicates.add(cb.equal(root.get("project"), project.trim()));
+                predicates.add(cb.like(cb.lower(root.get("project")), "%" + project.trim().toLowerCase() + "%"));
             }
 
             // Date range queries

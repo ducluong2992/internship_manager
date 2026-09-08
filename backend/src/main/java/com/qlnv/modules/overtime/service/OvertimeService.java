@@ -116,7 +116,16 @@ public class OvertimeService {
                 .filter(o -> "Approved".equalsIgnoreCase(o.getStatus()))
                 .mapToDouble(OvertimeRequest::getWeightedHours).sum();
 
+        User user = userRepository.findById(userId).orElse(null);
+        boolean isStaffOnsite = user != null && user.getStaffCategory() != null && user.getStaffCategory().toLowerCase().contains("onsite");
+        boolean isAdmin = user != null && ("admin".equalsIgnoreCase(user.getRole()) || "admin".equalsIgnoreCase(user.getUserType()));
+        boolean hasProject = user != null && ((user.getProject() != null && !user.getProject().trim().isEmpty()) || (user.getBorrowProject() != null && !user.getBorrowProject().trim().isEmpty()));
+
         Map<String, Object> stats = new HashMap<>();
+        stats.put("is_onsite", isStaffOnsite || isAdmin);
+        stats.put("has_project", hasProject || isAdmin);
+        stats.put("project", user != null ? (user.getProject() != null ? user.getProject() : user.getBorrowProject()) : "");
+        stats.put("staff_category", user != null ? user.getStaffCategory() : "");
         stats.put("total_requests", total);
         stats.put("pending_count", pending);
         stats.put("approved_count", approved);
@@ -182,6 +191,17 @@ public class OvertimeService {
 
     public List<OvertimeResponseDto.Response> getAdminOvertimeList(
             String status, String project, LocalDate fromDate, LocalDate toDate, String keyword) {
+        return getAdminOvertimeList(status, project, null, null, fromDate, toDate, keyword);
+    }
+
+    public List<OvertimeResponseDto.Response> getAdminOvertimeList(
+            String status, String project, Integer month, Integer year, LocalDate fromDate, LocalDate toDate, String keyword) {
+
+        if (fromDate == null && toDate == null && month != null && year != null) {
+            YearMonth ym = YearMonth.of(year, month);
+            fromDate = ym.atDay(1);
+            toDate = ym.atEndOfMonth();
+        }
 
         Specification<OvertimeRequest> spec = OvertimeSpecification.filter(null, status, project, fromDate, toDate, keyword);
         return overtimeRepository.findAll(spec).stream()
@@ -192,54 +212,74 @@ public class OvertimeService {
     }
 
     public Map<String, Object> getAdminOvertimeSummary(Integer month, Integer year, String project) {
-        LocalDate fromDate = null;
-        LocalDate toDate = null;
-        if (month != null && year != null) {
-            YearMonth ym = YearMonth.of(year, month);
-            fromDate = ym.atDay(1);
-            toDate = ym.atEndOfMonth();
-        }
+        return getAdminOvertimeSummary(month, year, project, null);
+    }
 
-        Specification<OvertimeRequest> spec = OvertimeSpecification.filter(null, null, project, fromDate, toDate, null);
+    public Map<String, Object> getAdminOvertimeSummary(Integer month, Integer year, String project, String keyword) {
+        int m = (month != null) ? month : LocalDate.now().getMonthValue();
+        int y = (year != null) ? year : LocalDate.now().getYear();
+        YearMonth ym = YearMonth.of(y, m);
+        LocalDate fromDate = ym.atDay(1);
+        LocalDate toDate = ym.atEndOfMonth();
+        int numDays = ym.lengthOfMonth();
+
+        Specification<OvertimeRequest> spec = OvertimeSpecification.filter(null, "Approved", project, fromDate, toDate, keyword);
         List<OvertimeRequest> list = overtimeRepository.findAll(spec);
 
         long total = list.size();
-        long pending = list.stream().filter(o -> "Pending".equalsIgnoreCase(o.getStatus())).count();
-        long approved = list.stream().filter(o -> "Approved".equalsIgnoreCase(o.getStatus())).count();
-        long rejected = list.stream().filter(o -> "Rejected".equalsIgnoreCase(o.getStatus())).count();
-
         double totalRaw = list.stream().mapToDouble(OvertimeRequest::getRawHours).sum();
         double totalWeighted = list.stream().mapToDouble(OvertimeRequest::getWeightedHours).sum();
-        double approvedWeighted = list.stream()
-                .filter(o -> "Approved".equalsIgnoreCase(o.getStatus()))
-                .mapToDouble(OvertimeRequest::getWeightedHours).sum();
 
-        // Project summary breakdown
-        Map<String, Map<String, Object>> projectSummary = new HashMap<>();
-        for (OvertimeRequest ot : list) {
-            String pName = ot.getProject() != null ? ot.getProject() : "Không xác định";
-            var m = projectSummary.computeIfAbsent(pName, k -> {
-                Map<String, Object> item = new HashMap<>();
-                item.put("project", k);
-                item.put("count", 0L);
-                item.put("total_raw", 0.0);
-                item.put("total_weighted", 0.0);
-                return item;
-            });
-            m.put("count", ((long) m.get("count")) + 1);
-            m.put("total_raw", ((double) m.get("total_raw")) + ot.getRawHours());
-            m.put("total_weighted", ((double) m.get("total_weighted")) + ot.getWeightedHours());
+        // Group by user
+        Map<Integer, List<OvertimeRequest>> byUser = list.stream()
+                .collect(Collectors.groupingBy(OvertimeRequest::getUserId));
+
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (Map.Entry<Integer, List<OvertimeRequest>> entry : byUser.entrySet()) {
+            List<OvertimeRequest> userOts = entry.getValue();
+            if (userOts.isEmpty()) continue;
+            User u = userOts.get(0).getUser();
+            String empCode = (u != null && u.getEmployeeCode() != null) ? u.getEmployeeCode() : "NV" + entry.getKey();
+            String fullName = (u != null && u.getFullName() != null) ? u.getFullName() : "Nhân viên";
+
+            double userRaw = userOts.stream().mapToDouble(OvertimeRequest::getRawHours).sum();
+            double userWeighted = userOts.stream().mapToDouble(OvertimeRequest::getWeightedHours).sum();
+
+            Map<Integer, List<Map<String, Object>>> daysMap = new HashMap<>();
+            for (OvertimeRequest ot : userOts) {
+                if (ot.getWorkDate() == null) continue;
+                int day = ot.getWorkDate().getDayOfMonth();
+                Map<String, Object> dayItem = new HashMap<>();
+                dayItem.put("id", ot.getId());
+                dayItem.put("raw_hours", ot.getRawHours());
+                dayItem.put("factor", ot.getFactor());
+                dayItem.put("start_time", ot.getStartTime());
+                dayItem.put("end_time", ot.getEndTime());
+                dayItem.put("status", ot.getStatus());
+                daysMap.computeIfAbsent(day, k -> new ArrayList<>()).add(dayItem);
+            }
+
+            Map<String, Object> row = new HashMap<>();
+            row.put("user_id", entry.getKey());
+            row.put("employee_code", empCode);
+            row.put("full_name", fullName);
+            row.put("total_raw", Math.round(userRaw * 100.0) / 100.0);
+            row.put("total_weighted", Math.round(userWeighted * 100.0) / 100.0);
+            row.put("days", daysMap);
+            rows.add(row);
         }
 
+        // Sort rows by employee_code
+        rows.sort((r1, r2) -> String.valueOf(r1.get("employee_code")).compareToIgnoreCase(String.valueOf(r2.get("employee_code"))));
+
         Map<String, Object> result = new HashMap<>();
+        result.put("month", m);
+        result.put("year", y);
+        result.put("num_days", numDays);
+        result.put("rows", rows);
         result.put("total_count", total);
-        result.put("pending_count", pending);
-        result.put("approved_count", approved);
-        result.put("rejected_count", rejected);
         result.put("total_raw_hours", Math.round(totalRaw * 100.0) / 100.0);
         result.put("total_weighted_hours", Math.round(totalWeighted * 100.0) / 100.0);
-        result.put("approved_weighted_hours", Math.round(approvedWeighted * 100.0) / 100.0);
-        result.put("project_summary", projectSummary.values());
         return result;
     }
 

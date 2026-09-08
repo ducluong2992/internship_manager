@@ -19,10 +19,10 @@ public class OvertimeExportService {
     private final OvertimeService overtimeService;
 
     public byte[] exportOvertimeReport(
-            String status, String project, LocalDate fromDate, LocalDate toDate, String keyword) {
+            String status, String project, Integer month, Integer year, LocalDate fromDate, LocalDate toDate, String keyword) {
 
         List<OvertimeResponseDto.Response> list = overtimeService.getAdminOvertimeList(
-                status, project, fromDate, toDate, keyword
+                status, project, month, year, fromDate, toDate, keyword
         );
 
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {

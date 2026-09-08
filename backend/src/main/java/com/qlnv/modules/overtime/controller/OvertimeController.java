@@ -92,10 +92,14 @@ public class OvertimeController {
     public ResponseEntity<List<OvertimeResponseDto.Response>> getAdminList(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String project,
+            @RequestParam(required = false) Integer month,
+            @RequestParam(required = false) Integer year,
             @RequestParam(required = false, name = "from_date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
             @RequestParam(required = false, name = "to_date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
-            @RequestParam(required = false) String keyword) {
-        return ResponseEntity.ok(overtimeService.getAdminOvertimeList(status, project, fromDate, toDate, keyword));
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false, name = "employee_name") String employeeName) {
+        String effectiveKeyword = (keyword != null && !keyword.trim().isEmpty()) ? keyword : employeeName;
+        return ResponseEntity.ok(overtimeService.getAdminOvertimeList(status, project, month, year, fromDate, toDate, effectiveKeyword));
     }
 
     @GetMapping("/admin/summary")
@@ -103,8 +107,11 @@ public class OvertimeController {
     public ResponseEntity<Map<String, Object>> getAdminSummary(
             @RequestParam(required = false) Integer month,
             @RequestParam(required = false) Integer year,
-            @RequestParam(required = false) String project) {
-        return ResponseEntity.ok(overtimeService.getAdminOvertimeSummary(month, year, project));
+            @RequestParam(required = false) String project,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false, name = "employee_name") String employeeName) {
+        String effectiveKeyword = (keyword != null && !keyword.trim().isEmpty()) ? keyword : employeeName;
+        return ResponseEntity.ok(overtimeService.getAdminOvertimeSummary(month, year, project, effectiveKeyword));
     }
 
     @PostMapping("/admin/{otId}/approve")
@@ -154,10 +161,14 @@ public class OvertimeController {
     public ResponseEntity<byte[]> exportOvertime(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String project,
+            @RequestParam(required = false) Integer month,
+            @RequestParam(required = false) Integer year,
             @RequestParam(required = false, name = "from_date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
             @RequestParam(required = false, name = "to_date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
-            @RequestParam(required = false) String keyword) {
-        byte[] data = overtimeExportService.exportOvertimeReport(status, project, fromDate, toDate, keyword);
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false, name = "employee_name") String employeeName) {
+        String effectiveKeyword = (keyword != null && !keyword.trim().isEmpty()) ? keyword : employeeName;
+        byte[] data = overtimeExportService.exportOvertimeReport(status, project, month, year, fromDate, toDate, effectiveKeyword);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=Phu_Luc_03_Tong_Hop_OT.xlsx")
                 .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))

@@ -115,26 +115,35 @@ async function renderRegisterOT(area) {
         const dowStr = DOW_NAMES[dObj.getDay()];
         const formattedDate = `${dowStr}, ${parts[2]}/${parts[1]}/${parts[0]}`;
 
-        const rejectInfo = r.status === 'Rejected' ? `
-          <div class="mt-1 small text-danger"><i class="bi bi-chat-left-text me-1"></i>
-            <strong>Lý do từ chối:</strong> ${r.reject_reason || ''}
-          </div>
-          <div class="mt-1 d-flex gap-1">
-            <button class="btn btn-sm btn-outline-warning py-0" onclick="openOTEditModal(${r.id})"><i class="bi bi-pencil"></i> Sửa</button>
-            <button class="btn btn-sm btn-outline-danger py-0" onclick="deleteOT(${r.id})"><i class="bi bi-trash"></i> Xóa</button>
-          </div>` : '';
-        const pendingActions = r.status === 'Pending' ? `
-          <div class="mt-1 d-flex gap-1">
-            <button class="btn btn-sm btn-outline-secondary py-0" onclick="openOTEditModal(${r.id})"><i class="bi bi-pencil"></i> Sửa</button>
-            <button class="btn btn-sm btn-outline-danger py-0" onclick="deleteOT(${r.id})"><i class="bi bi-trash"></i> Xóa</button>
-          </div>` : '';
+        let statusHtml = '';
+        if (r.status === 'Pending') {
+          statusHtml = `
+            <div class="d-flex align-items-center gap-2 flex-nowrap">
+              ${otBadge(r.status)}
+              <button class="btn btn-sm btn-outline-secondary py-0 px-2 text-nowrap" onclick="openOTEditModal(${r.id})"><i class="bi bi-pencil me-1"></i>Sửa</button>
+              <button class="btn btn-sm btn-outline-danger py-0 px-2 text-nowrap" onclick="deleteOT(${r.id})"><i class="bi bi-trash me-1"></i>Xóa</button>
+            </div>`;
+        } else if (r.status === 'Rejected') {
+          statusHtml = `
+            <div>
+              <div class="d-flex align-items-center gap-2 flex-nowrap mb-1">
+                ${otBadge(r.status)}
+                <button class="btn btn-sm btn-outline-warning py-0 px-2 text-nowrap" onclick="openOTEditModal(${r.id})"><i class="bi bi-pencil me-1"></i>Sửa</button>
+                <button class="btn btn-sm btn-outline-danger py-0 px-2 text-nowrap" onclick="deleteOT(${r.id})"><i class="bi bi-trash me-1"></i>Xóa</button>
+              </div>
+              ${r.reject_reason ? `<div class="small text-danger"><i class="bi bi-chat-left-text me-1"></i><strong>Lý do từ chối:</strong> ${r.reject_reason}</div>` : ''}
+            </div>`;
+        } else {
+          statusHtml = otBadge(r.status);
+        }
+
         listRows += `
         <tr>
-          <td class="fw-semibold">${formattedDate}</td>
-          <td>${formatTime24h(r.start_time)} – ${formatTime24h(r.end_time)}</td>
+          <td class="fw-semibold text-nowrap">${formattedDate}</td>
+          <td class="text-nowrap">${formatTime24h(r.start_time)} – ${formatTime24h(r.end_time)}</td>
           <td class="text-center">${r.raw_hours}h</td>
           <td class="text-center"><span class="badge bg-secondary">${r.factor}x</span></td>
-          <td>${otBadge(r.status)}${rejectInfo}${pendingActions}</td>
+          <td>${statusHtml}</td>
           <td class="text-center fw-bold text-danger">${r.weighted_hours}h</td>
         </tr>`;
       });
@@ -769,7 +778,7 @@ async function renderManageOT(area) {
   function buildFilters() {
     return `
     <div class="filter-bar mb-3 py-2 px-3">
-      <div class="d-flex align-items-center gap-2 flex-wrap">
+      <div class="d-flex align-items-center gap-2 flex-wrap w-100">
         <div class="d-flex align-items-center gap-1">
           <label class="form-label mb-0 small text-nowrap fw-semibold text-muted">Tháng:</label>
           <select class="form-select form-select-sm" id="ot-f-month" style="width:75px">
@@ -788,7 +797,7 @@ async function renderManageOT(area) {
           <label class="form-label mb-0 small text-nowrap fw-semibold text-muted">Tên NV:</label>
           <input type="text" class="form-control form-control-sm" id="ot-f-name" value="${filterName}" placeholder="Họ và tên..." style="width:135px" />
         </div>
-        <div class="d-flex align-items-center gap-1">
+        <div class="d-flex align-items-center gap-1" id="ot-status-filter-wrap">
           <label class="form-label mb-0 small text-nowrap fw-semibold text-muted">Trạng thái:</label>
           <select class="form-select form-select-sm" id="ot-f-status" style="width:110px">
             <option value="" ${!filterStatus ? 'selected' : ''}>Tất cả</option>
@@ -797,9 +806,9 @@ async function renderManageOT(area) {
             <option value="Rejected" ${filterStatus === 'Rejected' ? 'selected' : ''}>Từ chối</option>
           </select>
         </div>
-        <div class="d-flex gap-1 ms-auto align-items-center">
-          <button class="btn btn-danger btn-sm px-3" id="ot-filter-btn">
-            <i class="bi bi-search me-1"></i>Lọc
+        <div class="d-flex gap-2 ms-auto align-items-center">
+          <button class="btn btn-outline-secondary btn-sm px-3 text-nowrap" id="ot-reset-filter-btn" title="Khôi phục bộ lọc">
+            <i class="bi bi-arrow-counterclockwise me-1"></i>Khôi phục bộ lọc
           </button>
           <button class="btn btn-outline-danger btn-sm px-3 text-nowrap" id="ot-export-btn" title="Xuất Excel">
             <i class="bi bi-file-earmark-excel-fill me-1"></i>Xuất Excel
@@ -1055,16 +1064,68 @@ async function renderManageOT(area) {
     await reloadSummary();
   };
 
-  // ── Filter events ──
-  document.getElementById('ot-filter-btn').onclick = async () => {
-    filterMonth = parseInt(document.getElementById('ot-f-month').value);
-    filterYear = parseInt(document.getElementById('ot-f-year').value);
-    filterProject = document.getElementById('ot-f-project').value.trim();
-    filterName = document.getElementById('ot-f-name').value.trim();
-    filterStatus = document.getElementById('ot-f-status').value;
-    if (activeTab === 'list') await reload();
-    else await reloadSummary();
+  // ── Instant Filter & Reset Events ──
+  let filterDebounce = null;
+  const triggerFilter = () => {
+    const elMonth = document.getElementById('ot-f-month');
+    const elYear = document.getElementById('ot-f-year');
+    const elProject = document.getElementById('ot-f-project');
+    const elName = document.getElementById('ot-f-name');
+    const elStatus = document.getElementById('ot-f-status');
+
+    if (elMonth) filterMonth = parseInt(elMonth.value) || (now.getMonth() + 1);
+    if (elYear) filterYear = parseInt(elYear.value) || now.getFullYear();
+    if (elProject) filterProject = elProject.value.trim();
+    if (elName) filterName = elName.value.trim();
+    if (elStatus) filterStatus = elStatus.value;
+
+    if (activeTab === 'list') reload();
+    else reloadSummary();
   };
+
+  const elMonth = document.getElementById('ot-f-month');
+  const elYear = document.getElementById('ot-f-year');
+  const elProject = document.getElementById('ot-f-project');
+  const elName = document.getElementById('ot-f-name');
+  const elStatus = document.getElementById('ot-f-status');
+  const btnReset = document.getElementById('ot-reset-filter-btn');
+
+  if (elMonth) elMonth.onchange = triggerFilter;
+  if (elYear) elYear.onchange = triggerFilter;
+  if (elStatus) elStatus.onchange = triggerFilter;
+
+  if (elProject) {
+    elProject.oninput = () => {
+      clearTimeout(filterDebounce);
+      filterDebounce = setTimeout(triggerFilter, 300);
+    };
+  }
+
+  if (elName) {
+    elName.oninput = () => {
+      clearTimeout(filterDebounce);
+      filterDebounce = setTimeout(triggerFilter, 300);
+    };
+  }
+
+  if (btnReset) {
+    btnReset.onclick = () => {
+      const curDate = new Date();
+      filterMonth = curDate.getMonth() + 1;
+      filterYear = curDate.getFullYear();
+      filterProject = '';
+      filterName = '';
+      filterStatus = '';
+
+      if (elMonth) elMonth.value = filterMonth;
+      if (elYear) elYear.value = filterYear;
+      if (elProject) elProject.value = '';
+      if (elName) elName.value = '';
+      if (elStatus) elStatus.value = '';
+
+      triggerFilter();
+    };
+  }
 
   document.getElementById('ot-export-btn').onclick = async () => {
     const params = new URLSearchParams({
