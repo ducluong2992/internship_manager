@@ -386,27 +386,164 @@ public class ScheduleExcelService {
     }
 
     private String getCellString(Cell cell) {
+        return getCellString(cell, new HashSet<>());
+    }
+
+    private String getCellString(Cell cell, Set<String> visited) {
         if (cell == null) return "";
-        if (cell.getCellType() == CellType.NUMERIC) {
-            if (DateUtil.isCellDateFormatted(cell)) {
-                Date d = cell.getDateCellValue();
-                if (d != null) {
-                    return new java.text.SimpleDateFormat("yyyy-MM-dd").format(d);
-                }
+        try {
+            switch (cell.getCellType()) {
+                case NUMERIC:
+                    if (DateUtil.isCellDateFormatted(cell)) {
+                        Date d = cell.getDateCellValue();
+                        if (d != null) {
+                            return new java.text.SimpleDateFormat("yyyy-MM-dd").format(d);
+                        }
+                    }
+                    double num = cell.getNumericCellValue();
+                    if (num == Math.floor(num) && !Double.isInfinite(num)) {
+                        return java.math.BigDecimal.valueOf(num).toBigInteger().toString();
+                    } else {
+                        return java.math.BigDecimal.valueOf(num).stripTrailingZeros().toPlainString();
+                    }
+                case STRING:
+                    String strVal = cell.getStringCellValue().trim();
+                    if (strVal.contains("!") && strVal.matches("^(?:=)?(?:'[^']+'|[a-zA-Z0-9_\\-\\s]+)![A-Za-z]+\\d+$")) {
+                        String resolved = resolveCellReference(cell.getSheet().getWorkbook(), strVal, visited);
+                        if (resolved != null && !resolved.isEmpty()) return resolved;
+                    }
+                    return strVal;
+                case BOOLEAN:
+                    return String.valueOf(cell.getBooleanCellValue());
+                case FORMULA:
+                    try {
+                        String formula = cell.getCellFormula();
+                        if (formula != null && !formula.isEmpty()) {
+                            String resolved = resolveCellReference(cell.getSheet().getWorkbook(), formula, visited);
+                            if (resolved != null && !resolved.isEmpty()) return resolved;
+                        }
+                    } catch (Exception ignored) {}
+
+                    try {
+                        CellType cachedType = cell.getCachedFormulaResultType();
+                        switch (cachedType) {
+                            case NUMERIC:
+                                if (DateUtil.isCellDateFormatted(cell)) {
+                                    Date d = cell.getDateCellValue();
+                                    if (d != null) {
+                                        return new java.text.SimpleDateFormat("yyyy-MM-dd").format(d);
+                                    }
+                                }
+                                double fnum = cell.getNumericCellValue();
+                                if (fnum == Math.floor(fnum) && !Double.isInfinite(fnum)) {
+                                    return java.math.BigDecimal.valueOf(fnum).toBigInteger().toString();
+                                } else {
+                                    return java.math.BigDecimal.valueOf(fnum).stripTrailingZeros().toPlainString();
+                                }
+                            case STRING:
+                                String s = cell.getStringCellValue();
+                                if (s != null && !s.trim().isEmpty()) {
+                                    String trimmed = s.trim();
+                                    if (trimmed.contains("!") && trimmed.matches("^(?:=)?(?:'[^']+'|[a-zA-Z0-9_\\-\\s]+)![A-Za-z]+\\d+$")) {
+                                        String resolved = resolveCellReference(cell.getSheet().getWorkbook(), trimmed, visited);
+                                        if (resolved != null && !resolved.isEmpty()) return resolved;
+                                    }
+                                    return trimmed;
+                                }
+                                break;
+                            case BOOLEAN:
+                                return String.valueOf(cell.getBooleanCellValue());
+                            default:
+                                break;
+                        }
+                    } catch (Exception ignored) {}
+
+                    try {
+                        FormulaEvaluator evaluator = cell.getSheet().getWorkbook().getCreationHelper().createFormulaEvaluator();
+                        CellValue cellValue = evaluator.evaluate(cell);
+                        if (cellValue != null) {
+                            switch (cellValue.getCellType()) {
+                                case NUMERIC:
+                                    double evNum = cellValue.getNumberValue();
+                                    if (evNum == Math.floor(evNum) && !Double.isInfinite(evNum)) {
+                                        return java.math.BigDecimal.valueOf(evNum).toBigInteger().toString();
+                                    } else {
+                                        return java.math.BigDecimal.valueOf(evNum).stripTrailingZeros().toPlainString();
+                                    }
+                                case STRING:
+                                    String evStr = cellValue.getStringValue().trim();
+                                    if (evStr.contains("!") && evStr.matches("^(?:=)?(?:'[^']+'|[a-zA-Z0-9_\\-\\s]+)![A-Za-z]+\\d+$")) {
+                                        String resolved = resolveCellReference(cell.getSheet().getWorkbook(), evStr, visited);
+                                        if (resolved != null && !resolved.isEmpty()) return resolved;
+                                    }
+                                    return evStr;
+                                case BOOLEAN:
+                                    return String.valueOf(cellValue.getBooleanValue());
+                                default:
+                                    break;
+                            }
+                        }
+                    } catch (Exception ignored) {}
+                    break;
+                case BLANK:
+                    return "";
+                default:
+                    break;
             }
-            double num = cell.getNumericCellValue();
-            if (num == Math.floor(num) && !Double.isInfinite(num)) {
-                return java.math.BigDecimal.valueOf(num).toBigInteger().toString();
-            } else {
-                return java.math.BigDecimal.valueOf(num).stripTrailingZeros().toPlainString();
-            }
-        }
+        } catch (Exception ignored) {}
+
         DataFormatter formatter = new DataFormatter();
         String val = formatter.formatCellValue(cell).trim();
+        if (val.contains("!") && val.matches("^(?:=)?(?:'[^']+'|[a-zA-Z0-9_\\-\\s]+)![A-Za-z]+\\d+$")) {
+            String resolved = resolveCellReference(cell.getSheet().getWorkbook(), val, visited);
+            if (resolved != null && !resolved.isEmpty()) return resolved;
+        }
         if (val.matches("^\\d+\\.0+$")) {
             val = val.substring(0, val.indexOf('.'));
         }
         return val;
+    }
+
+    private String resolveCellReference(Workbook workbook, String refStr, Set<String> visited) {
+        if (workbook == null || refStr == null) return null;
+        refStr = refStr.trim();
+        if (refStr.startsWith("=")) refStr = refStr.substring(1).trim();
+
+        Matcher m = Pattern.compile("^(?:(?:'([^']+)'|([a-zA-Z0-9_\\-\\s]+))!)?([A-Za-z]+)(\\d+)$").matcher(refStr);
+        if (!m.find()) return null;
+
+        String sheetName = m.group(1) != null ? m.group(1) : m.group(2);
+        String colLetters = m.group(3);
+        int rowNum = Integer.parseInt(m.group(4)); // 1-based row in Excel
+
+        Sheet targetSheet = (sheetName != null) ? workbook.getSheet(sheetName) : null;
+        if (targetSheet == null && sheetName != null) {
+            for (int i = 0; i < workbook.getNumberOfSheets(); i++) {
+                if (workbook.getSheetName(i).equalsIgnoreCase(sheetName)) {
+                    targetSheet = workbook.getSheetAt(i);
+                    break;
+                }
+            }
+        }
+        if (targetSheet == null) return null;
+
+        int colIdx = 0;
+        for (int i = 0; i < colLetters.length(); i++) {
+            colIdx = colIdx * 26 + (Character.toUpperCase(colLetters.charAt(i)) - 'A' + 1);
+        }
+        colIdx = colIdx - 1; // 0-based col
+        int rowIdx = rowNum - 1; // 0-based row
+
+        String cellKey = targetSheet.getSheetName() + "!" + colIdx + "," + rowIdx;
+        if (visited.contains(cellKey)) return null;
+        visited.add(cellKey);
+
+        Row row = targetSheet.getRow(rowIdx);
+        if (row == null) return null;
+        Cell targetCell = row.getCell(colIdx);
+        if (targetCell == null) return null;
+
+        return getCellString(targetCell, visited);
     }
 
     @SuppressWarnings("unchecked")

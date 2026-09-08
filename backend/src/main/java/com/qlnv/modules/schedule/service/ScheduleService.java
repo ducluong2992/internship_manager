@@ -17,6 +17,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
@@ -107,7 +109,11 @@ public class ScheduleService {
         int pMonth = period.getMonth();
         int daysInMonth = YearMonth.of(pYear, pMonth).lengthOfMonth();
 
-        List<User> allUsers = userRepository.findByUserType("intern");
+        // 1. Sync all active interns (excluding resigned/inactive)
+        List<User> allUsers = userRepository.findAll().stream()
+                .filter(u -> isIntern(u) && !isResigned(u))
+                .collect(Collectors.toList());
+
         if (keyword != null && !keyword.trim().isEmpty()) {
             String kw = keyword.trim().toLowerCase();
             allUsers = allUsers.stream().filter(u ->
@@ -122,7 +128,8 @@ public class ScheduleService {
             allUsers = allUsers.stream().filter(u -> position.equalsIgnoreCase(u.getPosition())).collect(Collectors.toList());
         }
 
-        allUsers.sort(Comparator.comparing(User::getEmployeeCode, Comparator.nullsLast(Comparator.naturalOrder())));
+        // 3. Sort interns by natural numeric employee code (TTS1, TTS2, ..., TTS10, ...)
+        allUsers.sort(this::compareEmployeeCode);
 
         // Fetch all schedules for this period
         List<Schedule> periodSchedules = scheduleRepository.findByPeriodId(period.getId());
@@ -198,5 +205,66 @@ public class ScheduleService {
         result.put("rows", rows);
         result.put("users", rows);
         return result;
+    }
+
+    private boolean isIntern(User u) {
+        if (u == null) return false;
+        String ut = u.getUserType();
+        // 1. Strictly exclude Employee and Admin
+        if (ut != null && (ut.equalsIgnoreCase("employee") || ut.equalsIgnoreCase("nhan_vien") || ut.equalsIgnoreCase("nhân viên") || ut.equalsIgnoreCase("admin"))) {
+            return false;
+        }
+        if ("admin".equalsIgnoreCase(u.getRole())) {
+            return false;
+        }
+        // 2. Must be Intern / TTS
+        if (ut != null && (ut.equalsIgnoreCase("intern") || ut.equalsIgnoreCase("tts") || ut.toLowerCase().contains("thực tập") || ut.toLowerCase().contains("thuc tap"))) {
+            return true;
+        }
+        // 3. Fallback for unclassified records: only if employeeCode starts with "TTS"
+        String code = u.getEmployeeCode();
+        if (code != null && code.trim().toLowerCase().startsWith("tts") && (ut == null || ut.trim().isEmpty())) {
+            return true;
+        }
+        return false;
+    }
+
+    private boolean isResigned(User u) {
+        if (u == null) return false;
+        String status = u.getWorkingStatus();
+        if (status == null || status.trim().isEmpty()) return false;
+        String s = status.trim().toLowerCase();
+        return s.equals("resigned")
+                || s.contains("đã nghỉ")
+                || s.contains("da nghi")
+                || s.contains("nghỉ việc")
+                || s.contains("nghi viec")
+                || s.equals("nghỉ")
+                || s.equals("nghi");
+    }
+
+    private int compareEmployeeCode(User u1, User u2) {
+        String code1 = (u1 != null && u1.getEmployeeCode() != null) ? u1.getEmployeeCode().trim() : "";
+        String code2 = (u2 != null && u2.getEmployeeCode() != null) ? u2.getEmployeeCode().trim() : "";
+
+        if (code1.isEmpty() && code2.isEmpty()) return 0;
+        if (code1.isEmpty()) return 1;
+        if (code2.isEmpty()) return -1;
+
+        Matcher m1 = Pattern.compile("^([^0-9]*)(\\d+)$").matcher(code1);
+        Matcher m2 = Pattern.compile("^([^0-9]*)(\\d+)$").matcher(code2);
+
+        if (m1.matches() && m2.matches()) {
+            int prefixCmp = m1.group(1).compareToIgnoreCase(m2.group(1));
+            if (prefixCmp != 0) return prefixCmp;
+            try {
+                long num1 = Long.parseLong(m1.group(2));
+                long num2 = Long.parseLong(m2.group(2));
+                int numCmp = Long.compare(num1, num2);
+                if (numCmp != 0) return numCmp;
+            } catch (Exception ignored) {}
+        }
+
+        return code1.compareToIgnoreCase(code2);
     }
 }
