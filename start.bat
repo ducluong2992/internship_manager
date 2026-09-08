@@ -14,13 +14,20 @@ if defined JAVA_HOME if exist "%JAVA_HOME%\bin\java.exe" set "JAVA_CMD=%JAVA_HOM
 
 "%JAVA_CMD%" -version >nul 2>&1
 if errorlevel 1 (
-    if exist "C:\Program Files\Eclipse Adoptium\jdk-17.0.20.8-hotspot\bin\java.exe" (
-        set "JAVA_CMD=C:\Program Files\Eclipse Adoptium\jdk-17.0.20.8-hotspot\bin\java.exe"
-    ) else (
-        echo [ERROR] Khong tim thay Java 17+. Vui long cai dat JDK 17+ hoac cau hinh JAVA_HOME!
-        pause
-        exit /b 1
+    for /d %%D in ("C:\Program Files\Eclipse Adoptium\jdk-17*" "C:\Program Files\Java\jdk-17*" "C:\Program Files\Microsoft\jdk-17*") do (
+        if exist "%%D\bin\java.exe" (
+            set "JAVA_CMD=%%D\bin\java.exe"
+            set "JAVA_HOME=%%D"
+            set "PATH=%%D\bin;%PATH%"
+        )
     )
+)
+
+"%JAVA_CMD%" -version >nul 2>&1
+if errorlevel 1 (
+    echo [ERROR] Khong tim thay Java 17+. Vui long cai dat JDK 17+ hoac cau hinh JAVA_HOME!
+    pause
+    exit /b 1
 )
 
 echo [OK] Moi truong Java san sang.
