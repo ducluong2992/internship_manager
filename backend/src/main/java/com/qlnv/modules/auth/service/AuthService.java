@@ -37,6 +37,10 @@ public class AuthService {
         User user = userRepository.findById(account.getUserId())
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Không tìm thấy thông tin người dùng"));
 
+        if ("intern".equalsIgnoreCase(user.getUserType()) || "tts".equalsIgnoreCase(user.getUserType())) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Thực tập sinh không có tài khoản truy cập hệ thống");
+        }
+
         if (user.getAccountStatus() != null && user.getAccountStatus() == 0) {
             throw new ApiException(HttpStatus.FORBIDDEN, "Tài khoản đã bị khóa. Vui lòng liên hệ Admin.");
         }

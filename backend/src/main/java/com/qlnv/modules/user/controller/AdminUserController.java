@@ -82,8 +82,13 @@ public class AdminUserController {
     }
 
     @PostMapping(value = "/users/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<ImportResultDto> importUsers(@RequestParam("file") MultipartFile file) {
-        return ResponseEntity.ok(userExcelService.importUsersFromExcel(file, "intern"));
+    public ResponseEntity<ReconcilePreviewDto> importUsers(@RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(userExcelService.previewInternImportFile(file));
+    }
+
+    @PostMapping(value = "/users/preview-import-file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ReconcilePreviewDto> previewImportFile(@RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(userExcelService.previewInternImportFile(file));
     }
 
     @PostMapping("/users/preview-import-link")
@@ -96,6 +101,11 @@ public class AdminUserController {
         return ResponseEntity.ok(userExcelService.confirmInternImportLink(req));
     }
 
+    @PostMapping("/users/confirm-import")
+    public ResponseEntity<Map<String, Object>> confirmImport(@RequestBody ConfirmImportRequest req) {
+        return ResponseEntity.ok(userExcelService.confirmInternImportLink(req));
+    }
+
     @PostMapping("/users/import-link")
     public ResponseEntity<ReconcilePreviewDto> importLink(@RequestBody LinkImportRequest req) {
         return ResponseEntity.ok(userExcelService.previewInternImportLink(req.getUrl()));
@@ -105,7 +115,7 @@ public class AdminUserController {
     public ResponseEntity<Map<String, Object>> lockUser(
             @PathVariable Integer userId,
             @RequestBody(required = false) Map<String, Integer> body) {
-        Integer status = (body != null && body.containsKey("status")) ? body.get("status") : 0;
+        Integer status = (body != null && body.containsKey("status")) ? body.get("status") : null;
         return ResponseEntity.ok(userService.lockUser(userId, status));
     }
 

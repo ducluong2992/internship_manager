@@ -31,6 +31,16 @@ public class DataInitializer implements CommandLineRunner {
     public void run(String... args) {
         seedPositions();
         seedAdmin();
+        cleanUpInternAccounts();
+    }
+
+    private void cleanUpInternAccounts() {
+        List<User> internUsers = userRepository.findByUserType("intern");
+        internUsers.addAll(userRepository.findByUserType("tts"));
+        for (User u : internUsers) {
+            accountRepository.deleteByUserId(u.getId());
+        }
+        log.info("[OK] Intern accounts cleaned up - TTS has no login accounts");
     }
 
     private void seedPositions() {

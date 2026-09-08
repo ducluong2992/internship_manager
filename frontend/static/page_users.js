@@ -358,21 +358,21 @@ window.handleImportExcel = async function (event) {
   const formData = new FormData();
   formData.append('file', file);
 
-  toast('Đang xử lý file...', 'info');
-  event.target.value = ''; // Reset input
+  toast('Đang đối chiếu dữ liệu từ file Excel...', 'info');
+  event.target.value = '';
 
   try {
-    const res = await fetch(API + '/admin/users/import', {
+    const res = await fetch(API + '/admin/users/preview-import-file', {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + STATE.token },
       body: formData
     });
 
     const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || 'Lỗi khi nhập dữ liệu');
+    if (!res.ok) throw new Error(data.detail || data.message || 'Lỗi khi nhập dữ liệu');
 
-    toast(data.message, data.success > 0 ? 'success' : 'info');
-    navigate('manage-users'); // Reload table
+    currentReconcileData = data;
+    showReconcileModal(data);
   } catch (err) {
     toast(err.message, 'error');
   }
@@ -442,20 +442,20 @@ function showReconcileModal(data) {
   } else {
     updatedContainer.innerHTML = updated.map(item => `
       <div class="border rounded p-2 bg-white" style="font-size: 12px;">
-        <div class="d-flex align-items-center justify-content-between mb-1 pb-1 border-bottom">
-          <div class="d-flex align-items-center gap-2">
-            <span class="badge bg-secondary font-monospace" style="font-size: 10px;">${item.employee_code}</span>
-            <strong class="text-dark" style="font-size: 13px;">${item.full_name}</strong>
+        <div class="d-flex align-items-center justify-content-between mb-1 pb-1 border-bottom" style="min-width: 0;">
+          <div class="d-flex align-items-center gap-2 text-truncate me-2" style="min-width: 0; flex: 1;">
+            <span class="badge bg-secondary font-monospace flex-shrink-0" style="font-size: 10px;">${item.employee_code}</span>
+            <strong class="text-dark text-truncate" style="font-size: 13px;" title="${item.full_name}">${item.full_name}</strong>
           </div>
-          <span class="text-muted" style="font-size: 11px;">${item.changes.length} thay đổi</span>
+          <span class="text-muted flex-shrink-0" style="font-size: 11px;">${item.changes.length} thay đổi</span>
         </div>
         <div class="d-flex flex-column gap-1 pt-1">
           ${item.changes.map(ch => `
-            <div class="p-1 px-2 rounded bg-light border d-flex align-items-center flex-wrap gap-2" style="font-size: 12px;">
-              <span class="fw-semibold text-secondary" style="min-width: 100px;">${ch.field_name}:</span>
-              <span class="text-decoration-line-through text-muted">${ch.old_value || '—'}</span>
-              <i class="bi bi-arrow-right text-secondary fs-6"></i>
-              <span class="fw-bold text-dark">${ch.new_value}</span>
+            <div class="p-1 px-2 rounded bg-light border d-flex align-items-center gap-2" style="font-size: 12px; min-width: 0;">
+              <span class="fw-semibold text-secondary flex-shrink-0" style="min-width: 110px;">${ch.field_name}:</span>
+              <span class="text-decoration-line-through text-muted text-truncate" style="max-width: 180px;" title="${ch.old_value || '—'}">${ch.old_value || '—'}</span>
+              <i class="bi bi-arrow-right text-secondary fs-6 flex-shrink-0"></i>
+              <span class="fw-bold text-dark text-truncate" style="max-width: 250px;" title="${ch.new_value}">${ch.new_value}</span>
             </div>
           `).join('')}
         </div>
@@ -470,16 +470,14 @@ function showReconcileModal(data) {
   } else {
     addedContainer.innerHTML = added.map(item => `
       <div class="border rounded p-2 bg-white" style="font-size: 12px;">
-        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
-          <div class="d-flex align-items-center gap-2">
-            <span class="badge bg-secondary font-monospace" style="font-size: 10px;">${item.employee_code}</span>
-            <strong class="text-dark" style="font-size: 13px;">${item.full_name}</strong>
-            <span class="badge bg-light text-dark border" style="font-size: 10px;">Mới</span>
+        <div class="d-flex align-items-center justify-content-between gap-2" style="min-width: 0;">
+          <div class="d-flex align-items-center gap-2 text-truncate me-2" style="min-width: 0; flex: 1;">
+            <span class="badge bg-secondary font-monospace flex-shrink-0" style="font-size: 10px;">${item.employee_code}</span>
+            <strong class="text-dark text-truncate" style="font-size: 13px;" title="${item.full_name}">${item.full_name}</strong>
+            <span class="badge bg-success flex-shrink-0" style="font-size: 10px;">Mới</span>
           </div>
-          <div class="text-muted d-flex gap-3" style="font-size: 11px;">
-            <span>${item.project || '—'}</span>
-            <span>${item.position || '—'}</span>
-            ${item.viettel_email ? `<span>${item.viettel_email}</span>` : ''}
+          <div class="text-muted text-truncate text-end flex-shrink-0" style="font-size: 11px; max-width: 260px;" title="${[item.project, item.position, item.viettel_email].filter(Boolean).join(' · ')}">
+            <span>${[item.project, item.position, item.viettel_email].filter(Boolean).join(' · ') || '—'}</span>
           </div>
         </div>
       </div>
@@ -493,13 +491,15 @@ function showReconcileModal(data) {
   } else {
     removedContainer.innerHTML = removed.map(item => `
       <div class="border rounded p-2 bg-white" style="font-size: 12px;">
-        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
-          <div class="d-flex align-items-center gap-2">
-            <span class="badge bg-secondary font-monospace" style="font-size: 10px;">${item.employee_code}</span>
-            <strong class="text-dark" style="font-size: 13px;">${item.full_name}</strong>
-            <span class="text-muted" style="font-size: 11px;">${item.position || '—'} · ${item.project || '—'}</span>
+        <div class="d-flex align-items-center justify-content-between gap-2" style="min-width: 0;">
+          <div class="d-flex align-items-center gap-2 text-truncate me-2" style="min-width: 0; flex: 1;">
+            <span class="badge bg-secondary font-monospace flex-shrink-0" style="font-size: 10px;">${item.employee_code}</span>
+            <strong class="text-dark flex-shrink-0" style="font-size: 13px;">${item.full_name}</strong>
+            <span class="text-muted text-truncate" style="font-size: 11px;" title="${[item.position, item.project].filter(Boolean).join(' · ')}">
+              ${[item.position, item.project].filter(Boolean).join(' · ') ? '— ' + [item.position, item.project].filter(Boolean).join(' · ') : ''}
+            </span>
           </div>
-          <div class="choice-button-group d-flex align-items-center gap-1">
+          <div class="choice-button-group d-flex align-items-center gap-1 flex-shrink-0">
             <input type="radio" class="btn-check" name="rec_removed_${item.id}" id="choice_keep_${item.id}" value="keep" checked>
             <label class="btn btn-outline-secondary btn-sm px-2 py-0" for="choice_keep_${item.id}" style="font-size: 11px;">Giữ lại</label>
 

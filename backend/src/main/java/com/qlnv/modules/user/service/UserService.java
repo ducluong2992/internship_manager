@@ -152,16 +152,19 @@ public class UserService {
 
         user = userRepository.save(user);
 
-        // Create Account
-        String rawPassword = req.getPassword() != null && !req.getPassword().isEmpty() ? req.getPassword() : "User@123";
-        if (accountRepository.findByUserId(user.getId()).isEmpty()) {
-            Account account = Account.builder()
-                    .userId(user.getId())
-                    .username(empCode)
-                    .password(passwordEncoder.encode(rawPassword))
-                    .createdAt(LocalDateTime.now())
-                    .build();
-            accountRepository.save(account);
+        // Create Account ONLY for non-interns (Employee / Admin)
+        boolean isIntern = "intern".equalsIgnoreCase(user.getUserType()) || "tts".equalsIgnoreCase(user.getUserType());
+        if (!isIntern) {
+            String rawPassword = req.getPassword() != null && !req.getPassword().isEmpty() ? req.getPassword() : "User@123";
+            if (accountRepository.findByUserId(user.getId()).isEmpty()) {
+                Account account = Account.builder()
+                        .userId(user.getId())
+                        .username(empCode)
+                        .password(passwordEncoder.encode(rawPassword))
+                        .createdAt(LocalDateTime.now())
+                        .build();
+                accountRepository.save(account);
+            }
         }
 
         return toUserResponse(user);
@@ -230,14 +233,23 @@ public class UserService {
     }
 
     @Transactional
-    public Map<String, Object> lockUser(Integer id, Integer status) {
+    public Map<String, Object> lockUser(Integer id, Integer targetStatus) {
         User user = findEntityById(id);
-        if ("admin".equalsIgnoreCase(user.getEmployeeCode()) && status == 0) {
+        int currentStatus = user.getAccountStatus() != null ? user.getAccountStatus() : 1;
+        int newStatus = (targetStatus != null) ? targetStatus : (currentStatus == 1 ? 0 : 1);
+
+        if ("admin".equalsIgnoreCase(user.getEmployeeCode()) && newStatus == 0) {
             throw new ApiException(HttpStatus.FORBIDDEN, "Không thể khóa tài khoản admin");
         }
-        user.setAccountStatus(status != null ? status : 0);
+
+        user.setAccountStatus(newStatus);
         userRepository.save(user);
-        return Map.of("message", status == 0 ? "Khóa tài khoản thành công" : "Mở khóa tài khoản thành công", "status", user.getAccountStatus());
+
+        return Map.of(
+                "message", newStatus == 0 ? "Khóa tài khoản thành công" : "Mở khóa tài khoản thành công",
+                "status", newStatus,
+                "account_status", newStatus
+        );
     }
 
     @Transactional
@@ -257,6 +269,9 @@ public class UserService {
     @Transactional
     public Map<String, String> resetPassword(Integer id, String newPassword) {
         User user = findEntityById(id);
+        if ("intern".equalsIgnoreCase(user.getUserType()) || "tts".equalsIgnoreCase(user.getUserType())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Thực tập sinh không có tài khoản đăng nhập");
+        }
         Account account = accountRepository.findByUserId(user.getId())
                 .orElseGet(() -> {
                     Account acc = Account.builder()
@@ -279,20 +294,22 @@ public class UserService {
         Map<Integer, Account> accountMap = accountRepository.findAll().stream()
                 .collect(Collectors.toMap(Account::getUserId, a -> a, (a1, a2) -> a1));
 
-        return users.stream().map(u -> {
-            Account acc = accountMap.get(u.getId());
-            return AdminAccountRow.builder()
-                    .userId(u.getId())
-                    .employeeCode(u.getEmployeeCode())
-                    .fullName(u.getFullName())
-                    .username(acc != null ? acc.getUsername() : u.getEmployeeCode())
-                    .password(acc != null ? "••••••••" : "Chưa tạo")
-                    .accountStatus(u.getAccountStatus() != null ? u.getAccountStatus() : 1)
-                    .role(u.getRole())
-                    .workingStatus(u.getWorkingStatus())
-                    .userType(u.getUserType())
-                    .build();
-        }).collect(Collectors.toList());
+        return users.stream()
+                .filter(u -> !"intern".equalsIgnoreCase(u.getUserType()) && !"tts".equalsIgnoreCase(u.getUserType()))
+                .map(u -> {
+                    Account acc = accountMap.get(u.getId());
+                    return AdminAccountRow.builder()
+                            .userId(u.getId())
+                            .employeeCode(u.getEmployeeCode())
+                            .fullName(u.getFullName())
+                            .username(acc != null ? acc.getUsername() : u.getEmployeeCode())
+                            .password(acc != null ? "••••••••" : "Chưa tạo")
+                            .accountStatus(u.getAccountStatus() != null ? u.getAccountStatus() : 1)
+                            .role(u.getRole())
+                            .workingStatus(u.getWorkingStatus())
+                            .userType(u.getUserType())
+                            .build();
+                }).collect(Collectors.toList());
     }
 
     public List<ManagerResponse> getManagers() {

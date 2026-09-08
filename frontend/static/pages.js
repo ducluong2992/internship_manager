@@ -55,7 +55,7 @@ async function renderPage(page, area) {
       case 'manage-users': await renderManageUsers(area); break;
       case 'manage-employees': await renderManageEmployees(area); break;
       case 'manage-periods': await renderManagePeriods(area); break;
-      case 'manage-accounts': await renderManageAccounts(area, 'intern'); break;
+      case 'manage-accounts': await renderManageAccounts(area, 'employee'); break;
       case 'manage-emp-accounts': await renderManageAccounts(area, 'employee'); break;
       case 'admin-schedule': await renderAdminSchedule(area); break;
       case 'profile': await renderProfile(area); break;

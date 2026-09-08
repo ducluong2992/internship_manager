@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════
 // MANAGE ACCOUNTS (Admin)
 // ═══════════════════════════════════════════
-async function renderManageAccounts(area, userType = 'intern') {
+async function renderManageAccounts(area, userType = 'employee') {
   let accounts = await api('GET', `/admin/accounts?user_type=${userType}`);
   let filter = '';
 
@@ -25,13 +25,12 @@ async function renderManageAccounts(area, userType = 'intern') {
     const list = filtered();
     area.innerHTML = `
 <div class="section-header">
-  <div class="section-title"><i class="bi bi-person-lines-fill text-danger"></i> Quản lý tài khoản ${userType === 'intern' ? 'TTS' : 'Nhân viên'}</div>
+  <div class="section-title"><i class="bi bi-person-lines-fill text-danger"></i> Quản lý tài khoản nhân viên</div>
   <div class="d-flex gap-2">
-    ${userType === 'employee' ? `
     <button class="btn btn-outline-danger btn-sm" onclick="lockAllResignedAccounts('employee')">
       <i class="bi bi-lock-fill me-1"></i>Khóa TK NV nghỉ việc
-    </button>` : ''}
-    <button class="btn btn-outline-success btn-sm" onclick="exportAccounts('${userType}')">
+    </button>
+    <button class="btn btn-outline-success btn-sm" onclick="exportAccounts('employee')">
       <i class="bi bi-file-earmark-excel-fill me-1"></i>Xuất Excel
     </button>
   </div>
@@ -139,19 +138,23 @@ window.resetAccountPwd = async (id, name) => {
   catch (e) { toast(e.message, 'error'); }
 };
 
-window.toggleLockAccount = async (id, userType = 'intern') => {
+window.toggleLockAccount = async (id, userType = 'employee') => {
   try {
-    const r = await api('PATCH', `/admin/users/${id}/lock`);
+    const target = window._currentAccounts ? window._currentAccounts.find(a => a.user_id === id) : null;
+    const currentStatus = target && target.account_status !== undefined ? target.account_status : 1;
+    const nextStatus = currentStatus === 1 ? 0 : 1;
+
+    const r = await api('PATCH', `/admin/users/${id}/lock`, { status: nextStatus });
     toast(r.message, 'info');
-    if (window._currentAccounts) {
-      const target = window._currentAccounts.find(a => a.user_id === id);
-      if (target) target.account_status = r.account_status;
+
+    const updatedStatus = (r.account_status !== undefined) ? r.account_status : (r.status !== undefined ? r.status : nextStatus);
+    if (target) {
+      target.account_status = updatedStatus;
     }
     if (typeof window._renderCurrentAccounts === 'function') {
       window._renderCurrentAccounts();
     } else {
-      const targetPage = userType === 'employee' ? 'manage-emp-accounts' : 'manage-accounts';
-      navigate(targetPage);
+      navigate('manage-emp-accounts');
     }
   } catch (e) { toast(e.message, 'error'); }
 };

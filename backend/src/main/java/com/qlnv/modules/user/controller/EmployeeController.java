@@ -91,14 +91,38 @@ public class EmployeeController {
 
     @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ImportResultDto> importEmployees(@RequestParam("file") MultipartFile file) {
-        return ResponseEntity.ok(userExcelService.importUsersFromExcel(file, "employee"));
+    public ResponseEntity<com.qlnv.modules.user.dto.ReconcilePreviewDto> importEmployees(@RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(userExcelService.previewEmployeeImportFile(file));
+    }
+
+    @PostMapping(value = "/preview-import-file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<com.qlnv.modules.user.dto.ReconcilePreviewDto> previewImportFile(@RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(userExcelService.previewEmployeeImportFile(file));
+    }
+
+    @PostMapping("/preview-import-link")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<com.qlnv.modules.user.dto.ReconcilePreviewDto> previewImportLink(@RequestBody com.qlnv.modules.user.dto.LinkImportRequest req) {
+        return ResponseEntity.ok(userExcelService.previewEmployeeImportLink(req.getUrl()));
+    }
+
+    @PostMapping("/confirm-import")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Map<String, Object>> confirmImport(@RequestBody com.qlnv.modules.user.dto.ConfirmImportRequest req) {
+        return ResponseEntity.ok(userExcelService.confirmEmployeeImport(req));
+    }
+
+    @PostMapping("/confirm-import-link")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Map<String, Object>> confirmImportLink(@RequestBody com.qlnv.modules.user.dto.ConfirmImportRequest req) {
+        return ResponseEntity.ok(userExcelService.confirmEmployeeImport(req));
     }
 
     @PostMapping("/import-link")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ImportResultDto> importEmployeesLink(@RequestBody com.qlnv.modules.user.dto.LinkImportRequest req) {
-        return ResponseEntity.ok(userExcelService.importUsersFromUrl(req.getUrl(), "employee"));
+    public ResponseEntity<com.qlnv.modules.user.dto.ReconcilePreviewDto> importEmployeesLink(@RequestBody com.qlnv.modules.user.dto.LinkImportRequest req) {
+        return ResponseEntity.ok(userExcelService.previewEmployeeImportLink(req.getUrl()));
     }
 
     @GetMapping("/export")
