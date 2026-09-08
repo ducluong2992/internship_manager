@@ -60,6 +60,35 @@ public class AdminScheduleController {
         return ResponseEntity.ok(scheduleService.getAdminScheduleMatrix(periodId, month, year, project, position, keyword));
     }
 
+    @GetMapping("/schedule/import-template")
+    public ResponseEntity<byte[]> getImportTemplate(@RequestParam(value = "period_id", required = false) Integer periodId) {
+        byte[] data = scheduleExcelService.generateScheduleImportTemplate(periodId);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=mau_import_lich.xlsx")
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(data);
+    }
+
+    @PostMapping(value = "/schedule/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<Map<String, Object>> importSchedule(
+            @RequestParam(value = "period_id", required = false) Integer periodId,
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+        return ResponseEntity.ok(scheduleExcelService.importScheduleFromExcel(periodId, file));
+    }
+
+    @PostMapping("/schedule/import-link-sheets")
+    public ResponseEntity<Map<String, Object>> getScheduleLinkSheets(@RequestBody com.qlnv.modules.user.dto.LinkImportRequest req) {
+        List<String> sheets = scheduleExcelService.getScheduleLinkSheets(req.getUrl());
+        return ResponseEntity.ok(Map.of("sheets", sheets));
+    }
+
+    @PostMapping("/schedule/import-link")
+    public ResponseEntity<Map<String, Object>> importScheduleLink(
+            @RequestParam(value = "period_id", required = false) Integer periodId,
+            @RequestBody com.qlnv.modules.user.dto.LinkImportRequest req) {
+        return ResponseEntity.ok(scheduleExcelService.importScheduleFromLink(periodId, req.getUrl(), req.getSheetName()));
+    }
+
     @GetMapping("/schedule/export")
     public ResponseEntity<byte[]> exportSchedule(
             @RequestParam(required = false, name = "period_id") Integer periodId,

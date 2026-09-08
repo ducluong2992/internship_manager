@@ -25,9 +25,15 @@ if errorlevel 1 (
 
 "%JAVA_CMD%" -version >nul 2>&1
 if errorlevel 1 (
-    echo [ERROR] Khong tim thay Java 17+. Vui long cai dat JDK 17+ hoac cau hinh JAVA_HOME!
-    pause
-    exit /b 1
+    if exist "C:\Program Files\Eclipse Adoptium\jdk-17.0.20.101-hotspot\bin\java.exe" (
+        set "JAVA_CMD=C:\Program Files\Eclipse Adoptium\jdk-17.0.20.101-hotspot\bin\java.exe"
+        set "JAVA_HOME=C:\Program Files\Eclipse Adoptium\jdk-17.0.20.101-hotspot"
+        set "PATH=C:\Program Files\Eclipse Adoptium\jdk-17.0.20.101-hotspot\bin;%PATH%"
+    ) else (
+        echo [ERROR] Khong tim thay Java 17+. Vui long cai dat JDK 17+ hoac cau hinh JAVA_HOME!
+        pause
+        exit /b 1
+    )
 )
 
 echo [OK] Moi truong Java san sang.
@@ -65,4 +71,5 @@ call "C:\tools\apache-maven-3.9.9\bin\mvn.cmd" spring-boot:run
 goto END
 
 :END
-pause
+pause
+

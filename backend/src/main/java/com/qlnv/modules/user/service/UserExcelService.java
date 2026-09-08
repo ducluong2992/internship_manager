@@ -1,10 +1,13 @@
 package com.qlnv.modules.user.service;
 
+import com.qlnv.common.config.CustomByteArrayMultipartFile;
 import com.qlnv.common.exception.ApiException;
 import com.qlnv.modules.auth.entity.Account;
 import com.qlnv.modules.auth.repository.AccountRepository;
 import com.qlnv.modules.user.dto.AdminAccountRow;
+import com.qlnv.modules.user.dto.ConfirmImportRequest;
 import com.qlnv.modules.user.dto.ImportResultDto;
+import com.qlnv.modules.user.dto.ReconcilePreviewDto;
 import com.qlnv.modules.user.dto.UserResponse;
 import com.qlnv.modules.user.entity.Position;
 import com.qlnv.modules.user.entity.User;
@@ -317,6 +320,341 @@ public class UserExcelService {
         }
     }
 
+    public Workbook downloadWorkbookFromUrl(String urlStr) {
+        try {
+            String exportUrl = urlStr;
+            java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("/d/([a-zA-Z0-9-_]+)");
+            java.util.regex.Matcher matcher = pattern.matcher(urlStr);
+            if (matcher.find()) {
+                String sheetId = matcher.group(1);
+                exportUrl = "https://docs.google.com/spreadsheets/d/" + sheetId + "/export?format=xlsx";
+            }
+            URL u = new URL(exportUrl);
+            URLConnection conn = u.openConnection();
+            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
+            conn.setConnectTimeout(15000);
+            conn.setReadTimeout(30000);
+            try (InputStream is = conn.getInputStream()) {
+                return WorkbookFactory.create(is);
+            }
+        } catch (Exception e) {
+            log.error("Error downloading spreadsheet from URL: {}", urlStr, e);
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Không thể tải hoặc đọc dữ liệu từ link. Hãy chắc chắn link đã được chia sẻ công khai 'Bất kỳ ai có liên kết'. Lỗi: " + e.getMessage());
+        }
+    }
+
+    public ReconcilePreviewDto previewInternImportLink(String url) {
+        try (Workbook workbook = downloadWorkbookFromUrl(url)) {
+            Sheet sheet = workbook.getSheetAt(0);
+            Iterator<Row> rowIterator = sheet.iterator();
+
+            if (!rowIterator.hasNext()) {
+                throw new ApiException("File hoặc link Google Sheet không có dữ liệu");
+            }
+
+            Row headerRow = rowIterator.next();
+            Map<String, Integer> colIndexMap = new HashMap<>();
+            for (Cell cell : headerRow) {
+                String val = getCellString(cell).trim().toLowerCase();
+                colIndexMap.put(val, cell.getColumnIndex());
+            }
+
+            List<User> dbInterns = userRepository.findByUserType("intern");
+            Map<String, User> dbByCode = new HashMap<>();
+            Map<String, User> dbByName = new HashMap<>();
+            for (User u : dbInterns) {
+                if (u.getEmployeeCode() != null) dbByCode.put(u.getEmployeeCode().trim().toLowerCase(), u);
+                if (u.getFullName() != null) dbByName.put(u.getFullName().trim().toLowerCase(), u);
+            }
+
+            List<Map<String, Object>> updated = new ArrayList<>();
+            List<Map<String, Object>> added = new ArrayList<>();
+            Set<Integer> processedDbIds = new HashSet<>();
+            List<String> formatWarnings = new ArrayList<>();
+            int unchangedCount = 0;
+            int rowNum = 1;
+
+            while (rowIterator.hasNext()) {
+                Row row = rowIterator.next();
+                rowNum++;
+
+                String empCode = getCellByColName(row, colIndexMap, "mã", "mã tts", "mã nv", "mã tts (*)", "mã nv (*)");
+                String fullName = getCellByColName(row, colIndexMap, "họ và tên", "họ tên", "họ và tên (*)");
+
+                if (empCode.isEmpty() && fullName.isEmpty()) continue;
+
+                String position = getCellByColName(row, colIndexMap, "vị trí", "vị trí / chức danh", "chức danh", "role");
+                String gender = getCellByColName(row, colIndexMap, "giới tính", "gender");
+                String ethnicity = getCellByColName(row, colIndexMap, "dân tộc", "ethnicity");
+                String email = getCellByColName(row, colIndexMap, "email viettel", "email");
+                String birthdayStr = getCellByColName(row, colIndexMap, "ngày sinh", "ngày sinh (yyyy-mm-dd)", "birthday");
+                LocalDate birthday = parseDate(birthdayStr, row, colIndexMap, "ngày sinh");
+                if (birthday == null && !birthdayStr.isEmpty()) {
+                    formatWarnings.add("Dòng " + rowNum + " (" + fullName + "): Ngày sinh '" + birthdayStr + "' không đúng định dạng yyyy-MM-dd");
+                }
+
+                String hometown = getCellByColName(row, colIndexMap, "quê quán", "hometown");
+                String phone = getCellByColName(row, colIndexMap, "số điện thoại", "sđt", "phone");
+                String cccd = getCellByColName(row, colIndexMap, "cccd", "số cccd", "cmnd");
+                String bankName = getCellByColName(row, colIndexMap, "tên ngân hàng", "ngân hàng", "bank_name");
+                String bankAccount = getCellByColName(row, colIndexMap, "số tài khoản", "stk", "bank_account");
+                String project = getCellByColName(row, colIndexMap, "dự án", "project");
+                String joinDateStr = getCellByColName(row, colIndexMap, "ngày vào", "ngày vào (yyyy-mm-dd)", "ngày tham gia", "join_date");
+                LocalDate joinDate = parseDate(joinDateStr, row, colIndexMap, "ngày vào");
+                if (joinDate == null && !joinDateStr.isEmpty()) {
+                    formatWarnings.add("Dòng " + rowNum + " (" + fullName + "): Ngày vào '" + joinDateStr + "' không đúng định dạng yyyy-MM-dd");
+                }
+
+                String allowance = getCellByColName(row, colIndexMap, "trợ cấp", "allowance");
+                String employeeType = getCellByColName(row, colIndexMap, "loại tts", "loại nhân sự", "employee_type");
+                String workingStatus = getCellByColName(row, colIndexMap, "trạng thái", "trạng thái làm việc", "working_status");
+                String employmentType = getCellByColName(row, colIndexMap, "hình thức làm việc", "employment_type");
+
+                Map<String, Object> sheetData = new HashMap<>();
+                sheetData.put("employee_code", empCode);
+                sheetData.put("full_name", fullName);
+                if (!position.isEmpty()) sheetData.put("position", position);
+                if (!gender.isEmpty()) sheetData.put("gender", gender);
+                if (!ethnicity.isEmpty()) sheetData.put("ethnicity", ethnicity);
+                if (!email.isEmpty()) sheetData.put("viettel_email", email);
+                if (birthday != null) sheetData.put("birthday", birthday.toString());
+                if (!hometown.isEmpty()) sheetData.put("hometown", hometown);
+                if (!phone.isEmpty()) sheetData.put("phone", phone);
+                if (!cccd.isEmpty()) sheetData.put("cccd", cccd);
+                if (!bankName.isEmpty()) sheetData.put("bank_name", bankName);
+                if (!bankAccount.isEmpty()) sheetData.put("bank_account", bankAccount);
+                if (!project.isEmpty()) sheetData.put("project", project);
+                if (joinDate != null) sheetData.put("join_date", joinDate.toString());
+                if (!allowance.isEmpty()) sheetData.put("allowance", allowance);
+                if (!employeeType.isEmpty()) sheetData.put("employee_type", employeeType);
+                if (!workingStatus.isEmpty()) sheetData.put("working_status", workingStatus);
+                if (!employmentType.isEmpty()) sheetData.put("employment_type", employmentType);
+
+                User matched = null;
+                if (!empCode.isEmpty() && dbByCode.containsKey(empCode.toLowerCase())) {
+                    matched = dbByCode.get(empCode.toLowerCase());
+                } else if (!fullName.isEmpty() && dbByName.containsKey(fullName.toLowerCase())) {
+                    matched = dbByName.get(fullName.toLowerCase());
+                }
+
+                if (matched != null) {
+                    processedDbIds.add(matched.getId());
+                    List<Map<String, String>> changes = new ArrayList<>();
+
+                    checkFieldChange(changes, "Họ và tên", matched.getFullName(), fullName);
+                    checkFieldChange(changes, "Vị trí", matched.getPosition(), position);
+                    checkFieldChange(changes, "Giới tính", matched.getGender(), gender);
+                    checkFieldChange(changes, "Dân tộc", matched.getEthnicity(), ethnicity);
+                    checkFieldChange(changes, "Email Viettel", matched.getViettelEmail(), email);
+                    checkFieldChange(changes, "Ngày sinh", matched.getBirthday() != null ? matched.getBirthday().toString() : "", birthday != null ? birthday.toString() : "");
+                    checkFieldChange(changes, "Quê quán", matched.getHometown(), hometown);
+                    checkFieldChange(changes, "Số điện thoại", matched.getPhone(), phone);
+                    checkFieldChange(changes, "Số CCCD", matched.getCccd(), cccd);
+                    checkFieldChange(changes, "Ngân hàng", matched.getBankName(), bankName);
+                    checkFieldChange(changes, "Số tài khoản", matched.getBankAccount(), bankAccount);
+                    checkFieldChange(changes, "Dự án", matched.getProject(), project);
+                    checkFieldChange(changes, "Ngày vào", matched.getJoinDate() != null ? matched.getJoinDate().toString() : "", joinDate != null ? joinDate.toString() : "");
+                    checkFieldChange(changes, "Trợ cấp", matched.getAllowance(), allowance);
+                    checkFieldChange(changes, "Loại nhân sự", matched.getEmployeeType(), employeeType);
+                    checkFieldChange(changes, "Trạng thái", matched.getWorkingStatus(), workingStatus);
+                    checkFieldChange(changes, "Hình thức", matched.getEmploymentType(), employmentType);
+
+                    if (!changes.isEmpty()) {
+                        Map<String, Object> updateItem = new HashMap<>();
+                        updateItem.put("id", matched.getId());
+                        updateItem.put("employee_code", matched.getEmployeeCode());
+                        updateItem.put("full_name", matched.getFullName());
+                        updateItem.put("changes", changes);
+                        updateItem.put("new_data", sheetData);
+                        updated.add(updateItem);
+                    } else {
+                        unchangedCount++;
+                    }
+                } else {
+                    Map<String, Object> addItem = new HashMap<>();
+                    addItem.put("employee_code", empCode);
+                    addItem.put("full_name", fullName);
+                    addItem.put("project", project);
+                    addItem.put("position", position);
+                    addItem.put("viettel_email", email);
+                    addItem.put("new_data", sheetData);
+                    added.add(addItem);
+                }
+            }
+
+            List<Map<String, Object>> removed = new ArrayList<>();
+            for (User u : dbInterns) {
+                if (!processedDbIds.contains(u.getId())) {
+                    Map<String, Object> remItem = new HashMap<>();
+                    remItem.put("id", u.getId());
+                    remItem.put("employee_code", u.getEmployeeCode());
+                    remItem.put("full_name", u.getFullName());
+                    remItem.put("position", u.getPosition());
+                    remItem.put("project", u.getProject());
+                    removed.add(remItem);
+                }
+            }
+
+            return ReconcilePreviewDto.builder()
+                    .updated(updated)
+                    .added(added)
+                    .removed(removed)
+                    .unchangedCount(unchangedCount)
+                    .formatWarnings(formatWarnings)
+                    .build();
+
+        } catch (ApiException ae) {
+            throw ae;
+        } catch (Exception e) {
+            log.error("Error previewing intern import link: {}", url, e);
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Không thể đối chiếu dữ liệu: " + e.getMessage());
+        }
+    }
+
+    private void checkFieldChange(List<Map<String, String>> changes, String label, String oldVal, String newVal) {
+        if (newVal == null || newVal.trim().isEmpty()) return;
+        String sOld = cleanNumericString(oldVal);
+        String sNew = cleanNumericString(newVal);
+        if (!sOld.equalsIgnoreCase(sNew)) {
+            changes.add(Map.of("field_name", label, "old_value", sOld, "new_value", sNew));
+        }
+    }
+
+    private String cleanNumericString(String val) {
+        if (val == null) return "";
+        val = val.trim();
+        if (val.matches("^\\d+\\.0+$")) {
+            return val.substring(0, val.indexOf('.'));
+        }
+        return val;
+    }
+
+    @Transactional
+    public Map<String, Object> confirmInternImportLink(ConfirmImportRequest req) {
+        int updatedCount = 0;
+        int addedCount = 0;
+        int deletedCount = 0;
+
+        if (req.getUpdates() != null) {
+            for (Map<String, Object> item : req.getUpdates()) {
+                Integer id = item.get("id") != null ? Integer.parseInt(item.get("id").toString()) : null;
+                @SuppressWarnings("unchecked")
+                Map<String, Object> data = (Map<String, Object>) item.get("new_data");
+                if (id == null || data == null) continue;
+
+                Optional<User> opt = userRepository.findById(id);
+                if (opt.isPresent()) {
+                    User user = opt.get();
+                    applyUserDataMap(user, data);
+                    userRepository.save(user);
+                    updatedCount++;
+                }
+            }
+        }
+
+        if (req.getAdditions() != null) {
+            for (Map<String, Object> item : req.getAdditions()) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> data = (Map<String, Object>) item.get("new_data");
+                if (data == null) data = item;
+
+                String empCode = String.valueOf(data.getOrDefault("employee_code", "")).trim();
+                String fullName = String.valueOf(data.getOrDefault("full_name", "")).trim();
+                if (empCode.isEmpty() || fullName.isEmpty()) continue;
+
+                Optional<User> existing = userRepository.findByEmployeeCode(empCode);
+                User user;
+                boolean isNew = false;
+                if (existing.isPresent()) {
+                    user = existing.get();
+                } else {
+                    user = new User();
+                    user.setEmployeeCode(empCode);
+                    user.setCreatedAt(LocalDateTime.now());
+                    user.setUserType("intern");
+                    user.setRole("user");
+                    user.setAccountStatus(1);
+                    isNew = true;
+                }
+                user.setFullName(fullName);
+                applyUserDataMap(user, data);
+                user = userRepository.save(user);
+
+                if (isNew && accountRepository.findByUserId(user.getId()).isEmpty()) {
+                    Account acc = Account.builder()
+                            .userId(user.getId())
+                            .username(empCode)
+                            .password(passwordEncoder.encode("User@123"))
+                            .createdAt(LocalDateTime.now())
+                            .build();
+                    accountRepository.save(acc);
+                }
+                addedCount++;
+            }
+        }
+
+        if (req.getDeleteIds() != null) {
+            for (Integer id : req.getDeleteIds()) {
+                if (id != null && userRepository.existsById(id)) {
+                    accountRepository.deleteByUserId(id);
+                    userRepository.deleteById(id);
+                    deletedCount++;
+                }
+            }
+        }
+
+        String msg = String.format("Cập nhật thành công: %d sửa, %d thêm mới, %d đã xóa", updatedCount, addedCount, deletedCount);
+        return Map.of(
+                "message", msg,
+                "updated", updatedCount,
+                "added", addedCount,
+                "deleted", deletedCount
+        );
+    }
+
+    private void applyUserDataMap(User user, Map<String, Object> data) {
+        if (data.containsKey("full_name") && data.get("full_name") != null) user.setFullName(data.get("full_name").toString());
+        if (data.containsKey("position") && data.get("position") != null) {
+            String pos = data.get("position").toString();
+            user.setPosition(pos);
+            Optional<Position> pOpt = positionRepository.findByName(pos);
+            pOpt.ifPresent(p -> user.setPositionId(p.getId()));
+        }
+        if (data.containsKey("gender") && data.get("gender") != null) user.setGender(data.get("gender").toString());
+        if (data.containsKey("ethnicity") && data.get("ethnicity") != null) user.setEthnicity(data.get("ethnicity").toString());
+        if (data.containsKey("viettel_email") && data.get("viettel_email") != null) user.setViettelEmail(data.get("viettel_email").toString());
+        if (data.containsKey("birthday") && data.get("birthday") != null) {
+            try { user.setBirthday(LocalDate.parse(data.get("birthday").toString())); } catch (Exception ignored) {}
+        }
+        if (data.containsKey("hometown") && data.get("hometown") != null) user.setHometown(data.get("hometown").toString());
+        if (data.containsKey("phone") && data.get("phone") != null) user.setPhone(data.get("phone").toString());
+        if (data.containsKey("cccd") && data.get("cccd") != null) user.setCccd(data.get("cccd").toString());
+        if (data.containsKey("bank_name") && data.get("bank_name") != null) user.setBankName(data.get("bank_name").toString());
+        if (data.containsKey("bank_account") && data.get("bank_account") != null) user.setBankAccount(data.get("bank_account").toString());
+        if (data.containsKey("project") && data.get("project") != null) user.setProject(data.get("project").toString());
+        if (data.containsKey("join_date") && data.get("join_date") != null) {
+            try { user.setJoinDate(LocalDate.parse(data.get("join_date").toString())); } catch (Exception ignored) {}
+        }
+        if (data.containsKey("allowance") && data.get("allowance") != null) user.setAllowance(data.get("allowance").toString());
+        if (data.containsKey("employee_type") && data.get("employee_type") != null) user.setEmployeeType(data.get("employee_type").toString());
+        if (data.containsKey("working_status") && data.get("working_status") != null) user.setWorkingStatus(data.get("working_status").toString());
+        if (data.containsKey("employment_type") && data.get("employment_type") != null) user.setEmploymentType(data.get("employment_type").toString());
+    }
+
+    @Transactional
+    public ImportResultDto importUsersFromUrl(String url, String userType) {
+        try (Workbook workbook = downloadWorkbookFromUrl(url); ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            workbook.write(baos);
+            byte[] bytes = baos.toByteArray();
+            MultipartFile multipartFile = new CustomByteArrayMultipartFile("sheet.xlsx", bytes);
+            return importUsersFromExcel(multipartFile, userType);
+        } catch (ApiException ae) {
+            throw ae;
+        } catch (Exception e) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Lỗi import từ link: " + e.getMessage());
+        }
+    }
+
     public byte[] exportAccountsToExcel() {
         List<AdminAccountRow> accounts = userService.getAccountsList();
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
@@ -427,8 +765,38 @@ public class UserExcelService {
 
     private String getCellString(Cell cell) {
         if (cell == null) return "";
+        if (cell.getCellType() == CellType.NUMERIC) {
+            if (DateUtil.isCellDateFormatted(cell)) {
+                Date d = cell.getDateCellValue();
+                if (d != null) {
+                    return new java.text.SimpleDateFormat("yyyy-MM-dd").format(d);
+                }
+            }
+            double num = cell.getNumericCellValue();
+            if (num == Math.floor(num) && !Double.isInfinite(num)) {
+                return java.math.BigDecimal.valueOf(num).toBigInteger().toString();
+            } else {
+                return java.math.BigDecimal.valueOf(num).stripTrailingZeros().toPlainString();
+            }
+        }
+        if (cell.getCellType() == CellType.FORMULA) {
+            try {
+                if (cell.getCachedFormulaResultType() == CellType.NUMERIC) {
+                    double num = cell.getNumericCellValue();
+                    if (num == Math.floor(num) && !Double.isInfinite(num)) {
+                        return java.math.BigDecimal.valueOf(num).toBigInteger().toString();
+                    } else {
+                        return java.math.BigDecimal.valueOf(num).stripTrailingZeros().toPlainString();
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
         DataFormatter formatter = new DataFormatter();
-        return formatter.formatCellValue(cell);
+        String val = formatter.formatCellValue(cell).trim();
+        if (val.matches("^\\d+\\.0+$")) {
+            val = val.substring(0, val.indexOf('.'));
+        }
+        return val;
     }
 
     private String getCellByColName(Row row, Map<String, Integer> colIndexMap, String... colNames) {

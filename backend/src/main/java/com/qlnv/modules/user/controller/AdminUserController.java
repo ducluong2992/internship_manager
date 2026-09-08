@@ -1,8 +1,10 @@
 package com.qlnv.modules.user.controller;
 
 import com.qlnv.modules.user.dto.AdminAccountRow;
+import com.qlnv.modules.user.dto.ConfirmImportRequest;
 import com.qlnv.modules.user.dto.ImportResultDto;
 import com.qlnv.modules.user.dto.LinkImportRequest;
+import com.qlnv.modules.user.dto.ReconcilePreviewDto;
 import com.qlnv.modules.user.dto.UserRequestDto;
 import com.qlnv.modules.user.dto.UserResponse;
 import com.qlnv.modules.user.service.UserExcelService;
@@ -82,6 +84,21 @@ public class AdminUserController {
     @PostMapping(value = "/users/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ImportResultDto> importUsers(@RequestParam("file") MultipartFile file) {
         return ResponseEntity.ok(userExcelService.importUsersFromExcel(file, "intern"));
+    }
+
+    @PostMapping("/users/preview-import-link")
+    public ResponseEntity<ReconcilePreviewDto> previewImportLink(@RequestBody LinkImportRequest req) {
+        return ResponseEntity.ok(userExcelService.previewInternImportLink(req.getUrl()));
+    }
+
+    @PostMapping("/users/confirm-import-link")
+    public ResponseEntity<Map<String, Object>> confirmImportLink(@RequestBody ConfirmImportRequest req) {
+        return ResponseEntity.ok(userExcelService.confirmInternImportLink(req));
+    }
+
+    @PostMapping("/users/import-link")
+    public ResponseEntity<ReconcilePreviewDto> importLink(@RequestBody LinkImportRequest req) {
+        return ResponseEntity.ok(userExcelService.previewInternImportLink(req.getUrl()));
     }
 
     @PatchMapping("/users/{userId}/lock")

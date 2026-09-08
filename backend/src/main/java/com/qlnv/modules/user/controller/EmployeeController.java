@@ -95,6 +95,12 @@ public class EmployeeController {
         return ResponseEntity.ok(userExcelService.importUsersFromExcel(file, "employee"));
     }
 
+    @PostMapping("/import-link")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ImportResultDto> importEmployeesLink(@RequestBody com.qlnv.modules.user.dto.LinkImportRequest req) {
+        return ResponseEntity.ok(userExcelService.importUsersFromUrl(req.getUrl(), "employee"));
+    }
+
     @GetMapping("/export")
     public ResponseEntity<byte[]> exportEmployees(
             @RequestParam(required = false) String keyword,
