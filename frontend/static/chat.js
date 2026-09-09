@@ -1,5 +1,5 @@
 /* =============================================
-   CHAT ASSISTANT — Multi-Model & API Key Test
+   CHAT ASSISTANT — Viettel AI Assistant
    ============================================= */
 
 (function () {
@@ -11,18 +11,10 @@
   const chatForm = document.getElementById('form-chat');
   const chatInput = document.getElementById('chat-input');
   const chatBody = document.getElementById('chat-body');
-  const modelSelect = document.getElementById('chat-model-select');
-  const testKeyBtn = document.getElementById('chat-test-key-btn');
   const banner = document.getElementById('chat-banner');
   const bannerText = document.getElementById('chat-banner-text');
   const bannerClose = document.getElementById('chat-banner-close');
   const quickPrompts = document.getElementById('chat-quick-prompts');
-
-  const MODEL_DISPLAY_NAMES = {
-    'gemini-3.1-flash-lite': 'Gemini 3.1 Flash Lite',
-    'gemini-3.5-flash-lite': 'Gemini 3.5 Flash Lite',
-    'gemini-flash-latest': 'Gemini Flash'
-  };
 
   // ── Open / Close Chat ──
   function openChat() {
@@ -44,28 +36,6 @@
       closeChat();
     }
   });
-
-  // ── Model Selection Persistence ──
-  function getSelectedModel() {
-    if (!modelSelect) return 'gemini-3.1-flash-lite';
-    return modelSelect.value || 'gemini-3.1-flash-lite';
-  }
-
-  function initModelPreference() {
-    if (!modelSelect) return;
-    const savedModel = localStorage.getItem('chat_selected_model');
-    if (savedModel && Array.from(modelSelect.options).some(o => o.value === savedModel)) {
-      modelSelect.value = savedModel;
-    }
-  }
-
-  if (modelSelect) {
-    modelSelect.addEventListener('change', () => {
-      const val = modelSelect.value;
-      localStorage.setItem('chat_selected_model', val);
-      showBanner(`Đã chuyển sang mô hình <strong>${MODEL_DISPLAY_NAMES[val] || val}</strong>`, 'info', 2500);
-    });
-  }
 
   // ── Banner Helper ──
   let bannerTimer = null;
@@ -90,41 +60,6 @@
     });
   }
 
-  // ── Test API Key & Model Connection ──
-  if (testKeyBtn) {
-    testKeyBtn.addEventListener('click', async () => {
-      const selectedModel = getSelectedModel();
-      const modelName = MODEL_DISPLAY_NAMES[selectedModel] || selectedModel;
-
-      testKeyBtn.disabled = true;
-      testKeyBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Testing...';
-
-      try {
-        const res = await fetch(API + '/api/chat/test-key', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + STATE.token
-          },
-          body: JSON.stringify({ model: selectedModel })
-        });
-
-        const data = await res.json();
-        if (res.ok && data.success) {
-          showBanner(`<i class="bi bi-check-circle-fill me-1"></i><strong>Key thông suốt!</strong> Đã kết nối tốt với <strong>${modelName}</strong>.`, 'success', 5000);
-        } else {
-          const errMsg = data.message || data.detail || 'Không thể kết nối';
-          showBanner(`<i class="bi bi-exclamation-triangle-fill me-1"></i><strong>Lỗi kết nối:</strong> ${errMsg}`, 'error', 6000);
-        }
-      } catch (err) {
-        showBanner(`<i class="bi bi-x-circle-fill me-1"></i><strong>Lỗi mạng:</strong> Không thể kết nối tới server.`, 'error', 5000);
-      } finally {
-        testKeyBtn.disabled = false;
-        testKeyBtn.innerHTML = '<i class="bi bi-lightning-charge-fill me-1"></i>Test Key';
-      }
-    });
-  }
-
   // ── Per-user storage key ──
   function storageKey() {
     return `chat_history_${STATE.userId || 'guest'}`;
@@ -145,6 +80,64 @@
     }
   }
 
+  // ── Markdown Parser for Chat Messages ──
+  function formatMarkdown(text) {
+    if (!text) return '';
+
+    // 1. Escape HTML
+    let html = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+
+    // 2. Bold & Italic (***text***)
+    html = html.replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>');
+
+    // 3. Bold (**text**)
+    html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/__(.*?)__/g, '<strong>$1</strong>');
+
+    // 4. Italic (*text*)
+    html = html.replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
+
+    // 5. Code block / inline code
+    html = html.replace(/`([^`]+)`/g, '<code class="bg-secondary bg-opacity-25 px-1 py-0 rounded text-danger font-monospace">$1</code>');
+
+    // 6. Bullet lists (* item or - item)
+    const lines = html.split('\n');
+    let inList = false;
+    const processedLines = [];
+
+    for (let line of lines) {
+      const bulletMatch = line.match(/^(\s*)[*-]\s+(.+)$/);
+      if (bulletMatch) {
+        if (!inList) {
+          processedLines.push('<ul class="chat-markdown-list mb-2 ps-3">');
+          inList = true;
+        }
+        processedLines.push(`<li>${bulletMatch[2]}</li>`);
+      } else {
+        if (inList) {
+          processedLines.push('</ul>');
+          inList = false;
+        }
+        processedLines.push(line);
+      }
+    }
+    if (inList) {
+      processedLines.push('</ul>');
+    }
+
+    html = processedLines.join('\n');
+
+    // 7. Line breaks
+    html = html.replace(/\n/g, '<br>');
+    html = html.replace(/<br>(<ul|<li|<\/ul|<\/li>)/g, '$1');
+    html = html.replace(/(<\/ul>|<\/li>|<ul[^>]*>)<br>/g, '$1');
+
+    return html;
+  }
+
   // ── Render one message bubble ──
   function renderBubble(msg, animate = false) {
     const msgDiv = document.createElement('div');
@@ -153,21 +146,12 @@
 
     let modelTagHtml = '';
     if (msg.type === 'ai-message' && msg.model) {
-      const displayModel = MODEL_DISPLAY_NAMES[msg.model] || msg.model;
-      modelTagHtml = `<div class="chat-model-tag"><i class="bi bi-stars text-danger"></i>${displayModel}</div>`;
+      modelTagHtml = `<div class="chat-model-tag"><i class="bi bi-stars text-danger"></i>${msg.model}</div>`;
     }
 
-    let sourceHtml = '';
-    if (msg.sources && msg.sources.length > 0) {
-      sourceHtml = `<div class="chat-sources mt-2"><small class="text-muted fw-bold"><i class="bi bi-file-earmark-text me-1"></i>Nguồn tài liệu:</small><ul>`;
-      msg.sources.forEach(s => {
-        sourceHtml += `<li>${s.title} ${s.page ? `(Trang ${s.page})` : ''}</li>`;
-      });
-      sourceHtml += `</ul></div>`;
-    }
+    const formatted = formatMarkdown(msg.content || '');
 
-    const formatted = (msg.content || '').replace(/\n/g, '<br>');
-    msgDiv.innerHTML = `<div class="message-content">${modelTagHtml}<div>${formatted}</div>${sourceHtml}</div>`;
+    msgDiv.innerHTML = `<div class="message-content">${modelTagHtml}<div>${formatted}</div></div>`;
     chatBody.appendChild(msgDiv);
     chatBody.scrollTop = chatBody.scrollHeight;
   }
@@ -199,12 +183,9 @@
   }
 
   function resetChatView() {
-    const selectedModel = getSelectedModel();
-    const modelDisplayName = MODEL_DISPLAY_NAMES[selectedModel] || selectedModel;
     chatBody.innerHTML = `
       <div class="chat-message ai-message">
         <div class="message-content">
-          <div class="chat-model-tag"><i class="bi bi-stars text-danger"></i>${modelDisplayName}</div>
           <div>Xin chào <strong>${STATE.fullName || 'bạn'}</strong>! Tôi là trợ lý AI Viettel. Bạn có câu hỏi nào về quy chế, ca trực, OT hay tài liệu không?</div>
         </div>
       </div>`;
@@ -213,7 +194,6 @@
   // ── Init: load history for current user ──
   window.initChat = function () {
     if (!chatWidget) return;
-    initModelPreference();
 
     chatWidget.style.setProperty('display', 'block', 'important');
     if (toggleBtn) toggleBtn.style.setProperty('display', 'flex', 'important');
@@ -239,7 +219,6 @@
       const text = chatInput.value.trim();
       if (!text) return;
 
-      const currentModel = getSelectedModel();
       const userMsg = { type: 'user-message', content: text };
       renderBubble(userMsg, true);
       chatInput.value = '';
@@ -252,7 +231,7 @@
         <span class="spinner-grow spinner-grow-sm text-danger"></span>
         <span class="spinner-grow spinner-grow-sm text-danger ms-1"></span>
         <span class="spinner-grow spinner-grow-sm text-danger ms-1"></span>
-        <small class="text-muted ms-2" style="font-size: 11px;">Đang suy nghĩ...</small>
+        <small class="text-muted ms-2" style="font-size: 11px;">Đang tìm kiếm tài liệu...</small>
       </div>`;
       chatBody.appendChild(loadingDiv);
       chatBody.scrollTop = chatBody.scrollHeight;
@@ -265,8 +244,7 @@
             'Authorization': 'Bearer ' + STATE.token
           },
           body: JSON.stringify({
-            message: text,
-            model: currentModel
+            message: text
           })
         });
 
@@ -275,9 +253,10 @@
 
         const aiMsg = {
           type: 'ai-message',
-          content: res.ok ? data.answer : ('Có lỗi xảy ra: ' + (data.detail || 'Lỗi server')),
+          content: res.ok ? data.answer : ('Có lỗi xảy ra: ' + (data.detail || data.message || 'Lỗi server')),
           sources: res.ok ? data.sources : [],
-          model: (data && data.model_used) ? data.model_used : currentModel
+          ragUsed: res.ok ? data.rag_used : false,
+          model: (data && data.model_used) ? data.model_used : ''
         };
         renderBubble(aiMsg, true);
 
@@ -301,4 +280,3 @@
     });
   }
 })();
-

@@ -47,4 +47,21 @@ public class DocumentController {
         documentService.deleteDocument(docId);
         return ResponseEntity.ok(Map.of("message", "Xóa tài liệu thành công"));
     }
+
+    /**
+     * Trigger re-index thủ công — dùng khi thay đổi cấu hình chunk hoặc muốn embed lại.
+     */
+    @PostMapping("/{docId}/reindex")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<DocumentResponse> reindexDocument(@PathVariable("docId") Integer docId) {
+        return ResponseEntity.ok(documentService.reindexDocument(docId));
+    }
+
+    /**
+     * Poll trạng thái indexing — frontend dùng để cập nhật UI real-time.
+     */
+    @GetMapping("/{docId}/status")
+    public ResponseEntity<DocumentResponse> getDocumentStatus(@PathVariable("docId") Integer docId) {
+        return ResponseEntity.ok(documentService.getDocumentStatus(docId));
+    }
 }

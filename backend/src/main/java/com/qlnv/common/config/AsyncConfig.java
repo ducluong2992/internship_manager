@@ -29,4 +29,23 @@ public class AsyncConfig {
         executor.initialize();
         return executor;
     }
+
+    /**
+     * Executor riêng cho RAG indexing (chunk + embed).
+     * Dùng 1 thread sequential để tránh SQLite write contention.
+     * Queue 20: tối đa 20 tài liệu chờ index đồng thời.
+     */
+    @Bean(name = "ragIndexExecutor")
+    public Executor ragIndexExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(1);
+        executor.setMaxPoolSize(2);
+        executor.setQueueCapacity(20);
+        executor.setThreadNamePrefix("rag-index-");
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(120);
+        executor.initialize();
+        return executor;
+    }
 }
+

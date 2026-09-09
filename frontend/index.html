@@ -14,7 +14,7 @@
     rel="stylesheet" />
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" />
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
-  <link href="static/style.css?v=3.2" rel="stylesheet" />
+  <link href="static/style.css?v=3.3" rel="stylesheet" />
 </head>
 
 <body>
@@ -557,59 +557,73 @@
 
   <!-- ═══════════════════════ OT REGISTER MODAL ═══════════════════════ -->
   <div class="modal fade" id="modal-ot-register" tabindex="-1">
-    <div class="modal-dialog">
-      <div class="modal-content glass-modal">
-        <div class="modal-header">
-          <h5 class="modal-title" id="modal-ot-title">Đăng ký OT</h5>
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content glass-modal border-0 shadow-lg">
+        <div class="modal-header border-bottom border-light pb-3">
+          <h5 class="modal-title fw-bold d-flex align-items-center gap-2" id="modal-ot-title">
+            <span class="d-inline-flex align-items-center justify-content-center rounded-circle bg-danger bg-opacity-10 text-danger" style="width:34px;height:34px;font-size:1rem;">
+              <i class="bi bi-alarm-fill"></i>
+            </span>
+            Đăng ký OT
+          </h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
-        <div class="modal-body">
+        <div class="modal-body px-4 py-3">
           <form id="form-ot-register">
             <input type="hidden" id="ot-edit-id" />
+
+            <!-- Ngày -->
             <div class="row g-3 mb-3">
               <div class="col-6">
-                <label class="form-label fw-semibold">Từ ngày *</label>
-                <input id="ot-date" type="date" class="form-control" />
+                <label class="form-label fw-semibold small text-uppercase text-muted ls-1">Từ ngày <span class="text-danger">*</span></label>
+                <input id="ot-date" type="date" class="form-control form-control-sm rounded-3" style="color-scheme:light;" />
               </div>
               <div class="col-6">
-                <label class="form-label fw-semibold">Đến ngày <small class="text-muted">(tùy chọn)</small></label>
-                <input id="ot-end-date" type="date" class="form-control" placeholder="Nếu đăng ký nhiều ngày" />
+                <label class="form-label fw-semibold small text-uppercase text-muted ls-1">Đến ngày <span class="text-muted fw-normal">(tùy chọn)</span></label>
+                <input id="ot-end-date" type="date" class="form-control form-control-sm rounded-3" style="color-scheme:light;" />
               </div>
             </div>
+
+            <!-- Giờ -->
             <div class="row g-3 mb-3">
               <div class="col-6 position-relative">
-                <label class="form-label fw-semibold">Giờ bắt đầu *</label>
+                <label class="form-label fw-semibold small text-uppercase text-muted ls-1">Giờ bắt đầu <span class="text-danger">*</span></label>
                 <div class="input-time-native-wrap">
-                  <input id="ot-start" type="text" class="form-control" placeholder="18:30" maxlength="5" />
+                  <input id="ot-start" type="text" class="form-control form-control-sm rounded-3 ot-placeholder" placeholder="18:30" maxlength="5" />
                   <span class="time-clock-btn" data-target="ot-start"><i class="bi bi-clock"></i></span>
                 </div>
                 <div id="picker-ot-start" class="native-time-picker-popup d-none"></div>
               </div>
               <div class="col-6 position-relative">
-                <label class="form-label fw-semibold">Giờ kết thúc *</label>
+                <label class="form-label fw-semibold small text-uppercase text-muted ls-1">Giờ kết thúc <span class="text-danger">*</span></label>
                 <div class="input-time-native-wrap">
-                  <input id="ot-end" type="text" class="form-control" placeholder="22:00" maxlength="5" />
+                  <input id="ot-end" type="text" class="form-control form-control-sm rounded-3 ot-placeholder" placeholder="22:00" maxlength="5" />
                   <span class="time-clock-btn" data-target="ot-end"><i class="bi bi-clock"></i></span>
                 </div>
                 <div id="picker-ot-end" class="native-time-picker-popup d-none"></div>
               </div>
             </div>
+
             <!-- Cảnh báo giờ OT -->
-            <div id="ot-time-warning" class="d-none alert alert-warning py-2 small mb-3">
+            <div id="ot-time-warning" class="d-none alert alert-warning py-2 small mb-3 rounded-3">
               <i class="bi bi-exclamation-triangle-fill me-1"></i>
               <span id="ot-time-warning-text"></span>
             </div>
+
             <!-- Checkbox ngày lễ -->
-            <div class="mb-3 form-check">
-              <input class="form-check-input" type="checkbox" id="ot-is-holiday" />
-              <label class="form-check-label fw-semibold" for="ot-is-holiday">
-                Ngày lễ / Nghỉ bù
-                <small class="text-muted ms-1">(hệ số 3.0 / 3.9)</small>
-              </label>
+            <div class="mb-3">
+              <div class="form-check ot-holiday-check p-3 rounded-3" style="background:rgba(220,53,69,.06);border:1px dashed rgba(220,53,69,.3);padding-left:2.5rem!important;">
+                <input class="form-check-input mt-1" type="checkbox" id="ot-is-holiday" />
+                <label class="form-check-label fw-semibold" for="ot-is-holiday">
+                  <i class="bi bi-calendar-heart text-danger me-1"></i>Ngày lễ / Nghỉ bù
+                  <small class="text-muted ms-1 fw-normal">(hệ số 3.0 / 3.9)</small>
+                </label>
+              </div>
             </div>
+
             <!-- Preview tự động tách đoạn -->
             <div id="ot-calc-preview" class="d-none mb-3">
-              <div class="p-3 rounded" style="background:rgba(30,90,200,.07);border:1px solid rgba(30,90,200,.18)">
+              <div class="p-3 rounded-3" style="background:rgba(30,90,200,.07);border:1px solid rgba(30,90,200,.18)">
                 <div class="fw-semibold small mb-2 text-primary">
                   <i class="bi bi-scissors me-1"></i>Phân tích hệ số OT
                 </div>
@@ -625,16 +639,27 @@
                 </div>
               </div>
             </div>
-            <div class="mb-3">
-              <label class="form-label fw-semibold">Lý do OT</label>
-              <textarea id="ot-reason" class="form-control" rows="3"
-                placeholder="Cú pháp: [Tên QLTT yêu cầu] - [Công việc cụ thể] (Ví dụ: lucnv11 - upcode...)"></textarea>
+
+            <!-- Lý do OT -->
+            <div class="mb-1">
+              <label class="form-label fw-semibold small text-uppercase text-muted ls-1">Lý do OT</label>
+              <textarea id="ot-reason" class="form-control rounded-3 ot-placeholder" rows="3"
+                placeholder="VD: lucnv11 - upcode dự án ABC..."></textarea>
+              <div class="form-text text-muted" style="font-size:.75rem;">
+                <i class="bi bi-info-circle me-1"></i>Cú pháp: [Tên QLTT yêu cầu] - [Công việc cụ thể]
+              </div>
             </div>
           </form>
         </div>
-        <div class="modal-footer">
-          <button class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
-          <button class="btn btn-danger" id="btn-save-ot"><i class="bi bi-check-lg me-1"></i>Đăng ký</button>
+
+        <!-- Footer: 2 nút to, căn giữa -->
+        <div class="modal-footer border-top border-light justify-content-center gap-3 py-3">
+          <button class="btn btn-outline-secondary px-5 py-2 rounded-3 fw-semibold" data-bs-dismiss="modal" style="min-width:130px;">
+            <i class="bi bi-x-lg me-1"></i>Hủy
+          </button>
+          <button class="btn btn-danger px-5 py-2 rounded-3 fw-semibold shadow-sm" id="btn-save-ot" style="min-width:130px;">
+            <i class="bi bi-check-lg me-1"></i>Đăng ký
+          </button>
         </div>
       </div>
     </div>
@@ -813,20 +838,6 @@
             <i class="bi bi-x-lg"></i>
           </button>
         </div>
-      </div>
-
-      <!-- Model Selector & Test Key Toolbar -->
-      <div class="chat-toolbar">
-        <div class="d-flex align-items-center gap-1 flex-grow-1">
-          <i class="bi bi-cpu text-danger" style="font-size: 13px;"></i>
-          <select id="chat-model-select" class="form-select form-select-sm chat-model-dropdown" title="Chọn Model Gemini">
-            <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash Lite</option>
-            <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash Lite</option>
-          </select>
-        </div>
-        <button id="chat-test-key-btn" type="button" class="btn btn-sm chat-test-btn" title="Kiểm tra kết nối API Key & Model">
-          <i class="bi bi-lightning-charge-fill me-1"></i>Test Key
-        </button>
       </div>
 
       <!-- Test Key / Notification Banner -->

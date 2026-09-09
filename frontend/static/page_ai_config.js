@@ -13,14 +13,14 @@ async function renderAIConfig(area) {
     maskedKey = '•'.repeat(25) + (keyStr.length > 4 ? keyStr.slice(-4) : '');
   }
 
-  const currentChatModel = config.chat_model || 'gemini-3.1-flash-lite';
+  const currentChatModel = config.chat_model || 'gemini-2.5-flash';
 
   area.innerHTML = `
 <div class="row justify-content-center">
-  <div class="col-lg-8">
+  <div class="col-lg-7 col-md-9">
     <div class="glass-card p-4">
       <div class="section-header mb-4 d-flex justify-content-between align-items-center">
-        <div class="section-title"><i class="bi bi-robot text-danger me-2"></i>Cấu hình Trợ lý AI & Gemini Models</div>
+        <div class="section-title"><i class="bi bi-robot text-danger me-2"></i>Cấu hình Trợ lý AI</div>
         <button type="button" class="btn btn-outline-danger btn-sm" id="btn-test-cfg-key">
           <i class="bi bi-lightning-charge-fill me-1"></i>Kiểm tra kết nối Key
         </button>
@@ -30,51 +30,36 @@ async function renderAIConfig(area) {
       
       <form id="form-ai-config">
         <div class="row g-3">
-          <div class="col-md-6">
-            <label class="form-label fw-semibold">Provider</label>
+          <div class="col-12">
+            <label class="form-label fw-semibold">Nhà cung cấp (Provider)</label>
             <input type="text" class="form-control" id="cfg-provider" value="${config.provider || 'Google Gemini'}" readonly>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label fw-semibold">API Key</label>
-            <div class="input-group">
-              <input type="text" class="form-control" id="cfg-api-key" placeholder="Nhập API Key mới để cập nhật" value="${maskedKey}">
-            </div>
-            <div class="form-text text-muted">${config.api_key ? 'Đã cấu hình API Key. Nhập chuỗi mới để thay đổi.' : 'Chưa cấu hình API Key.'}</div>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label fw-semibold">Chat Model mặc định</label>
-            <select class="form-select" id="cfg-chat-model">
-              <option value="gemini-3.1-flash-lite" ${currentChatModel === 'gemini-3.1-flash-lite' ? 'selected' : ''}>gemini-3.1-flash-lite (Khuyến nghị)</option>
-              <option value="gemini-3.5-flash-lite" ${currentChatModel === 'gemini-3.5-flash-lite' ? 'selected' : ''}>gemini-3.5-flash-lite</option>
-              <option value="gemini-flash-latest" ${currentChatModel === 'gemini-flash-latest' ? 'selected' : ''}>gemini-flash-latest</option>
-              <option value="gemini-flash-lite-latest" ${currentChatModel === 'gemini-flash-lite-latest' ? 'selected' : ''}>gemini-flash-lite-latest</option>
-              <option value="gemini-2.5-flash-lite" ${currentChatModel === 'gemini-2.5-flash-lite' ? 'selected' : ''}>gemini-2.5-flash-lite</option>
-            </select>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label fw-semibold">Embedding Model</label>
-            <input type="text" class="form-control" id="cfg-embedding-model" value="${config.embedding_model || 'gemini-embedding-001'}">
-            <div class="form-text text-muted">Model tạo vector tài liệu: gemini-embedding-001, text-embedding-004</div>
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">Top K (Số đoạn trích)</label>
-            <input type="number" class="form-control" id="cfg-top-k" value="${config.top_k || 5}">
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">Chunk Size</label>
-            <input type="number" class="form-control" id="cfg-chunk-size" value="${config.chunk_size || 1000}">
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">Overlap</label>
-            <input type="number" class="form-control" id="cfg-overlap" value="${config.overlap || 150}">
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">Temperature</label>
-            <input type="number" step="0.1" max="2" min="0" class="form-control" id="cfg-temp" value="${config.temperature !== undefined ? config.temperature : 0.2}">
+            <div class="form-text text-muted">Dịch vụ AI được tích hợp trong hệ thống: Google Gemini.</div>
           </div>
           
-          <div class="col-12 d-flex justify-content-end gap-2 mt-4">
-            <button type="submit" class="btn btn-danger btn-sm px-4" id="btn-save-cfg"><i class="bi bi-check-lg me-1"></i>Lưu cấu hình</button>
+          <div class="col-12">
+            <label class="form-label fw-semibold">Google Gemini API Key <span class="text-danger">*</span></label>
+            <div class="input-group">
+              <input type="text" class="form-control font-monospace" id="cfg-api-key" placeholder="Nhập API Key mới để cập nhật" value="${maskedKey}">
+            </div>
+            <div class="form-text text-muted">${config.api_key ? '<i class="bi bi-shield-check text-success me-1"></i>Đã cấu hình API Key. Nhập chuỗi mới để thay đổi.' : '<i class="bi bi-exclamation-circle text-warning me-1"></i>Chưa cấu hình API Key.'}</div>
+          </div>
+
+          <div class="col-12">
+            <label class="form-label fw-semibold">Model AI <span class="text-danger">*</span></label>
+            <select class="form-select" id="cfg-chat-model">
+              <option value="gemini-2.5-flash" ${currentChatModel === 'gemini-2.5-flash' ? 'selected' : ''}>Gemini 2.5 Flash (Khuyến nghị - Nhanh & Chính xác)</option>
+              <option value="gemini-2.5-pro" ${currentChatModel === 'gemini-2.5-pro' ? 'selected' : ''}>Gemini 2.5 Pro (Suy luận sâu & Nâng cao)</option>
+              <option value="gemini-2.0-flash" ${currentChatModel === 'gemini-2.0-flash' ? 'selected' : ''}>Gemini 2.0 Flash</option>
+              <option value="gemini-1.5-flash" ${currentChatModel === 'gemini-1.5-flash' ? 'selected' : ''}>Gemini 1.5 Flash</option>
+              <option value="gemini-1.5-pro" ${currentChatModel === 'gemini-1.5-pro' ? 'selected' : ''}>Gemini 1.5 Pro</option>
+              <option value="gemini-3.1-flash-lite" ${currentChatModel === 'gemini-3.1-flash-lite' ? 'selected' : ''}>Gemini 3.1 Flash Lite</option>
+              <option value="gemini-3.5-flash-lite" ${currentChatModel === 'gemini-3.5-flash-lite' ? 'selected' : ''}>Gemini 3.5 Flash Lite</option>
+            </select>
+            <div class="form-text text-muted">Mô hình AI sẽ được áp dụng trực tiếp cho toàn bộ câu trả lời trong Chatbox.</div>
+          </div>
+          
+          <div class="col-12 d-flex justify-content-end gap-2 mt-4 pt-2 border-top">
+            <button type="submit" class="btn btn-danger px-4" id="btn-save-cfg"><i class="bi bi-check-lg me-1"></i>Lưu cấu hình</button>
           </div>
         </div>
       </form>
@@ -126,12 +111,8 @@ async function renderAIConfig(area) {
     btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang lưu...';
 
     const payload = {
-      chat_model: document.getElementById('cfg-chat-model').value,
-      embedding_model: document.getElementById('cfg-embedding-model').value,
-      top_k: parseInt(document.getElementById('cfg-top-k').value),
-      chunk_size: parseInt(document.getElementById('cfg-chunk-size').value),
-      overlap: parseInt(document.getElementById('cfg-overlap').value),
-      temperature: parseFloat(document.getElementById('cfg-temp').value)
+      provider: document.getElementById('cfg-provider').value,
+      chat_model: document.getElementById('cfg-chat-model').value
     };
 
     const apiKey = document.getElementById('cfg-api-key').value.trim();
@@ -141,7 +122,7 @@ async function renderAIConfig(area) {
 
     try {
       await api('POST', '/api/ai-config', payload);
-      toast('Lưu cấu hình thành công!');
+      toast('Lưu cấu hình AI thành công!');
       renderAIConfig(area);
     } catch(err) {
       toast('Lỗi: ' + err.message, 'danger');

@@ -26,4 +26,17 @@ public class DocumentResponse {
     @JsonProperty("created_at")
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime createdAt;
+
+    /** Trạng thái RAG indexing: PENDING / INDEXING / INDEXED / ERROR */
+    @JsonProperty("index_status")
+    private String indexStatus;
+
+    /** Số chunk đã tạo sau khi index */
+    @JsonProperty("chunk_count")
+    private Integer chunkCount;
+
+    /** Thời điểm index hoàn thành */
+    @JsonProperty("indexed_at")
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
+    private LocalDateTime indexedAt;
 }
