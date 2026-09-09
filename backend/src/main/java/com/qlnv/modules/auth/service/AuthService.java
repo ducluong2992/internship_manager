@@ -27,7 +27,12 @@ public class AuthService {
     private final JwtTokenProvider tokenProvider;
 
     public TokenResponse login(LoginRequest req) {
-        Account account = accountRepository.findByUsername(req.getUsername().trim())
+        String input = req.getUsername().trim();
+        Account account = accountRepository.findByUsername(input)
+                .or(() -> accountRepository.findByUsername(input.toLowerCase()))
+                .or(() -> userRepository.findByViettelEmail(input).flatMap(u -> accountRepository.findByUserId(u.getId())))
+                .or(() -> userRepository.findByViettelEmail(input.toLowerCase()).flatMap(u -> accountRepository.findByUserId(u.getId())))
+                .or(() -> userRepository.findByEmployeeCode(input).flatMap(u -> accountRepository.findByUserId(u.getId())))
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Tài khoản hoặc mật khẩu không chính xác"));
 
         if (!passwordEncoder.matches(req.getPassword(), account.getPassword())) {

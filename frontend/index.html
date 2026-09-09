@@ -303,115 +303,7 @@
     </div>
   </div>
 
-  <!-- Modal Đối chiếu Import Link Google Sheet cho Thực tập sinh -->
-  <div class="modal fade" id="modal-import-reconcile" tabindex="-1" data-bs-backdrop="static">
-    <div class="modal-dialog modal-dialog-scrollable" style="max-width: 680px;">
-      <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; overflow: hidden; font-size: 13px;">
-        <div class="modal-header text-white py-2 px-3" style="background: #d5001c !important;">
-          <div class="d-flex align-items-center gap-2">
-            <i class="bi bi-arrow-repeat fs-6"></i>
-            <h6 class="modal-title fw-bold mb-0 text-white fs-6" id="modal-reconcile-title">Kết quả đối chiếu dữ liệu
-              Thực tập sinh</h6>
-          </div>
-          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"
-            style="font-size: 10px;"></button>
-        </div>
 
-        <div class="modal-body p-3 bg-light">
-          <!-- Warnings container for Excel cell format issues -->
-          <div id="reconcile-warnings-container"></div>
-
-          <!-- Summary count pills bar -->
-          <div class="d-flex flex-wrap gap-2 mb-3 p-2 bg-white rounded-2 border">
-            <div class="stat-pill border bg-light text-dark d-flex align-items-center gap-2 px-2 py-1 rounded-2"
-              style="flex: 1; min-width: 120px;">
-              <i class="bi bi-pencil-square text-secondary"></i>
-              <div>
-                <div class="text-muted" style="font-size: 11px;">Thay đổi thông tin</div>
-                <div class="fw-bold" id="rec-count-updated" style="font-size: 13px;">0</div>
-              </div>
-            </div>
-            <div class="stat-pill border bg-light text-dark d-flex align-items-center gap-2 px-2 py-1 rounded-2"
-              style="flex: 1; min-width: 120px;">
-              <i class="bi bi-person-plus text-secondary"></i>
-              <div>
-                <div class="text-muted" style="font-size: 11px;">Thêm mới</div>
-                <div class="fw-bold" id="rec-count-added" style="font-size: 13px;">0</div>
-              </div>
-            </div>
-            <div class="stat-pill border bg-light text-dark d-flex align-items-center gap-2 px-2 py-1 rounded-2"
-              style="flex: 1; min-width: 120px;">
-              <i class="bi bi-person-x text-secondary"></i>
-              <div>
-                <div class="text-muted" style="font-size: 11px;">Chỉ có trên Web</div>
-                <div class="fw-bold" id="rec-count-removed" style="font-size: 13px;">0</div>
-              </div>
-            </div>
-            <div class="stat-pill border bg-light text-dark d-flex align-items-center gap-2 px-2 py-1 rounded-2"
-              style="flex: 1; min-width: 120px;">
-              <i class="bi bi-check-circle text-secondary"></i>
-              <div>
-                <div class="text-muted" style="font-size: 11px;">Không thay đổi</div>
-                <div class="fw-bold" id="rec-count-unchanged" style="font-size: 13px;">0</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Section 1: TTS Thay đổi thông tin -->
-          <div class="reconcile-section mb-3" id="section-rec-updated">
-            <div
-              class="section-card-header bg-white border rounded-top p-2 px-3 d-flex align-items-center justify-content-between">
-              <span class="fw-bold text-dark" style="font-size: 13px;">Thực tập sinh thay đổi thông tin</span>
-              <span class="badge bg-light text-dark border fw-normal" id="badge-count-updated"
-                style="font-size: 11px;">0 người</span>
-            </div>
-            <div class="p-2 bg-white border border-top-0 rounded-bottom">
-              <div id="list-rec-updated" class="d-flex flex-column gap-2"></div>
-            </div>
-          </div>
-
-          <!-- Section 2: TTS Thêm mới -->
-          <div class="reconcile-section mb-3" id="section-rec-added">
-            <div
-              class="section-card-header bg-white border rounded-top p-2 px-3 d-flex align-items-center justify-content-between">
-              <span class="fw-bold text-dark" style="font-size: 13px;">Thực tập sinh thêm mới</span>
-              <span class="badge bg-light text-dark border fw-normal" id="badge-count-added" style="font-size: 11px;">0
-                người</span>
-            </div>
-            <div class="p-2 bg-white border border-top-0 rounded-bottom">
-              <div id="list-rec-added" class="d-flex flex-column gap-2"></div>
-            </div>
-          </div>
-
-          <!-- Section 3: TTS Chỉ có trên Web -->
-          <div class="reconcile-section mb-2" id="section-rec-removed">
-            <div
-              class="section-card-header bg-white border rounded-top p-2 px-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
-              <span class="fw-bold text-dark" style="font-size: 13px;">Thực tập sinh chỉ có trên Web</span>
-              <div class="d-flex align-items-center gap-1">
-                <button type="button" class="btn btn-sm btn-light border py-0 px-2 text-dark" style="font-size: 11px;"
-                  onclick="setAllRemovedChoice('keep')">Giữ lại tất cả</button>
-                <button type="button" class="btn btn-sm btn-light border py-0 px-2 text-danger" style="font-size: 11px;"
-                  onclick="setAllRemovedChoice('delete')">Xóa tất cả</button>
-                <span class="badge bg-light text-dark border fw-normal ms-1" id="badge-count-removed"
-                  style="font-size: 11px;">0 người</span>
-              </div>
-            </div>
-            <div class="p-2 bg-white border border-top-0 rounded-bottom">
-              <div id="list-rec-removed" class="d-flex flex-column gap-2"></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="modal-footer bg-light border-top px-3 py-2">
-          <button type="button" class="btn btn-sm btn-outline-secondary px-3" data-bs-dismiss="modal"
-            style="font-size: 12px;">Hủy bỏ</button>
-          <button type="button" class="btn btn-sm btn-danger px-3 fw-bold shadow-sm" id="btn-confirm-reconcile"
-            style="font-size: 12px; background: #d5001c !important;">Xác nhận & Cập nhật</button>
-        </div>
-      </div>
-    </div>
-  </div>
 
   <!-- Employee Modal -->
   <div class="modal fade" id="modal-employee" tabindex="-1">
@@ -967,24 +859,55 @@
         </form>
       </div>
     </div>
-  </div>
+  <!-- Modal Tiến trình Import Bất đồng bộ (Async Job Progress) -->
+  <div class="modal fade" id="modal-job-progress" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 480px;">
+      <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; overflow: hidden;">
+        <div class="modal-header py-2 px-3 bg-light border-bottom">
+          <div class="d-flex align-items-center gap-2">
+            <div id="job-progress-header-icon" class="spinner-border spinner-border-sm text-primary" role="status"></div>
+            <h6 class="modal-title fw-bold mb-0 text-dark fs-6" id="job-progress-title">Tiến trình xử lý</h6>
+          </div>
+          <button type="button" class="btn-close d-none" id="job-progress-btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body p-4 text-center">
+          <div class="mb-3">
+            <div id="job-progress-status-badge" class="badge bg-primary px-3 py-2 fs-6 fw-normal mb-2">Đang khởi tạo...</div>
+            <div id="job-progress-filename" class="text-muted small"></div>
+          </div>
 
+          <!-- Progress bar -->
+          <div class="progress mb-3" style="height: 16px; border-radius: 8px; background-color: #e9ecef;">
+            <div id="job-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-danger" 
+                 role="progressbar" style="width: 5%; font-size: 11px; font-weight: 600;" aria-valuenow="5" aria-valuemin="0" aria-valuemax="100">5%</div>
+          </div>
+
+          <!-- Detail info -->
+          <p id="job-progress-detail" class="text-secondary small mb-1">Đang gửi yêu cầu vào hàng đợi...</p>
+          <div id="job-progress-error" class="alert alert-danger small p-2 mt-3 d-none text-start"></div>
+        </div>
+        <div class="modal-footer bg-light py-2 px-3 border-top justify-content-end">
+          <button type="button" class="btn btn-secondary btn-sm d-none" id="job-progress-btn-done" data-bs-dismiss="modal">Đóng</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="static/pages.js?v=5.2"></script>
-  <script src="static/page_users.js?v=5.0"></script>
-  <script src="static/page_periods.js?v=5.0"></script>
-  <script src="static/page_admin_schedule.js?v=5.0"></script>
-  <script src="static/page_profile.js?v=5.0"></script>
-  <script src="static/page_schedule.js?v=5.0"></script>
-  <script src="static/page_accounts.js?v=5.0"></script>
-  <script src="static/page_employees.js?v=5.0"></script>
-  <script src="static/page_documents.js?v=5.0"></script>
-  <script src="static/page_ai_config.js?v=5.5"></script>
-  <script src="static/chat.js?v=5.5"></script>
-  <script src="static/page_ot.js?v=5.5"></script>
-  <script src="static/app.js?v=5.5"></script>
+  <script src="static/pages.js?v=5.7"></script>
+  <script src="static/page_users.js?v=5.7"></script>
+  <script src="static/page_periods.js?v=5.7"></script>
+  <script src="static/page_admin_schedule.js?v=5.7"></script>
+  <script src="static/page_profile.js?v=5.7"></script>
+  <script src="static/page_schedule.js?v=5.7"></script>
+  <script src="static/page_accounts.js?v=5.7"></script>
+  <script src="static/page_employees.js?v=5.7"></script>
+  <script src="static/page_documents.js?v=5.7"></script>
+  <script src="static/page_ai_config.js?v=5.7"></script>
+  <script src="static/chat.js?v=5.7"></script>
+  <script src="static/page_ot.js?v=5.7"></script>
+  <script src="static/app.js?v=5.7"></script>
 
 </body>
 

@@ -36,9 +36,16 @@ public class OvertimeController {
     }
 
     @PostMapping("/preview")
-    public ResponseEntity<List<OvertimeCalculator.Segment>> previewOvertime(
+    public ResponseEntity<Map<String, Object>> previewOvertime(
             @Valid @RequestBody OvertimeRequestDto req) {
-        return ResponseEntity.ok(overtimeService.preview(req));
+        List<OvertimeCalculator.Segment> segments = overtimeService.preview(req);
+        double totalRaw = segments.stream().mapToDouble(s -> s.getRawHours() != null ? s.getRawHours() : 0.0).sum();
+        double totalWeighted = segments.stream().mapToDouble(s -> s.getWeightedHours() != null ? s.getWeightedHours() : 0.0).sum();
+        return ResponseEntity.ok(Map.of(
+                "segments", segments,
+                "total_raw_hours", Math.round(totalRaw * 100.0) / 100.0,
+                "total_weighted_hours", Math.round(totalWeighted * 100.0) / 100.0
+        ));
     }
 
     @GetMapping("/my")
@@ -46,22 +53,22 @@ public class OvertimeController {
             @AuthenticationPrincipal UserPrincipal principal,
             @RequestParam(required = false, name = "from_date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
             @RequestParam(required = false, name = "to_date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
-            @RequestParam(required = false) String status) {
+            @RequestParam(value = "status", required = false) String status) {
         return ResponseEntity.ok(overtimeService.getMyOvertime(principal.getId(), fromDate, toDate, status));
     }
 
     @GetMapping("/my/stats")
     public ResponseEntity<Map<String, Object>> getMyStats(
             @AuthenticationPrincipal UserPrincipal principal,
-            @RequestParam(required = false) Integer month,
-            @RequestParam(required = false) Integer year) {
+            @RequestParam(value = "month", required = false) Integer month,
+            @RequestParam(value = "year", required = false) Integer year) {
         return ResponseEntity.ok(overtimeService.getMyStats(principal.getId(), month, year));
     }
 
     @PutMapping("/{otId}")
     public ResponseEntity<OvertimeResponseDto.Response> updateOvertime(
             @AuthenticationPrincipal UserPrincipal principal,
-            @PathVariable Integer otId,
+            @PathVariable("otId") Integer otId,
             @Valid @RequestBody OvertimeRequestDto req) {
         boolean isAdmin = "admin".equalsIgnoreCase(principal.getRole());
         return ResponseEntity.ok(overtimeService.updateOvertime(principal.getId(), otId, req, isAdmin));
@@ -70,7 +77,7 @@ public class OvertimeController {
     @DeleteMapping("/{otId}")
     public ResponseEntity<Map<String, String>> deleteOvertime(
             @AuthenticationPrincipal UserPrincipal principal,
-            @PathVariable Integer otId) {
+            @PathVariable("otId") Integer otId) {
         boolean isAdmin = "admin".equalsIgnoreCase(principal.getRole());
         overtimeService.deleteOvertime(principal.getId(), otId, isAdmin);
         return ResponseEntity.ok(Map.of("message", "Xóa đơn OT thành công"));
@@ -82,7 +89,7 @@ public class OvertimeController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Map<String, String>> adminDeleteOvertime(
             @AuthenticationPrincipal UserPrincipal principal,
-            @PathVariable Integer otId) {
+            @PathVariable("otId") Integer otId) {
         overtimeService.deleteOvertime(principal.getId(), otId, true);
         return ResponseEntity.ok(Map.of("message", "Admin xóa đơn OT thành công"));
     }
@@ -90,13 +97,13 @@ public class OvertimeController {
     @GetMapping("/admin/list")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<OvertimeResponseDto.Response>> getAdminList(
-            @RequestParam(required = false) String status,
-            @RequestParam(required = false) String project,
-            @RequestParam(required = false) Integer month,
-            @RequestParam(required = false) Integer year,
+            @RequestParam(value = "status", required = false) String status,
+            @RequestParam(value = "project", required = false) String project,
+            @RequestParam(value = "month", required = false) Integer month,
+            @RequestParam(value = "year", required = false) Integer year,
             @RequestParam(required = false, name = "from_date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
             @RequestParam(required = false, name = "to_date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
-            @RequestParam(required = false) String keyword,
+            @RequestParam(value = "keyword", required = false) String keyword,
             @RequestParam(required = false, name = "employee_name") String employeeName) {
         String effectiveKeyword = (keyword != null && !keyword.trim().isEmpty()) ? keyword : employeeName;
         return ResponseEntity.ok(overtimeService.getAdminOvertimeList(status, project, month, year, fromDate, toDate, effectiveKeyword));
@@ -105,10 +112,10 @@ public class OvertimeController {
     @GetMapping("/admin/summary")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Map<String, Object>> getAdminSummary(
-            @RequestParam(required = false) Integer month,
-            @RequestParam(required = false) Integer year,
-            @RequestParam(required = false) String project,
-            @RequestParam(required = false) String keyword,
+            @RequestParam(value = "month", required = false) Integer month,
+            @RequestParam(value = "year", required = false) Integer year,
+            @RequestParam(value = "project", required = false) String project,
+            @RequestParam(value = "keyword", required = false) String keyword,
             @RequestParam(required = false, name = "employee_name") String employeeName) {
         String effectiveKeyword = (keyword != null && !keyword.trim().isEmpty()) ? keyword : employeeName;
         return ResponseEntity.ok(overtimeService.getAdminOvertimeSummary(month, year, project, effectiveKeyword));
@@ -118,7 +125,7 @@ public class OvertimeController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<OvertimeResponseDto.Response> approveOvertime(
             @AuthenticationPrincipal UserPrincipal principal,
-            @PathVariable Integer otId) {
+            @PathVariable("otId") Integer otId) {
         return ResponseEntity.ok(overtimeService.approveOvertime(otId, principal.getId()));
     }
 
@@ -126,7 +133,7 @@ public class OvertimeController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<OvertimeResponseDto.Response> rejectOvertime(
             @AuthenticationPrincipal UserPrincipal principal,
-            @PathVariable Integer otId,
+            @PathVariable("otId") Integer otId,
             @RequestBody(required = false) OvertimeResponseDto.Approve req) {
         String reason = req != null ? req.getRejectReason() : null;
         return ResponseEntity.ok(overtimeService.rejectOvertime(otId, principal.getId(), reason));
@@ -134,7 +141,7 @@ public class OvertimeController {
 
     @PostMapping("/admin/{otId}/reset-pending")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<OvertimeResponseDto.Response> resetPendingOvertime(@PathVariable Integer otId) {
+    public ResponseEntity<OvertimeResponseDto.Response> resetPendingOvertime(@PathVariable("otId") Integer otId) {
         return ResponseEntity.ok(overtimeService.resetPendingOvertime(otId));
     }
 
@@ -150,22 +157,22 @@ public class OvertimeController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Map<String, Object>> approveAllPending(
             @AuthenticationPrincipal UserPrincipal principal,
-            @RequestParam(required = false) Integer month,
-            @RequestParam(required = false) Integer year,
-            @RequestParam(required = false) String project) {
+            @RequestParam(value = "month", required = false) Integer month,
+            @RequestParam(value = "year", required = false) Integer year,
+            @RequestParam(value = "project", required = false) String project) {
         return ResponseEntity.ok(overtimeService.approveAllPending(principal.getId(), month, year, project));
     }
 
     @GetMapping("/admin/export")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<byte[]> exportOvertime(
-            @RequestParam(required = false) String status,
-            @RequestParam(required = false) String project,
-            @RequestParam(required = false) Integer month,
-            @RequestParam(required = false) Integer year,
+            @RequestParam(value = "status", required = false) String status,
+            @RequestParam(value = "project", required = false) String project,
+            @RequestParam(value = "month", required = false) Integer month,
+            @RequestParam(value = "year", required = false) Integer year,
             @RequestParam(required = false, name = "from_date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
             @RequestParam(required = false, name = "to_date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
-            @RequestParam(required = false) String keyword,
+            @RequestParam(value = "keyword", required = false) String keyword,
             @RequestParam(required = false, name = "employee_name") String employeeName) {
         String effectiveKeyword = (keyword != null && !keyword.trim().isEmpty()) ? keyword : employeeName;
         byte[] data = overtimeExportService.exportOvertimeReport(status, project, month, year, fromDate, toDate, effectiveKeyword);

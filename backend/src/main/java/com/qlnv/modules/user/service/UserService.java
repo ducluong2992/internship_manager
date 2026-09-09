@@ -4,6 +4,7 @@ import com.qlnv.common.exception.ApiException;
 import com.qlnv.modules.auth.entity.Account;
 import com.qlnv.modules.auth.repository.AccountRepository;
 import com.qlnv.modules.overtime.repository.OvertimeRequestRepository;
+import com.qlnv.modules.schedule.entity.Schedule;
 import com.qlnv.modules.schedule.repository.ScheduleRepository;
 import com.qlnv.modules.user.dto.AdminAccountRow;
 import com.qlnv.modules.user.dto.ManagerResponse;
@@ -134,7 +135,7 @@ public class UserService {
                 .joinDate(req.getJoinDate())
                 .allowance(req.getAllowance() != null ? req.getAllowance() : "Không")
                 .employeeType(req.getEmployeeType() != null ? req.getEmployeeType() : "TTS Trung tâm")
-                .workingStatus(req.getWorkingStatus() != null ? req.getWorkingStatus() : "Working")
+                .workingStatus(UserExcelService.normalizeWorkingStatus(req.getWorkingStatus()))
                 .employmentType(req.getEmploymentType() != null ? req.getEmploymentType() : "Fulltime")
                 .directManager(req.getDirectManager())
                 .computerSerial(req.getComputerSerial())
@@ -153,13 +154,19 @@ public class UserService {
         user = userRepository.save(user);
 
         // Create Account ONLY for non-interns (Employee / Admin)
-        boolean isIntern = "intern".equalsIgnoreCase(user.getUserType()) || "tts".equalsIgnoreCase(user.getUserType());
+        boolean isIntern = "intern".equalsIgnoreCase(user.getUserType())
+                || "tts".equalsIgnoreCase(user.getUserType())
+                || (req.getUserType() != null && ("intern".equalsIgnoreCase(req.getUserType()) || "tts".equalsIgnoreCase(req.getUserType())))
+                || (user.getEmployeeCode() != null && user.getEmployeeCode().trim().toUpperCase().startsWith("TTS"));
         if (!isIntern) {
-            String rawPassword = req.getPassword() != null && !req.getPassword().isEmpty() ? req.getPassword() : "User@123";
+            String username = (user.getViettelEmail() != null && !user.getViettelEmail().trim().isEmpty())
+                    ? user.getViettelEmail().trim().toLowerCase()
+                    : empCode;
+            String rawPassword = req.getPassword() != null && !req.getPassword().isEmpty() ? req.getPassword() : "123456";
             if (accountRepository.findByUserId(user.getId()).isEmpty()) {
                 Account account = Account.builder()
                         .userId(user.getId())
-                        .username(empCode)
+                        .username(username)
                         .password(passwordEncoder.encode(rawPassword))
                         .createdAt(LocalDateTime.now())
                         .build();
@@ -187,7 +194,17 @@ public class UserService {
         if (req.getUserType() != null) user.setUserType(req.getUserType());
         if (req.getGender() != null) user.setGender(req.getGender());
         if (req.getEthnicity() != null) user.setEthnicity(req.getEthnicity());
-        if (req.getViettelEmail() != null) user.setViettelEmail(req.getViettelEmail());
+        if (req.getViettelEmail() != null) {
+            user.setViettelEmail(req.getViettelEmail());
+            boolean isIntern = "intern".equalsIgnoreCase(user.getUserType()) || "tts".equalsIgnoreCase(user.getUserType());
+            if (!isIntern) {
+                String newUsername = !req.getViettelEmail().trim().isEmpty() ? req.getViettelEmail().trim().toLowerCase() : user.getEmployeeCode();
+                accountRepository.findByUserId(user.getId()).ifPresent(acc -> {
+                    acc.setUsername(newUsername);
+                    accountRepository.save(acc);
+                });
+            }
+        }
         if (req.getBirthday() != null) user.setBirthday(req.getBirthday());
         if (req.getHometown() != null) user.setHometown(req.getHometown());
         if (req.getPhone() != null) user.setPhone(req.getPhone());
@@ -200,7 +217,7 @@ public class UserService {
         if (req.getJoinDate() != null) user.setJoinDate(req.getJoinDate());
         if (req.getAllowance() != null) user.setAllowance(req.getAllowance());
         if (req.getEmployeeType() != null) user.setEmployeeType(req.getEmployeeType());
-        if (req.getWorkingStatus() != null) user.setWorkingStatus(req.getWorkingStatus());
+        if (req.getWorkingStatus() != null) user.setWorkingStatus(UserExcelService.normalizeWorkingStatus(req.getWorkingStatus()));
         if (req.getEmploymentType() != null) user.setEmploymentType(req.getEmploymentType());
         if (req.getDirectManager() != null) user.setDirectManager(req.getDirectManager());
         if (req.getComputerSerial() != null) user.setComputerSerial(req.getComputerSerial());
@@ -230,6 +247,22 @@ public class UserService {
         scheduleRepository.deleteByUserId(id);
         accountRepository.deleteByUserId(id);
         userRepository.delete(user);
+    }
+
+    @Transactional
+    public Map<String, Object> deleteAllByUserType(String userType) {
+        List<User> users = userRepository.findByUserType(userType);
+        int count = 0;
+        for (User user : users) {
+            if ("admin".equalsIgnoreCase(user.getEmployeeCode())) continue;
+            if ("admin".equalsIgnoreCase(user.getRole())) continue;
+            overtimeRequestRepository.deleteByUserId(user.getId());
+            scheduleRepository.deleteByUserId(user.getId());
+            accountRepository.deleteByUserId(user.getId());
+            userRepository.delete(user);
+            count++;
+        }
+        return Map.of("message", "Đã xóa thành công " + count + " bản ghi", "deleted_count", count);
     }
 
     @Transactional
@@ -274,15 +307,18 @@ public class UserService {
         }
         Account account = accountRepository.findByUserId(user.getId())
                 .orElseGet(() -> {
+                    String username = (user.getViettelEmail() != null && !user.getViettelEmail().trim().isEmpty())
+                            ? user.getViettelEmail().trim().toLowerCase()
+                            : user.getEmployeeCode();
                     Account acc = Account.builder()
                             .userId(user.getId())
-                            .username(user.getEmployeeCode())
+                            .username(username)
                             .createdAt(LocalDateTime.now())
                             .build();
                     return acc;
                 });
 
-        String pwd = (newPassword != null && !newPassword.trim().isEmpty()) ? newPassword.trim() : "User@123";
+        String pwd = (newPassword != null && !newPassword.trim().isEmpty()) ? newPassword.trim() : "123456";
         account.setPassword(passwordEncoder.encode(pwd));
         accountRepository.save(account);
 
@@ -298,11 +334,14 @@ public class UserService {
                 .filter(u -> !"intern".equalsIgnoreCase(u.getUserType()) && !"tts".equalsIgnoreCase(u.getUserType()))
                 .map(u -> {
                     Account acc = accountMap.get(u.getId());
+                    String defaultUsername = (u.getViettelEmail() != null && !u.getViettelEmail().trim().isEmpty())
+                            ? u.getViettelEmail().trim().toLowerCase()
+                            : u.getEmployeeCode();
                     return AdminAccountRow.builder()
                             .userId(u.getId())
                             .employeeCode(u.getEmployeeCode())
                             .fullName(u.getFullName())
-                            .username(acc != null ? acc.getUsername() : u.getEmployeeCode())
+                            .username(acc != null ? acc.getUsername() : defaultUsername)
                             .password(acc != null ? "••••••••" : "Chưa tạo")
                             .accountStatus(u.getAccountStatus() != null ? u.getAccountStatus() : 1)
                             .role(u.getRole())
@@ -336,8 +375,8 @@ public class UserService {
         List<User> interns = all.stream().filter(u -> "intern".equalsIgnoreCase(u.getUserType())).collect(Collectors.toList());
         List<User> employees = all.stream().filter(u -> "employee".equalsIgnoreCase(u.getUserType())).collect(Collectors.toList());
 
-        long workingInterns = interns.stream().filter(u -> "working".equalsIgnoreCase(u.getWorkingStatus())).count();
-        long resignedInterns = interns.stream().filter(u -> "resigned".equalsIgnoreCase(u.getWorkingStatus())).count();
+        long workingInterns = interns.stream().filter(u -> "working".equalsIgnoreCase(UserExcelService.normalizeWorkingStatus(u.getWorkingStatus()))).count();
+        long resignedInterns = interns.stream().filter(u -> "resigned".equalsIgnoreCase(UserExcelService.normalizeWorkingStatus(u.getWorkingStatus()))).count();
         long fulltime = interns.stream().filter(u -> "fulltime".equalsIgnoreCase(u.getEmploymentType())).count();
         long parttime = interns.stream().filter(u -> "parttime".equalsIgnoreCase(u.getEmploymentType())).count();
         long internCount = interns.stream().filter(u -> {
@@ -378,12 +417,16 @@ public class UserService {
         long activeAccounts = all.stream().filter(u -> u.getAccountStatus() != null && u.getAccountStatus() == 1).count();
         long lockedAccounts = all.stream().filter(u -> u.getAccountStatus() != null && u.getAccountStatus() == 0).count();
 
+        long workingEmployees = Math.max(0, employees.size() - empResigned);
+
         Map<String, Object> stats = new HashMap<>();
         stats.put("total_users", totalUsers);
         stats.put("total_interns", interns.size());
         stats.put("total_employees", employees.size());
         stats.put("working", workingInterns);
         stats.put("working_interns", workingInterns);
+        stats.put("working_employees", workingEmployees);
+        stats.put("emp_working", workingEmployees);
         stats.put("resigned", resignedInterns);
         stats.put("resigned_interns", resignedInterns);
         stats.put("fulltime", fulltime);
@@ -401,6 +444,40 @@ public class UserService {
 
         stats.put("active_accounts", activeAccounts);
         stats.put("locked_accounts", lockedAccounts);
+
+        // ─── Today Workers (TTS đi làm hôm nay: S = Sáng, C = Chiều, SC = Cả ngày) ───
+        LocalDate today = LocalDate.now();
+        List<Schedule> todaySchedules = scheduleRepository.findByWorkDay(today);
+        List<Map<String, Object>> todayWorkers = new ArrayList<>();
+        for (Schedule s : todaySchedules) {
+            String shift = s.getShift() != null ? s.getShift().trim().toUpperCase() : "";
+            if ("S".equals(shift) || "C".equals(shift) || "SC".equals(shift)) {
+                User u = s.getUser();
+                if (u == null && s.getUserId() != null) {
+                    u = userRepository.findById(s.getUserId()).orElse(null);
+                }
+                if (u != null) {
+                    boolean isIntern = "intern".equalsIgnoreCase(u.getUserType())
+                            || "tts".equalsIgnoreCase(u.getUserType())
+                            || (u.getEmployeeCode() != null && u.getEmployeeCode().toUpperCase().startsWith("TTS"));
+                    if (isIntern) {
+                        Map<String, Object> w = new HashMap<>();
+                        w.put("id", s.getId());
+                        w.put("user_id", u.getId());
+                        w.put("employee_code", u.getEmployeeCode());
+                        w.put("full_name", u.getFullName());
+                        w.put("project", u.getProject() != null && !u.getProject().trim().isEmpty() ? u.getProject() : "—");
+                        w.put("position", u.getPosition() != null && !u.getPosition().trim().isEmpty() ? u.getPosition() : "—");
+                        w.put("shift", shift);
+                        w.put("work_day", s.getWorkDay().toString());
+                        todayWorkers.add(w);
+                    }
+                }
+            }
+        }
+        todayWorkers.sort((a, b) -> String.valueOf(a.get("employee_code")).compareTo(String.valueOf(b.get("employee_code"))));
+        stats.put("today_workers", todayWorkers);
+
         return stats;
     }
 

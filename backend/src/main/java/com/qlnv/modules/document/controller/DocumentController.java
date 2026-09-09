@@ -37,13 +37,13 @@ public class DocumentController {
 
     @PutMapping("/{docId}/toggle")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<DocumentResponse> toggleDocument(@PathVariable Integer docId) {
+    public ResponseEntity<DocumentResponse> toggleDocument(@PathVariable("docId") Integer docId) {
         return ResponseEntity.ok(documentService.toggleActive(docId));
     }
 
     @DeleteMapping("/{docId}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Map<String, String>> deleteDocument(@PathVariable Integer docId) {
+    public ResponseEntity<Map<String, String>> deleteDocument(@PathVariable("docId") Integer docId) {
         documentService.deleteDocument(docId);
         return ResponseEntity.ok(Map.of("message", "Xóa tài liệu thành công"));
     }

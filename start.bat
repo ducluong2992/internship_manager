@@ -47,12 +47,23 @@ echo.
 echo Nhan Ctrl+C de dung may chu.
 echo.
 
-if exist "target\qlnv-backend-2.0.0.jar" goto RUN_JAR
-
+set "MVN_CMD="
 where mvn >nul 2>&1
-if not errorlevel 1 goto RUN_MVN
+if not errorlevel 1 set "MVN_CMD=mvn"
 
-if exist "C:\tools\apache-maven-3.9.9\bin\mvn.cmd" goto RUN_CUSTOM_MVN
+if not defined MVN_CMD if exist "C:\tools\apache-maven-3.9.16\apache-maven-3.9.16\bin\mvn.cmd" set "MVN_CMD=C:\tools\apache-maven-3.9.16\apache-maven-3.9.16\bin\mvn.cmd"
+if not defined MVN_CMD if exist "C:\tools\apache-maven-3.9.9\bin\mvn.cmd" set "MVN_CMD=C:\tools\apache-maven-3.9.9\bin\mvn.cmd"
+if not defined MVN_CMD (
+    for /d %%M in ("C:\tools\apache-maven*") do (
+        if not defined MVN_CMD if exist "%%M\bin\mvn.cmd" set "MVN_CMD=%%M\bin\mvn.cmd"
+        if not defined MVN_CMD for /d %%S in ("%%M\apache-maven*") do (
+            if not defined MVN_CMD if exist "%%S\bin\mvn.cmd" set "MVN_CMD=%%S\bin\mvn.cmd"
+        )
+    )
+)
+
+if defined MVN_CMD goto RUN_MVN
+if exist "target\qlnv-backend-2.0.0.jar" goto RUN_JAR
 
 echo [ERROR] Khong tim thay Maven hoac file jar da build!
 pause
@@ -63,11 +74,7 @@ exit /b 1
 goto END
 
 :RUN_MVN
-mvn spring-boot:run
-goto END
-
-:RUN_CUSTOM_MVN
-call "C:\tools\apache-maven-3.9.9\bin\mvn.cmd" spring-boot:run
+call "%MVN_CMD%" spring-boot:run
 goto END
 
 :END

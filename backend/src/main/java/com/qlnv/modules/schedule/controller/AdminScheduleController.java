@@ -38,13 +38,13 @@ public class AdminScheduleController {
 
     @PutMapping("/periods/{periodId}")
     public ResponseEntity<PeriodResponse> updatePeriod(
-            @PathVariable Integer periodId,
+            @PathVariable("periodId") Integer periodId,
             @Valid @RequestBody PeriodRequestDto req) {
         return ResponseEntity.ok(periodService.updatePeriod(periodId, req));
     }
 
     @DeleteMapping("/periods/{periodId}")
-    public ResponseEntity<Map<String, String>> deletePeriod(@PathVariable Integer periodId) {
+    public ResponseEntity<Map<String, String>> deletePeriod(@PathVariable("periodId") Integer periodId) {
         periodService.deletePeriod(periodId);
         return ResponseEntity.ok(Map.of("message", "Xóa kỳ lịch thành công"));
     }
@@ -52,11 +52,11 @@ public class AdminScheduleController {
     @GetMapping("/schedule")
     public ResponseEntity<Map<String, Object>> getScheduleMatrix(
             @RequestParam(required = false, name = "period_id") Integer periodId,
-            @RequestParam(required = false) Integer month,
-            @RequestParam(required = false) Integer year,
-            @RequestParam(required = false) String project,
-            @RequestParam(required = false) String position,
-            @RequestParam(required = false) String keyword) {
+            @RequestParam(value = "month", required = false) Integer month,
+            @RequestParam(value = "year", required = false) Integer year,
+            @RequestParam(value = "project", required = false) String project,
+            @RequestParam(value = "position", required = false) String position,
+            @RequestParam(value = "keyword", required = false) String keyword) {
         return ResponseEntity.ok(scheduleService.getAdminScheduleMatrix(periodId, month, year, project, position, keyword));
     }
 
@@ -92,11 +92,11 @@ public class AdminScheduleController {
     @GetMapping("/schedule/export")
     public ResponseEntity<byte[]> exportSchedule(
             @RequestParam(required = false, name = "period_id") Integer periodId,
-            @RequestParam(required = false) Integer month,
-            @RequestParam(required = false) Integer year,
-            @RequestParam(required = false) String project,
-            @RequestParam(required = false) String position,
-            @RequestParam(required = false) String keyword) {
+            @RequestParam(value = "month", required = false) Integer month,
+            @RequestParam(value = "year", required = false) Integer year,
+            @RequestParam(value = "project", required = false) String project,
+            @RequestParam(value = "position", required = false) String position,
+            @RequestParam(value = "keyword", required = false) String keyword) {
         byte[] data = scheduleExcelService.exportScheduleMatrix(periodId, month, year, project, position, keyword);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=Bang_tong_hop_lich_lam_viec.xlsx")

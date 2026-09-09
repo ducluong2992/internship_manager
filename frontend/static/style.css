@@ -1319,6 +1319,11 @@ body {
   color: #0288d1;
 }
 
+.confirm-icon-wrap.confirm-icon-success {
+  background: rgba(46, 125, 50, 0.12);
+  color: #2e7d32;
+}
+
 #confirm-modal-title,
 #prompt-modal-title {
   font-family: 'Be Vietnam Pro', 'Inter', sans-serif;

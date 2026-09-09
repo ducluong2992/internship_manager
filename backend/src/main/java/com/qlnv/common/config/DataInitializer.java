@@ -32,15 +32,48 @@ public class DataInitializer implements CommandLineRunner {
         seedPositions();
         seedAdmin();
         cleanUpInternAccounts();
+        syncEmployeeAccounts();
     }
 
     private void cleanUpInternAccounts() {
-        List<User> internUsers = userRepository.findByUserType("intern");
-        internUsers.addAll(userRepository.findByUserType("tts"));
-        for (User u : internUsers) {
-            accountRepository.deleteByUserId(u.getId());
+        List<User> allUsers = userRepository.findAll();
+        for (User u : allUsers) {
+            boolean isIntern = "intern".equalsIgnoreCase(u.getUserType())
+                    || "tts".equalsIgnoreCase(u.getUserType())
+                    || (u.getEmployeeCode() != null && u.getEmployeeCode().trim().toUpperCase().startsWith("TTS"));
+            if (isIntern) {
+                accountRepository.deleteByUserId(u.getId());
+            }
         }
         log.info("[OK] Intern accounts cleaned up - TTS has no login accounts");
+    }
+
+    private void syncEmployeeAccounts() {
+        String encodedDefaultPassword = passwordEncoder.encode("123456");
+        List<User> employees = userRepository.findByUserType("employee");
+        for (User u : employees) {
+            String desiredUsername = (u.getViettelEmail() != null && !u.getViettelEmail().trim().isEmpty())
+                    ? u.getViettelEmail().trim().toLowerCase()
+                    : (u.getEmployeeCode() != null ? u.getEmployeeCode().trim() : null);
+            if (desiredUsername == null || desiredUsername.isEmpty()) continue;
+
+            java.util.Optional<Account> accOpt = accountRepository.findByUserId(u.getId());
+            if (accOpt.isPresent()) {
+                Account acc = accOpt.get();
+                acc.setUsername(desiredUsername);
+                acc.setPassword(encodedDefaultPassword);
+                accountRepository.save(acc);
+            } else {
+                Account acc = Account.builder()
+                        .userId(u.getId())
+                        .username(desiredUsername)
+                        .password(encodedDefaultPassword)
+                        .createdAt(LocalDateTime.now())
+                        .build();
+                accountRepository.save(acc);
+            }
+        }
+        log.info("[OK] Employee accounts synced: username = viettel_email, password = 123456");
     }
 
     private void seedPositions() {
@@ -72,8 +105,9 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     private void seedAdmin() {
-        if (userRepository.findByEmployeeCode("admin").isEmpty()) {
-            User admin = User.builder()
+        User admin = userRepository.findByEmployeeCode("admin").orElse(null);
+        if (admin == null) {
+            admin = User.builder()
                     .employeeCode("admin")
                     .fullName("Quản trị viên")
                     .role("admin")
@@ -82,8 +116,22 @@ public class DataInitializer implements CommandLineRunner {
                     .createdAt(LocalDateTime.now())
                     .build();
             admin = userRepository.save(admin);
+        } else {
+            admin.setRole("admin");
+            if (!"admin".equalsIgnoreCase(admin.getUserType())) {
+                admin.setUserType("admin");
+            }
+            admin.setAccountStatus(1);
+            admin = userRepository.save(admin);
+        }
 
-            Account adminAcc = Account.builder()
+        final Integer adminUserId = admin.getId();
+        Account adminAcc = accountRepository.findByUsername("admin")
+                .or(() -> accountRepository.findByUserId(adminUserId))
+                .orElse(null);
+
+        if (adminAcc == null) {
+            adminAcc = Account.builder()
                     .userId(admin.getId())
                     .username("admin")
                     .password(passwordEncoder.encode("Admin@123"))
@@ -91,6 +139,12 @@ public class DataInitializer implements CommandLineRunner {
                     .build();
             accountRepository.save(adminAcc);
             log.info("[OK] Admin account created: admin / Admin@123");
+        } else {
+            adminAcc.setUserId(admin.getId());
+            adminAcc.setUsername("admin");
+            adminAcc.setPassword(passwordEncoder.encode("Admin@123"));
+            accountRepository.save(adminAcc);
+            log.info("[OK] Admin account verified & synchronized: admin / Admin@123");
         }
     }
 }

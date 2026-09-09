@@ -1,5 +1,7 @@
 package com.qlnv.modules.user.controller;
 
+import com.qlnv.modules.importjob.entity.ImportJob;
+import com.qlnv.modules.importjob.service.ImportJobService;
 import com.qlnv.modules.user.dto.AdminAccountRow;
 import com.qlnv.modules.user.dto.ConfirmImportRequest;
 import com.qlnv.modules.user.dto.ImportResultDto;
@@ -16,6 +18,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -31,15 +34,16 @@ public class AdminUserController {
 
     private final UserService userService;
     private final UserExcelService userExcelService;
+    private final ImportJobService importJobService;
 
     // ─── Users (Interns / All) Management ───
 
     @GetMapping({"/users", "/users/"})
     public ResponseEntity<List<UserResponse>> getUsers(
-            @RequestParam(required = false) String keyword,
+            @RequestParam(value = "keyword", required = false) String keyword,
             @RequestParam(required = false, name = "user_type") String userType,
-            @RequestParam(required = false) String role,
-            @RequestParam(required = false) String project,
+            @RequestParam(value = "role", required = false) String role,
+            @RequestParam(value = "project", required = false) String project,
             @RequestParam(required = false, name = "working_status") String workingStatus,
             @RequestParam(required = false, name = "staff_category") String staffCategory,
             @RequestParam(required = false, name = "employment_status") String employmentStatus,
@@ -61,15 +65,20 @@ public class AdminUserController {
 
     @PutMapping("/users/{userId}")
     public ResponseEntity<UserResponse> updateUser(
-            @PathVariable Integer userId,
+            @PathVariable("userId") Integer userId,
             @Valid @RequestBody UserRequestDto req) {
         return ResponseEntity.ok(userService.updateUser(userId, req));
     }
 
     @DeleteMapping("/users/{userId}")
-    public ResponseEntity<Map<String, String>> deleteUser(@PathVariable Integer userId) {
+    public ResponseEntity<Map<String, String>> deleteUser(@PathVariable("userId") Integer userId) {
         userService.deleteUser(userId);
         return ResponseEntity.ok(Map.of("message", "Xóa thành công"));
+    }
+
+    @DeleteMapping("/users/all")
+    public ResponseEntity<Map<String, Object>> deleteAllUsers() {
+        return ResponseEntity.ok(userService.deleteAllByUserType("intern"));
     }
 
     @GetMapping("/users/import-template")
@@ -106,6 +115,25 @@ public class AdminUserController {
         return ResponseEntity.ok(userExcelService.confirmInternImportLink(req));
     }
 
+    /**
+     * Async confirm — trả về jobId ngay, xử lý nền.
+     * POST /admin/users/confirm-import-async
+     */
+    @PostMapping("/users/confirm-import-async")
+    public ResponseEntity<Map<String, Object>> confirmImportAsync(
+            @RequestBody ConfirmImportRequest req,
+            Authentication auth) {
+        String createdBy = auth != null ? auth.getName() : "admin";
+        ImportJob job = importJobService.createJob("intern", "reconcile-confirm", createdBy);
+        importJobService.processConfirmAsync(job.getId(), req, "intern");
+        return ResponseEntity.ok(Map.of(
+                "jobId",   job.getId(),
+                "status",  "PENDING",
+                "message", "Đang xử lý " + (req.getAdditions() != null ? req.getAdditions().size() : 0)
+                           + " thêm mới, " + (req.getUpdates() != null ? req.getUpdates().size() : 0) + " cập nhật"
+        ));
+    }
+
     @PostMapping("/users/import-link")
     public ResponseEntity<ReconcilePreviewDto> importLink(@RequestBody LinkImportRequest req) {
         return ResponseEntity.ok(userExcelService.previewInternImportLink(req.getUrl()));
@@ -113,7 +141,7 @@ public class AdminUserController {
 
     @PatchMapping("/users/{userId}/lock")
     public ResponseEntity<Map<String, Object>> lockUser(
-            @PathVariable Integer userId,
+            @PathVariable("userId") Integer userId,
             @RequestBody(required = false) Map<String, Integer> body) {
         Integer status = (body != null && body.containsKey("status")) ? body.get("status") : null;
         return ResponseEntity.ok(userService.lockUser(userId, status));
@@ -126,9 +154,9 @@ public class AdminUserController {
 
     @PatchMapping("/users/{userId}/reset-password")
     public ResponseEntity<Map<String, String>> resetPassword(
-            @PathVariable Integer userId,
+            @PathVariable("userId") Integer userId,
             @RequestBody(required = false) Map<String, String> body) {
-        String newPwd = (body != null) ? body.get("new_password") : "User@123";
+        String newPwd = (body != null) ? body.get("new_password") : "123456";
         return ResponseEntity.ok(userService.resetPassword(userId, newPwd));
     }
 

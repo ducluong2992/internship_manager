@@ -19,23 +19,34 @@ function getWorkdays(y, m) {
 function pad2(n) { return String(n).padStart(2, '0'); }
 function toDateStr(y, m, d) { return `${y}-${pad2(m)}-${pad2(d)}`; }
 function badgeStatus(s) {
-  if (s === 'Working') return `<span class="custom-badge badge-working">Đang làm</span>`;
-  if (s === 'Lên chính thức') return `<span class="custom-badge badge-purple">Lên chính thức</span>`;
-  if (s === 'Chuyển trung tâm') return `<span class="custom-badge badge-blue">Chuyển TT</span>`;
-  return `<span class="custom-badge badge-resigned">Đã nghỉ</span>`;
+  if (!s) return `<span class="custom-badge badge-working">Đang làm</span>`;
+  const lower = String(s).trim().toLowerCase();
+  if (lower === 'working' || lower.includes('đang làm') || lower.includes('dang lam') || lower === 'làm việc') {
+    return `<span class="custom-badge badge-working">Đang làm</span>`;
+  }
+  if (lower.includes('chính thức') || lower.includes('chinh thuc')) {
+    return `<span class="custom-badge badge-purple">Lên chính thức</span>`;
+  }
+  if (lower.includes('chuyển') || lower.includes('chuyen')) {
+    return `<span class="custom-badge badge-blue">Chuyển TT</span>`;
+  }
+  if (lower === 'resigned' || lower.includes('nghỉ') || lower.includes('nghi') || lower.includes('dừng') || lower.includes('dung')) {
+    return `<span class="custom-badge badge-resigned">Đã nghỉ</span>`;
+  }
+  return `<span class="custom-badge badge-working">${s}</span>`;
 }
 function badgeShift(s) {
   if (s === 'SC') return `<span class="custom-badge badge-working">SC</span>`;
-  if (s === 'S')  return `<span class="custom-badge badge-blue">S</span>`;
-  if (s === 'C')  return `<span class="custom-badge badge-yellow">C</span>`;
+  if (s === 'S') return `<span class="custom-badge badge-blue">S</span>`;
+  if (s === 'C') return `<span class="custom-badge badge-yellow">C</span>`;
   return `<span style="opacity:.3">—</span>`;
 }
 function badgeEmpType(t) {
-  if ((t||'').toLowerCase().includes('mượn')) return `<span class="custom-badge badge-yellow">Đi mượn</span>`;
+  if ((t || '').toLowerCase().includes('mượn')) return `<span class="custom-badge badge-yellow">Đi mượn</span>`;
   return `<span class="custom-badge badge-blue">TTS Trung tâm</span>`;
 }
 function badgeEmpKind(k) {
-  if ((k||'').toLowerCase() === 'parttime') return `<span class="custom-badge badge-yellow">Part-time</span>`;
+  if ((k || '').toLowerCase() === 'parttime') return `<span class="custom-badge badge-yellow">Part-time</span>`;
   return `<span class="custom-badge badge-working">Full-time</span>`;
 }
 
@@ -119,6 +130,7 @@ async function renderDashboard(area) {
   // Calculations for progress bars & cards
   const totalEmployees = stats.total_employees || 0;
   const activeInterns = stats.working || 0; // Chỉ lấy TỔNG SỐ TTS ACTIVE
+  const activeEmployees = stats.emp_working != null ? stats.emp_working : (stats.working_employees != null ? stats.working_employees : Math.max(0, totalEmployees - (stats.emp_resigned || 0)));
   const totalStructure = totalEmployees + activeInterns; // Cơ cấu nhân sự hoạt động
 
   // 1. Cơ cấu Nhân sự
@@ -158,17 +170,31 @@ async function renderDashboard(area) {
 
 <!-- 1. KEY METRICS -->
 <div class="row g-3 mb-4">
+  <!-- Thẻ 1: TTS Đang làm -->
   <div class="col-12 col-sm-6 col-xl-3">
     <div class="viettel-stat-card card-red-1 shadow-sm">
-      <div class="stat-title">TỔNG SỐ TTS ACTIVE</div>
+      <div class="stat-title">TTS ĐANG LÀM</div>
       <div class="d-flex align-items-baseline">
         <span class="stat-number">${activeInterns}</span>
         <span class="stat-unit">nhân sự</span>
       </div>
     </div>
   </div>
+
+  <!-- Thẻ 2: NV Đang làm (Hiển thị ngay sau thẻ TTS Đang làm) -->
   <div class="col-12 col-sm-6 col-xl-3">
     <div class="viettel-stat-card card-red-2 shadow-sm">
+      <div class="stat-title">NV ĐANG LÀM</div>
+      <div class="d-flex align-items-baseline">
+        <span class="stat-number">${activeEmployees}</span>
+        <span class="stat-unit">nhân sự</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Thẻ 3: NV Thử việc / Học việc -->
+  <div class="col-12 col-sm-6 col-xl-3">
+    <div class="viettel-stat-card card-red-3 shadow-sm">
       <div class="stat-title">NV THỬ VIỆC / HỌC VIỆC</div>
       <div class="d-flex align-items-baseline">
         <span class="stat-number">${stats.emp_probation || 0}</span>
@@ -176,8 +202,10 @@ async function renderDashboard(area) {
       </div>
     </div>
   </div>
+
+  <!-- Thẻ 4: NV Onsite / Dự án -->
   <div class="col-12 col-sm-6 col-xl-3">
-    <div class="viettel-stat-card card-red-3 shadow-sm">
+    <div class="viettel-stat-card card-red-4 shadow-sm">
       <div class="stat-title">NV ONSITE / DỰ ÁN</div>
       <div class="d-flex align-items-baseline">
         <span class="stat-number">${empOnsite}</span>
@@ -185,16 +213,8 @@ async function renderDashboard(area) {
       </div>
     </div>
   </div>
-  <div class="col-12 col-sm-6 col-xl-3">
-    <div class="viettel-stat-card card-red-4 shadow-sm">
-      <div class="stat-title">NV ĐÃ NGHỈ VIỆC / SẮP OUT</div>
-      <div class="d-flex align-items-baseline">
-        <span class="stat-number">${stats.emp_resigned || 0}</span>
-        <span class="stat-unit">nhân sự</span>
-      </div>
-    </div>
-  </div>
 </div>
+
 
 <!-- 2. PROGRESS BAR STATS (3 TYPES) -->
 <div class="row g-4 mb-4">
@@ -267,28 +287,45 @@ async function renderDashboard(area) {
 <div class="row mb-4">
   <div class="col-12">
     <div class="glass-card p-4">
-      <h6 class="fw-bold mb-3"><i class="bi bi-calendar-check-fill text-success me-2"></i>TTS đi làm hôm nay - ${pad2(now.getDate())}/${pad2(now.getMonth() + 1)}/${now.getFullYear()}</h6>
+      <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+        <h6 class="fw-bold mb-0">
+          <i class="bi bi-calendar-check-fill text-success me-2"></i>
+          TTS đi làm hôm nay — ${pad2(now.getDate())}/${pad2(now.getMonth() + 1)}/${now.getFullYear()}
+          <span class="badge bg-success ms-2 px-2 py-1" style="font-size:0.75rem;border-radius:12px">${(stats.today_workers || []).length} TTS</span>
+        </h6>
+        <div class="d-flex flex-wrap gap-2" style="font-size: 12px;">
+          <span class="custom-badge badge-blue"><i class="bi bi-sun-fill me-1"></i>Sáng: <b>${(stats.today_workers || []).filter(w => (w.shift || '').toUpperCase() === 'S').length}</b></span>
+          <span class="custom-badge badge-yellow"><i class="bi bi-moon-stars-fill me-1"></i>Chiều: <b>${(stats.today_workers || []).filter(w => (w.shift || '').toUpperCase() === 'C').length}</b></span>
+          <span class="custom-badge badge-working"><i class="bi bi-clock-fill me-1"></i>Cả ngày: <b>${(stats.today_workers || []).filter(w => (w.shift || '').toUpperCase() === 'SC').length}</b></span>
+        </div>
+      </div>
       <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
           <thead class="table-light">
             <tr>
-              <th>Mã NV</th>
+              <th style="width: 110px;">Mã TTS</th>
               <th>Họ và tên</th>
-              <th>Ca làm việc</th>
+              <th>Dự án</th>
+              <th>Vị trí</th>
+              <th class="text-center" style="width: 140px;">Ca làm việc</th>
             </tr>
           </thead>
           <tbody>
-            ${stats.today_workers && stats.today_workers.length > 0 ? stats.today_workers.map(w => `
+            ${stats.today_workers && stats.today_workers.length > 0 ? stats.today_workers.map(w => {
+    const shift = (w.shift || '').toUpperCase();
+    let badge = `<span class="custom-badge">${w.shift}</span>`;
+    if (shift === 'S') badge = `<span class="custom-badge badge-blue"><i class="bi bi-sun-fill me-1"></i>Sáng</span>`;
+    else if (shift === 'C') badge = `<span class="custom-badge badge-yellow"><i class="bi bi-moon-stars-fill me-1"></i>Chiều</span>`;
+    else if (shift === 'SC') badge = `<span class="custom-badge badge-working"><i class="bi bi-clock-fill me-1"></i>Cả ngày</span>`;
+    return `
               <tr>
-                <td><code>${w.employee_code}</code></td>
-                <td class="fw-medium">${w.full_name}</td>
-                <td>
-                  ${w.shift === 'S' ? '<span class="custom-badge badge-blue">Sáng</span>' : ''}
-                  ${w.shift === 'C' ? '<span class="custom-badge badge-yellow">Chiều</span>' : ''}
-                  ${w.shift === 'SC' ? '<span class="custom-badge badge-working">Cả ngày</span>' : ''}
-                </td>
-              </tr>
-            `).join('') : '<tr><td colspan="3" class="text-center text-muted py-3">Không có ai đăng ký lịch làm hôm nay.</td></tr>'}
+                <td><code style="font-size:0.78rem;color:#475569;background:#f1f5f9;padding:2px 6px;border-radius:4px">${w.employee_code}</code></td>
+                <td class="fw-semibold text-dark">${w.full_name}</td>
+                <td class="text-muted small">${w.project || '—'}</td>
+                <td class="small">${w.position && w.position !== '—' ? `<span class="role-pill">${w.position}</span>` : '—'}</td>
+                <td class="text-center">${badge}</td>
+              </tr>`;
+  }).join('') : '<tr><td colspan="5" class="text-center text-muted py-4"><i class="bi bi-calendar-x me-2"></i>Không có TTS nào đăng ký lịch làm hôm nay.</td></tr>'}
           </tbody>
         </table>
       </div>

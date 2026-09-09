@@ -22,6 +22,7 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Integer>, Jp
     // ─── Range & Criteria Queries ───
     List<Schedule> findByPeriodIdAndUserId(Integer periodId, Integer userId);
     List<Schedule> findByPeriodId(Integer periodId);
+    List<Schedule> findByWorkDay(LocalDate workDay);
     List<Schedule> findByWorkDayBetween(LocalDate startDate, LocalDate endDate);
     List<Schedule> findByUserIdAndWorkDayBetween(Integer userId, LocalDate startDate, LocalDate endDate);
 

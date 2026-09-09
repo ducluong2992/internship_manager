@@ -100,6 +100,9 @@ async function renderManageEmployees(area) {
     <button class="btn btn-danger btn-sm" id="btn-add-employee">
       <i class="bi bi-person-plus-fill me-1"></i>Thêm mới
     </button>
+    <button class="btn btn-outline-danger btn-sm" id="btn-delete-all-employees" onclick="deleteAllEmployees()" title="Xóa toàn bộ danh sách nhân viên">
+      <i class="bi bi-trash3-fill me-1"></i>Xóa tất cả
+    </button>
   </div>
 </div>
 
@@ -190,23 +193,85 @@ async function renderManageEmployees(area) {
 
 // ─── Badge helpers ────────────────────────────────────────────────────────────
 
+function getHashColor(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const h = Math.abs(hash % 360);
+  return {
+    bg: `hsla(${h}, 70%, 92%, 1)`,
+    color: `hsla(${h}, 80%, 28%, 1)`,
+    border: `hsla(${h}, 70%, 75%, 1)`
+  };
+}
+
 function badgeEmpStatus(s) {
-  const text = s || 'Thử việc';
+  const text = (s || 'Thử việc').trim();
   const lower = text.toLowerCase();
-  if (lower.includes('chuyển trung tâm')) {
-    return `<span class="custom-badge" style="background:rgba(156,39,176,.15);color:#9c27b0;border:1px solid rgba(156,39,176,.3)">${text}</span>`;
+
+  // 1. Chính thức (Official) -> Xanh lá (Emerald Green)
+  if (lower.includes('chính thức') || lower === 'official') {
+    return `<span class="custom-badge" style="background: rgba(34,197,94,0.12); color: #15803d; border: 1px solid rgba(34,197,94,0.3); font-weight: 500;">${text}</span>`;
   }
-  if (lower.includes('chính thức')) {
-    return `<span class="custom-badge" style="background:rgba(63,185,80,.15);color:var(--success);border:1px solid rgba(63,185,80,.3)">${text}</span>`;
+  // 2. Thử việc (Probation) -> Cam ấm (Warm Orange)
+  if (lower.includes('thử việc') || lower === 'probation') {
+    return `<span class="custom-badge" style="background: rgba(249,115,22,0.12); color: #c2410c; border: 1px solid rgba(249,115,22,0.3); font-weight: 500;">${text}</span>`;
   }
-  return `<span class="custom-badge" style="background:rgba(255,193,7,.15);color:#d39e00;border:1px solid rgba(255,193,7,.3)">${text}</span>`;
+  // 3. Học việc (Apprentice) -> Vàng nghệ (Gold/Amber)
+  if (lower.includes('học việc') || lower === 'apprentice') {
+    return `<span class="custom-badge" style="background: rgba(234,179,8,0.14); color: #a16207; border: 1px solid rgba(234,179,8,0.35); font-weight: 500;">${text}</span>`;
+  }
+  // 4. Chuyển trung tâm (Transfer) -> Tím hoàng gia (Purple/Violet)
+  if (lower.includes('chuyển trung tâm') || lower.includes('chuyển tt') || lower.includes('transfer')) {
+    return `<span class="custom-badge" style="background: rgba(168,85,247,0.12); color: #7e22ce; border: 1px solid rgba(168,85,247,0.3); font-weight: 500;">${text}</span>`;
+  }
+  // 5. Nghỉ việc / Đã nghỉ việc (Resigned) -> Đỏ tươi (Crimson/Red)
+  if (lower.includes('nghỉ việc') || lower.includes('nghi viec') || lower === 'resigned' || lower === 'đã nghỉ') {
+    return `<span class="custom-badge" style="background: rgba(239,68,68,0.12); color: #b91c1c; border: 1px solid rgba(239,68,68,0.3); font-weight: 500;">${text}</span>`;
+  }
+  // 6. Tạm hoãn / Nghỉ không lương / Nghỉ chế độ -> Xám đá (Slate)
+  if (lower.includes('tạm hoãn') || lower.includes('không lương') || lower.includes('chế độ')) {
+    return `<span class="custom-badge" style="background: rgba(100,116,139,0.12); color: #475569; border: 1px solid rgba(100,116,139,0.3); font-weight: 500;">${text}</span>`;
+  }
+
+  // Fallback: Màu sắc riêng biệt tự sinh theo giá trị
+  const c = getHashColor(text);
+  return `<span class="custom-badge" style="background: ${c.bg}; color: ${c.color}; border: 1px solid ${c.border}; font-weight: 500;">${text}</span>`;
 }
 
 function badgeStaffCat(c) {
-  if (c === 'Cho mượn') return `<span class="custom-badge" style="background:rgba(229,57,53,.12);color:var(--danger);border:1px solid rgba(229,57,53,.3)">Cho mượn</span>`;
-  if (c === 'Onsite') return `<span class="custom-badge" style="background:rgba(88,166,255,.15);color:var(--info);border:1px solid rgba(88,166,255,.3)">Onsite</span>`;
-  return `<span class="custom-badge" style="background:rgba(88,166,255,.1);color:var(--info);border:1px solid rgba(88,166,255,.2)">NS trung tâm</span>`;
+  const text = (c || 'NS trung tâm').trim();
+  const lower = text.toLowerCase();
+
+  // 1. NS trung tâm (Center Staff) -> Xanh chàm đậm / Indigo
+  if (lower.includes('trung tâm') || lower === 'ns trung tâm' || lower === 'center') {
+    return `<span class="custom-badge" style="background: rgba(99,102,241,0.12); color: #4338ca; border: 1px solid rgba(99,102,241,0.3); font-weight: 500;">${text}</span>`;
+  }
+  // 2. Onsite / Dự án -> Xanh da trời / Sky Cyan
+  if (lower.includes('onsite') || lower.includes('dự án')) {
+    return `<span class="custom-badge" style="background: rgba(14,165,233,0.12); color: #0369a1; border: 1px solid rgba(14,165,233,0.3); font-weight: 500;">${text}</span>`;
+  }
+  // 3. Cho mượn / Đi mượn -> Hồng tím / Magenta Pink
+  if (lower.includes('mượn') || lower === 'cho mượn' || lower === 'borrow') {
+    return `<span class="custom-badge" style="background: rgba(236,72,153,0.12); color: #be185d; border: 1px solid rgba(236,72,153,0.3); font-weight: 500;">${text}</span>`;
+  }
+  // 4. Hợp đồng / HĐLĐ -> Xanh ngọc / Teal
+  if (lower.includes('hợp đồng') || lower.includes('hđlđ') || lower.includes('contract')) {
+    return `<span class="custom-badge" style="background: rgba(20,184,166,0.12); color: #0f766e; border: 1px solid rgba(20,184,166,0.3); font-weight: 500;">${text}</span>`;
+  }
+  // 5. Cộng tác viên / CTV -> Nâu cam / Terracotta
+  if (lower.includes('cộng tác') || lower.includes('ctv') || lower.includes('collaborator')) {
+    return `<span class="custom-badge" style="background: rgba(217,119,6,0.12); color: #9a3412; border: 1px solid rgba(217,119,6,0.3); font-weight: 500;">${text}</span>`;
+  }
+
+  // Fallback: Màu sắc riêng biệt tự sinh theo giá trị
+  const col = getHashColor(text);
+  return `<span class="custom-badge" style="background: ${col.bg}; color: ${col.color}; border: 1px solid ${col.border}; font-weight: 500;">${text}</span>`;
 }
+
+window.badgeEmpStatus = badgeEmpStatus;
+window.badgeStaffCat = badgeStaffCat;
 
 // ─── Open modal ───────────────────────────────────────────────────────────────
 
@@ -395,23 +460,34 @@ window.handleEmployeeImportExcel = async function (event) {
   if (!file) return;
   const formData = new FormData();
   formData.append('file', file);
-  toast('Đang đối chiếu dữ liệu từ file Excel...', 'info');
+  toast('Đang tải file lên máy chủ...', 'info');
   event.target.value = '';
   try {
-    const res = await fetch(API + '/employees/preview-import-file', {
+    const res = await fetch(API + '/api/import-jobs/submit?userType=employee', {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + STATE.token },
       body: formData,
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || data.message || 'Lỗi khi đọc dữ liệu');
-    showEmployeeReconcileModal(data);
+    if (!res.ok) throw new Error(data.error || data.detail || data.message || 'Lỗi khi đọc dữ liệu');
+
+    showAlert({
+      title: 'Tiếp nhận import thành công',
+      message: 'Yêu cầu import Nhân viên đã được tiếp nhận thành công và đang được xử lý ngầm (background). Bạn có thể tiếp tục công việc khác!',
+      okText: 'Đã hiểu',
+      type: 'success'
+    });
+
+    trackBackgroundImportJob(data.jobId, 'Nhân viên', () => {
+      const cur = window.currentPage || (typeof STATE !== 'undefined' && STATE.currentPage);
+      if (cur === 'manage-employees' || !cur || document.getElementById('emp-search')) {
+        navigate('manage-employees');
+      }
+    });
   } catch (err) {
-    toast(err.message, 'error');
+    toast(err.message || 'Lỗi khi tải file', 'error');
   }
 };
-
-let currentEmpReconcileData = null;
 
 window.promptEmployeeImportLink = async function () {
   const fn = window.showPrompt || showPrompt;
@@ -429,163 +505,27 @@ window.promptEmployeeImportLink = async function () {
   }
   localStorage.setItem('last_emp_sheet_url', url);
   localStorage.setItem('last_sheet_url', url);
-  toast('Đang đối chiếu dữ liệu từ link...', 'info');
+  toast('Đang gửi yêu cầu import link Google Sheets...', 'info');
   try {
-    const data = await api('POST', '/employees/preview-import-link', { url });
-    showEmployeeReconcileModal(data);
-  } catch (err) {
-    toast(err.message, 'error');
-  }
-};
+    const data = await api('POST', '/api/import-jobs/submit-link?userType=employee', { url });
 
-function showEmployeeReconcileModal(data) {
-  currentEmpReconcileData = data;
-  const { updated, added, removed, unchanged_count, format_warnings } = data;
+    showAlert({
+      title: 'Tiếp nhận import thành công',
+      message: 'Yêu cầu import Nhân viên từ Google Sheets đã được tiếp nhận thành công và đang được xử lý ngầm (background). Bạn có thể tiếp tục công việc khác!',
+      okText: 'Đã hiểu',
+      type: 'success'
+    });
 
-  const titleEl = document.getElementById('modal-reconcile-title');
-  if (titleEl) titleEl.textContent = 'Kết quả đối chiếu dữ liệu Nhân viên';
-
-  const warnContainer = document.getElementById('reconcile-warnings-container');
-  if (warnContainer) {
-    if (format_warnings && format_warnings.length > 0) {
-      warnContainer.innerHTML = `
-        <div class="alert alert-warning py-2 px-3 mb-3 border-warning-subtle text-dark rounded-2" style="font-size: 12px; background: #fff8e1;">
-          <div class="fw-bold mb-1 text-warning-emphasis"><i class="bi bi-exclamation-triangle-fill me-1 text-warning"></i>Cảnh báo định dạng ô dữ liệu Excel:</div>
-          <ul class="mb-0 ps-3">
-            ${format_warnings.map(w => `<li>${w}</li>`).join('')}
-          </ul>
-        </div>`;
-    } else {
-      warnContainer.innerHTML = '';
-    }
-  }
-
-  document.getElementById('rec-count-updated').textContent = updated.length;
-  document.getElementById('rec-count-added').textContent = added.length;
-  document.getElementById('rec-count-removed').textContent = removed.length;
-  document.getElementById('rec-count-unchanged').textContent = unchanged_count || 0;
-
-  document.getElementById('badge-count-updated').textContent = `${updated.length} người`;
-  document.getElementById('badge-count-added').textContent = `${added.length} người`;
-  document.getElementById('badge-count-removed').textContent = `${removed.length} người`;
-
-  // Render Section 1: Updated
-  const updatedContainer = document.getElementById('list-rec-updated');
-  if (updated.length === 0) {
-    updatedContainer.innerHTML = `<div class="text-muted text-center py-2 bg-light rounded" style="font-size: 12px;">Không có nhân viên thay đổi thông tin</div>`;
-  } else {
-    updatedContainer.innerHTML = updated.map(item => `
-      <div class="border rounded p-2 bg-white" style="font-size: 12px;">
-        <div class="d-flex align-items-center justify-content-between mb-1 pb-1 border-bottom" style="min-width: 0;">
-          <div class="d-flex align-items-center gap-2 text-truncate me-2" style="min-width: 0; flex: 1;">
-            <span class="badge bg-secondary font-monospace flex-shrink-0" style="font-size: 10px;">${item.employee_code}</span>
-            <strong class="text-dark text-truncate" style="font-size: 13px;" title="${item.full_name}">${item.full_name}</strong>
-          </div>
-          <span class="text-muted flex-shrink-0" style="font-size: 11px;">${item.changes.length} thay đổi</span>
-        </div>
-        <div class="d-flex flex-column gap-1 pt-1">
-          ${item.changes.map(ch => `
-            <div class="p-1 px-2 rounded bg-light border d-flex align-items-center gap-2" style="font-size: 12px; min-width: 0;">
-              <span class="fw-semibold text-secondary flex-shrink-0" style="min-width: 110px;">${ch.field_name}:</span>
-              <span class="text-decoration-line-through text-muted text-truncate" style="max-width: 180px;" title="${ch.old_value || '—'}">${ch.old_value || '—'}</span>
-              <i class="bi bi-arrow-right text-secondary fs-6 flex-shrink-0"></i>
-              <span class="fw-bold text-dark text-truncate" style="max-width: 250px;" title="${ch.new_value}">${ch.new_value}</span>
-            </div>
-          `).join('')}
-        </div>
-      </div>
-    `).join('');
-  }
-
-  // Render Section 2: Added
-  const addedContainer = document.getElementById('list-rec-added');
-  if (added.length === 0) {
-    addedContainer.innerHTML = `<div class="text-muted text-center py-2 bg-light rounded" style="font-size: 12px;">Không có nhân viên thêm mới</div>`;
-  } else {
-    addedContainer.innerHTML = added.map(item => `
-      <div class="border rounded p-2 bg-white" style="font-size: 12px;">
-        <div class="d-flex align-items-center justify-content-between gap-2" style="min-width: 0;">
-          <div class="d-flex align-items-center gap-2 text-truncate me-2" style="min-width: 0; flex: 1;">
-            <span class="badge bg-secondary font-monospace flex-shrink-0" style="font-size: 10px;">${item.employee_code}</span>
-            <strong class="text-dark text-truncate" style="font-size: 13px;" title="${item.full_name}">${item.full_name}</strong>
-            <span class="badge bg-success flex-shrink-0" style="font-size: 10px;">Mới</span>
-          </div>
-          <div class="text-muted text-truncate text-end flex-shrink-0" style="font-size: 11px; max-width: 260px;" title="${[item.project, item.position, item.viettel_email].filter(Boolean).join(' · ')}">
-            <span>${[item.project, item.position, item.viettel_email].filter(Boolean).join(' · ') || '—'}</span>
-          </div>
-        </div>
-      </div>
-    `).join('');
-  }
-
-  // Render Section 3: Removed (In Web but not in Sheet)
-  const removedContainer = document.getElementById('list-rec-removed');
-  if (removed.length === 0) {
-    removedContainer.innerHTML = `<div class="text-muted text-center py-2 bg-light rounded" style="font-size: 12px;">Tất cả nhân viên trên Web đều có trong Sheet</div>`;
-  } else {
-    removedContainer.innerHTML = removed.map(item => `
-      <div class="border rounded p-2 bg-white" style="font-size: 12px;">
-        <div class="d-flex align-items-center justify-content-between gap-2" style="min-width: 0;">
-          <div class="d-flex align-items-center gap-2 text-truncate me-2" style="min-width: 0; flex: 1;">
-            <span class="badge bg-secondary font-monospace flex-shrink-0" style="font-size: 10px;">${item.employee_code}</span>
-            <strong class="text-dark flex-shrink-0" style="font-size: 13px;">${item.full_name}</strong>
-            <span class="text-muted text-truncate" style="font-size: 11px;" title="${[item.position, item.project].filter(Boolean).join(' · ')}">
-              ${[item.position, item.project].filter(Boolean).join(' · ') ? '— ' + [item.position, item.project].filter(Boolean).join(' · ') : ''}
-            </span>
-          </div>
-          <div class="choice-button-group d-flex align-items-center gap-1 flex-shrink-0">
-            <input type="radio" class="btn-check" name="rec_removed_${item.id}" id="choice_keep_${item.id}" value="keep" checked>
-            <label class="btn btn-outline-secondary btn-sm px-2 py-0" for="choice_keep_${item.id}" style="font-size: 11px;">Giữ lại</label>
-
-            <input type="radio" class="btn-check" name="rec_removed_${item.id}" id="choice_delete_${item.id}" value="delete">
-            <label class="btn btn-outline-danger btn-sm px-2 py-0" for="choice_delete_${item.id}" style="font-size: 11px;">Xóa đi</label>
-          </div>
-        </div>
-      </div>
-    `).join('');
-  }
-
-  // Set up confirm action button
-  const confirmBtn = document.getElementById('btn-confirm-reconcile');
-  confirmBtn.onclick = () => executeEmployeeReconcileSync(data);
-
-  bootstrap.Modal.getOrCreateInstance(document.getElementById('modal-import-reconcile')).show();
-}
-
-async function executeEmployeeReconcileSync(data) {
-  const deleteIds = [];
-  if (data.removed && data.removed.length) {
-    data.removed.forEach(item => {
-      const deleteRadio = document.getElementById(`choice_delete_${item.id}`);
-      if (deleteRadio && deleteRadio.checked) {
-        deleteIds.push(item.id);
+    trackBackgroundImportJob(data.jobId, 'Nhân viên', () => {
+      const cur = window.currentPage || (typeof STATE !== 'undefined' && STATE.currentPage);
+      if (cur === 'manage-employees' || !cur || document.getElementById('emp-search')) {
+        navigate('manage-employees');
       }
     });
-  }
-
-  const payload = {
-    updates: data.updated || [],
-    additions: data.added || [],
-    delete_ids: deleteIds
-  };
-
-  const confirmBtn = document.getElementById('btn-confirm-reconcile');
-  const originalHtml = confirmBtn.innerHTML;
-  confirmBtn.disabled = true;
-  confirmBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Đang cập nhật...`;
-
-  try {
-    const res = await api('POST', '/employees/confirm-import', payload);
-    toast(res.message, 'success');
-    bootstrap.Modal.getInstance(document.getElementById('modal-import-reconcile')).hide();
-    navigate('manage-employees');
   } catch (err) {
-    toast(err.message || 'Lỗi khi cập nhật dữ liệu', 'error');
-  } finally {
-    confirmBtn.disabled = false;
-    confirmBtn.innerHTML = originalHtml;
+    toast(err.message || 'Lỗi khi gửi yêu cầu import', 'error');
   }
-}
+};
 
 window.exportEmployees = function () {
   const url = API + '/employees/export';
@@ -601,3 +541,28 @@ window.exportEmployees = function () {
       window.URL.revokeObjectURL(blobUrl);
     }).catch(() => toast('Lỗi khi xuất Excel', 'error'));
 };
+
+// ─── Xóa toàn bộ danh sách Nhân viên ─────────────────────────────────────────
+async function deleteAllEmployees() {
+  const confirmed = await showConfirm({
+    title: 'Xóa toàn bộ danh sách Nhân viên',
+    message: 'Bạn có chắc chắn muốn xóa toàn bộ danh sách nhân viên? Hành động này không thể hoàn tác. Tất cả dữ liệu liên quan (lịch làm việc, OT, v.v.) cũng sẽ bị xóa.',
+    okText: 'Xóa tất cả',
+    cancelText: 'Hủy bỏ',
+    type: 'danger'
+  });
+  if (!confirmed) return;
+
+  const btn = document.getElementById('btn-delete-all-employees');
+  const originalHtml = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span>Đang xóa...`; }
+
+  try {
+    const res = await api('DELETE', '/employees/all');
+    toast(res.message || 'Đã xóa toàn bộ danh sách nhân viên thành công', 'success');
+    navigate('manage-employees');
+  } catch (err) {
+    toast(err.message || 'Xóa thất bại', 'error');
+    if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
+  }
+}

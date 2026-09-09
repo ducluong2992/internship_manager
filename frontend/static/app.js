@@ -89,7 +89,7 @@ function showConfirm(options = {}) {
     const message = typeof options === 'string' ? options : (options.message || 'Bạn có chắc chắn muốn thực hiện thao tác này?');
     const okText = options.okText || 'Xác nhận';
     const cancelText = options.cancelText || 'Hủy bỏ';
-    const type = options.type || 'warning'; // 'danger', 'warning', 'info'
+    const type = options.type || 'warning'; // 'danger', 'warning', 'info', 'success'
 
     document.getElementById('confirm-modal-title').textContent = title;
     document.getElementById('confirm-modal-message').textContent = message;
@@ -105,6 +105,12 @@ function showConfirm(options = {}) {
     okBtn.textContent = okText;
     cancelBtn.textContent = cancelText;
 
+    if (options.hideCancel) {
+      cancelBtn.classList.add('d-none');
+    } else {
+      cancelBtn.classList.remove('d-none');
+    }
+
     const iconBg = document.getElementById('confirm-modal-icon-bg');
     const iconEl = document.getElementById('confirm-modal-icon');
 
@@ -117,8 +123,11 @@ function showConfirm(options = {}) {
       } else if (type === 'warning') {
         iconEl.className = 'bi bi-exclamation-triangle-fill';
         okBtn.className = 'btn btn-warning text-white px-4 py-2 rounded-3 fw-semibold';
+      } else if (type === 'success') {
+        iconEl.className = 'bi bi-check-circle-fill text-success';
+        okBtn.className = 'btn btn-success text-white px-4 py-2 rounded-3 fw-semibold';
       } else {
-        iconEl.className = 'bi bi-question-circle-fill';
+        iconEl.className = 'bi bi-info-circle-fill';
         okBtn.className = 'btn btn-primary px-4 py-2 rounded-3 fw-semibold';
       }
     }
@@ -159,6 +168,21 @@ function showConfirm(options = {}) {
 
     modalEl.style.setProperty('z-index', '1090', 'important');
     modalInstance.show();
+  });
+}
+
+// ── Alert Modal (Thông báo giữa màn hình) ──
+function showAlert(options = {}) {
+  const title = typeof options === 'string' ? 'Thông báo' : (options.title || 'Thông báo');
+  const message = typeof options === 'string' ? options : (options.message || '');
+  const okText = options.okText || 'Đã hiểu';
+  const type = options.type || 'success';
+  return showConfirm({
+    title,
+    message,
+    okText,
+    type,
+    hideCancel: true
   });
 }
 
@@ -250,10 +274,168 @@ function showPrompt(options = {}) {
   });
 }
 
+// ── Async Import Job Progress Modal ──
+function showJobProgressModal(jobId, onComplete) {
+  const modalEl = document.getElementById('modal-job-progress');
+  if (!modalEl) {
+    console.warn('modal-job-progress element not found');
+    return;
+  }
+
+  const iconEl = document.getElementById('job-progress-header-icon');
+  const badgeEl = document.getElementById('job-progress-status-badge');
+  const barEl = document.getElementById('job-progress-bar');
+  const detailEl = document.getElementById('job-progress-detail');
+  const errorEl = document.getElementById('job-progress-error');
+  const doneBtn = document.getElementById('job-progress-btn-done');
+  const closeBtn = document.getElementById('job-progress-btn-close');
+
+  // Reset initial UI state
+  iconEl.className = 'spinner-border spinner-border-sm text-danger';
+  iconEl.innerHTML = '';
+  badgeEl.className = 'badge bg-primary px-3 py-2 fs-6 fw-normal mb-2';
+  badgeEl.textContent = 'Đang xếp hàng đợi (PENDING)...';
+  barEl.className = 'progress-bar progress-bar-striped progress-bar-animated bg-danger';
+  barEl.style.width = '10%';
+  barEl.textContent = '10%';
+  detailEl.textContent = 'Đang chuyển tác vụ vào hàng đợi xử lý...';
+  errorEl.classList.add('d-none');
+  errorEl.textContent = '';
+  doneBtn.classList.add('d-none');
+  closeBtn.classList.add('d-none');
+
+  const modalInstance = bootstrap.Modal.getOrCreateInstance(modalEl);
+  modalInstance.show();
+
+  let pollCount = 0;
+  const maxPolls = 150; // ~ 2.5 phút
+  let timerId = null;
+
+  const poll = async () => {
+    pollCount++;
+    try {
+      const job = await api('GET', `/api/import-jobs/${jobId}`);
+      if (!job) return;
+
+      const percent = Math.max(5, Math.min(100, job.percent || 10));
+      barEl.style.width = `${percent}%`;
+      barEl.textContent = `${percent}%`;
+
+      if (job.progress) {
+        detailEl.textContent = job.progress;
+      }
+
+      if (job.status === 'PROCESSING') {
+        badgeEl.className = 'badge bg-warning text-dark px-3 py-2 fs-6 fw-normal mb-2';
+        badgeEl.textContent = 'Đang xử lý (PROCESSING)...';
+        barEl.className = 'progress-bar progress-bar-striped progress-bar-animated bg-danger';
+      } else if (job.status === 'SUCCESS') {
+        clearInterval(timerId);
+        iconEl.className = 'bi bi-check-circle-fill text-success fs-5';
+        iconEl.innerHTML = '';
+        badgeEl.className = 'badge bg-success px-3 py-2 fs-6 fw-normal mb-2';
+        badgeEl.textContent = 'Thành công (SUCCESS)';
+        barEl.className = 'progress-bar bg-success';
+        barEl.style.width = '100%';
+        barEl.textContent = '100%';
+        detailEl.textContent = job.progress || 'Hoàn tất nhập dữ liệu vào CSDL!';
+        doneBtn.classList.remove('d-none');
+        closeBtn.classList.remove('d-none');
+
+        toast('Nhập dữ liệu thành công!', 'success');
+        if (typeof onComplete === 'function') {
+          setTimeout(() => onComplete(job), 1000);
+        }
+        return;
+      } else if (job.status === 'FAILED') {
+        clearInterval(timerId);
+        iconEl.className = 'bi bi-x-circle-fill text-danger fs-5';
+        iconEl.innerHTML = '';
+        badgeEl.className = 'badge bg-danger px-3 py-2 fs-6 fw-normal mb-2';
+        badgeEl.textContent = 'Thất bại (FAILED)';
+        barEl.className = 'progress-bar bg-danger';
+        barEl.style.width = '100%';
+        barEl.textContent = 'Lỗi';
+        detailEl.textContent = 'Quá trình nhập dữ liệu thất bại.';
+        errorEl.textContent = job.errorMessage || 'Lỗi không xác định';
+        errorEl.classList.remove('d-none');
+        doneBtn.classList.remove('d-none');
+        closeBtn.classList.remove('d-none');
+
+        toast('Nhập dữ liệu thất bại: ' + (job.errorMessage || 'Lỗi'), 'error');
+        return;
+      }
+
+    } catch (err) {
+      console.warn('Polling error:', err);
+    }
+
+    if (pollCount >= maxPolls) {
+      clearInterval(timerId);
+      badgeEl.className = 'badge bg-secondary px-3 py-2 fs-6 fw-normal mb-2';
+      badgeEl.textContent = 'Hết thời gian chờ';
+      detailEl.textContent = 'Tác vụ vẫn đang chạy ngầm trong máy chủ. Bạn có thể kiểm tra lại sau.';
+      doneBtn.classList.remove('d-none');
+      closeBtn.classList.remove('d-none');
+    }
+  };
+
+  // Poll ngay lập tức và sau đó mỗi 800ms
+  poll();
+  timerId = setInterval(poll, 800);
+
+  modalEl.addEventListener('hidden.bs.modal', () => {
+    if (timerId) clearInterval(timerId);
+  }, { once: true });
+}
+
+// ── Non-blocking Background Import Job Tracker ──
+function trackBackgroundImportJob(jobId, label = 'dữ liệu', onComplete) {
+  if (!jobId) return;
+
+  let pollCount = 0;
+  const maxPolls = 180; // ~ 3 phút
+  let timerId = null;
+
+  const poll = async () => {
+    pollCount++;
+    try {
+      const job = await api('GET', `/api/import-jobs/${jobId}`);
+      if (!job) return;
+
+      if (job.status === 'SUCCESS') {
+        clearInterval(timerId);
+        // Tác vụ import hoàn tất ngầm, tự động làm mới dữ liệu mà không cần popup thông báo
+        if (typeof onComplete === 'function') {
+          onComplete(job);
+        }
+        return;
+      } else if (job.status === 'FAILED') {
+        clearInterval(timerId);
+        toast(`Xử lý import ${label} thất bại: ${job.errorMessage || 'Lỗi không xác định'}`, 'error', 6000);
+        return;
+      }
+    } catch (err) {
+      console.warn('Background import poll error:', err);
+    }
+
+    if (pollCount >= maxPolls) {
+      clearInterval(timerId);
+    }
+  };
+
+  // Poll lần đầu sau 400ms và sau đó lặp lại mỗi 1s
+  setTimeout(poll, 400);
+  timerId = setInterval(poll, 1000);
+}
+
 // Gắn các hàm thông báo & modal lên window object toàn cục
 window.toast = toast;
+window.showAlert = showAlert;
 window.showConfirm = showConfirm;
 window.showPrompt = showPrompt;
+window.showJobProgressModal = showJobProgressModal;
+window.trackBackgroundImportJob = trackBackgroundImportJob;
 
 // Ghi đè prompt mặc định của web để hiển thị bằng Prompt Modal góc giữa màn hình
 window.prompt = function (message, defaultValue = '') {
@@ -295,6 +477,8 @@ const PAGE_TITLES = {
 };
 
 function navigate(page) {
+  STATE.currentPage = page;
+  window.currentPage = page;
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   const navEl = document.getElementById('nav-' + page);
   if (navEl) navEl.classList.add('active');
@@ -303,6 +487,7 @@ function navigate(page) {
   area.innerHTML = '<div class="d-flex justify-content-center py-5"><div class="spinner-border text-danger"></div></div>';
   renderPage(page, area);
 }
+window.navigate = navigate;
 
 // ── Nav click ──
 document.querySelectorAll('.nav-item[data-page]').forEach(el => {

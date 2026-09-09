@@ -51,7 +51,9 @@ async function renderManageUsers(area) {
 
       // 4. Trạng thái
       if (window.userFilterStatus.size > 0) {
-        if (!window.userFilterStatus.has(u.working_status)) return false;
+        const ws = (u.working_status || '').toLowerCase();
+        const normWs = (ws.includes('nghỉ') || ws.includes('nghi') || ws.includes('dừng') || ws.includes('dung') || ws === 'resigned') ? 'Resigned' : 'Working';
+        if (!window.userFilterStatus.has(u.working_status) && !window.userFilterStatus.has(normWs)) return false;
       }
 
       // 5. Vị trí
@@ -71,7 +73,11 @@ async function renderManageUsers(area) {
     const cursorEnd = isFocused ? searchEl?.selectionEnd : null;
 
     const list = filtered();
-    const working = users.filter(u => u.user_type === 'intern' && u.working_status === 'Working').length;
+    const working = users.filter(u => {
+      if (u.user_type !== 'intern') return false;
+      const ws = (u.working_status || '').toLowerCase();
+      return ws === 'working' || ws.includes('đang làm') || ws.includes('dang lam') || (!ws.includes('nghỉ') && !ws.includes('nghi') && !ws.includes('resigned') && ws !== '');
+    }).length;
 
     // Build filter options lists
     const projectOptions = [
@@ -150,6 +156,9 @@ async function renderManageUsers(area) {
     </div>
     <input type="file" id="import-file-input" class="d-none" accept=".xlsx" onchange="handleImportExcel(event)" />
     <button class="btn btn-danger btn-sm" id="btn-add-user"><i class="bi bi-person-plus-fill me-1"></i>Thêm mới</button>
+    <button class="btn btn-outline-danger btn-sm" id="btn-delete-all-users" onclick="deleteAllUsers()" title="Xóa toàn bộ danh sách TTS">
+      <i class="bi bi-trash3-fill me-1"></i>Xóa tất cả
+    </button>
   </div>
 </div>
 <div class="filter-bar mb-3">
@@ -358,27 +367,36 @@ window.handleImportExcel = async function (event) {
   const formData = new FormData();
   formData.append('file', file);
 
-  toast('Đang đối chiếu dữ liệu từ file Excel...', 'info');
+  toast('Đang tải file lên máy chủ...', 'info');
   event.target.value = '';
 
   try {
-    const res = await fetch(API + '/admin/users/preview-import-file', {
+    const res = await fetch(API + '/api/import-jobs/submit?userType=intern', {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + STATE.token },
       body: formData
     });
 
     const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || data.message || 'Lỗi khi nhập dữ liệu');
+    if (!res.ok) throw new Error(data.error || data.detail || data.message || 'Lỗi khi nhập dữ liệu');
 
-    currentReconcileData = data;
-    showReconcileModal(data);
+    showAlert({
+      title: 'Tiếp nhận import thành công',
+      message: 'Yêu cầu import Thực tập sinh đã được tiếp nhận thành công và đang được xử lý ngầm (background). Bạn có thể tiếp tục công việc khác!',
+      okText: 'Đã hiểu',
+      type: 'success'
+    });
+
+    trackBackgroundImportJob(data.jobId, 'TTS', () => {
+      const cur = window.currentPage || (typeof STATE !== 'undefined' && STATE.currentPage);
+      if (cur === 'manage-users' || !cur || document.getElementById('user-search')) {
+        navigate('manage-users');
+      }
+    });
   } catch (err) {
-    toast(err.message, 'error');
+    toast(err.message || 'Lỗi khi tải file', 'error');
   }
 };
-
-let currentReconcileData = null;
 
 window.promptImportLink = async function () {
   const fn = window.showPrompt || showPrompt;
@@ -398,166 +416,50 @@ window.promptImportLink = async function () {
   localStorage.setItem('last_user_sheet_url', url);
   localStorage.setItem('last_sheet_url', url);
 
-  toast('Đang đối chiếu dữ liệu từ link...', 'info');
+  toast('Đang gửi yêu cầu import link Google Sheets...', 'info');
   try {
-    const data = await api('POST', '/admin/users/preview-import-link', { url: url });
-    currentReconcileData = data;
-    showReconcileModal(data);
-  } catch (err) {
-    toast(err.message || 'Lỗi khi đối chiếu dữ liệu', 'error');
-  }
-};
+    const data = await api('POST', '/api/import-jobs/submit-link?userType=intern', { url: url });
 
-function showReconcileModal(data) {
-  const { updated, added, removed, unchanged_count, format_warnings } = data;
+    showAlert({
+      title: 'Tiếp nhận import thành công',
+      message: 'Yêu cầu import Thực tập sinh từ Google Sheets đã được tiếp nhận thành công và đang được xử lý ngầm (background). Bạn có thể tiếp tục công việc khác!',
+      okText: 'Đã hiểu',
+      type: 'success'
+    });
 
-  const warnContainer = document.getElementById('reconcile-warnings-container');
-  if (warnContainer) {
-    if (format_warnings && format_warnings.length > 0) {
-      warnContainer.innerHTML = `
-        <div class="alert alert-warning py-2 px-3 mb-3 border-warning-subtle text-dark rounded-2" style="font-size: 12px; background: #fff8e1;">
-          <div class="fw-bold mb-1 text-warning-emphasis"><i class="bi bi-exclamation-triangle-fill me-1 text-warning"></i>Cảnh báo định dạng ô dữ liệu Excel:</div>
-          <ul class="mb-0 ps-3">
-            ${format_warnings.map(w => `<li>${w}</li>`).join('')}
-          </ul>
-        </div>`;
-    } else {
-      warnContainer.innerHTML = '';
-    }
-  }
-
-  document.getElementById('rec-count-updated').textContent = updated.length;
-  document.getElementById('rec-count-added').textContent = added.length;
-  document.getElementById('rec-count-removed').textContent = removed.length;
-  document.getElementById('rec-count-unchanged').textContent = unchanged_count || 0;
-
-  document.getElementById('badge-count-updated').textContent = `${updated.length} người`;
-  document.getElementById('badge-count-added').textContent = `${added.length} người`;
-  document.getElementById('badge-count-removed').textContent = `${removed.length} người`;
-
-  // Render Section 1: Updated
-  const updatedContainer = document.getElementById('list-rec-updated');
-  if (updated.length === 0) {
-    updatedContainer.innerHTML = `<div class="text-muted text-center py-2 bg-light rounded" style="font-size: 12px;">Không có thực tập sinh thay đổi thông tin</div>`;
-  } else {
-    updatedContainer.innerHTML = updated.map(item => `
-      <div class="border rounded p-2 bg-white" style="font-size: 12px;">
-        <div class="d-flex align-items-center justify-content-between mb-1 pb-1 border-bottom" style="min-width: 0;">
-          <div class="d-flex align-items-center gap-2 text-truncate me-2" style="min-width: 0; flex: 1;">
-            <span class="badge bg-secondary font-monospace flex-shrink-0" style="font-size: 10px;">${item.employee_code}</span>
-            <strong class="text-dark text-truncate" style="font-size: 13px;" title="${item.full_name}">${item.full_name}</strong>
-          </div>
-          <span class="text-muted flex-shrink-0" style="font-size: 11px;">${item.changes.length} thay đổi</span>
-        </div>
-        <div class="d-flex flex-column gap-1 pt-1">
-          ${item.changes.map(ch => `
-            <div class="p-1 px-2 rounded bg-light border d-flex align-items-center gap-2" style="font-size: 12px; min-width: 0;">
-              <span class="fw-semibold text-secondary flex-shrink-0" style="min-width: 110px;">${ch.field_name}:</span>
-              <span class="text-decoration-line-through text-muted text-truncate" style="max-width: 180px;" title="${ch.old_value || '—'}">${ch.old_value || '—'}</span>
-              <i class="bi bi-arrow-right text-secondary fs-6 flex-shrink-0"></i>
-              <span class="fw-bold text-dark text-truncate" style="max-width: 250px;" title="${ch.new_value}">${ch.new_value}</span>
-            </div>
-          `).join('')}
-        </div>
-      </div>
-    `).join('');
-  }
-
-  // Render Section 2: Added
-  const addedContainer = document.getElementById('list-rec-added');
-  if (added.length === 0) {
-    addedContainer.innerHTML = `<div class="text-muted text-center py-2 bg-light rounded" style="font-size: 12px;">Không có thực tập sinh thêm mới</div>`;
-  } else {
-    addedContainer.innerHTML = added.map(item => `
-      <div class="border rounded p-2 bg-white" style="font-size: 12px;">
-        <div class="d-flex align-items-center justify-content-between gap-2" style="min-width: 0;">
-          <div class="d-flex align-items-center gap-2 text-truncate me-2" style="min-width: 0; flex: 1;">
-            <span class="badge bg-secondary font-monospace flex-shrink-0" style="font-size: 10px;">${item.employee_code}</span>
-            <strong class="text-dark text-truncate" style="font-size: 13px;" title="${item.full_name}">${item.full_name}</strong>
-            <span class="badge bg-success flex-shrink-0" style="font-size: 10px;">Mới</span>
-          </div>
-          <div class="text-muted text-truncate text-end flex-shrink-0" style="font-size: 11px; max-width: 260px;" title="${[item.project, item.position, item.viettel_email].filter(Boolean).join(' · ')}">
-            <span>${[item.project, item.position, item.viettel_email].filter(Boolean).join(' · ') || '—'}</span>
-          </div>
-        </div>
-      </div>
-    `).join('');
-  }
-
-  // Render Section 3: Removed (In Web but not in Sheet)
-  const removedContainer = document.getElementById('list-rec-removed');
-  if (removed.length === 0) {
-    removedContainer.innerHTML = `<div class="text-muted text-center py-2 bg-light rounded" style="font-size: 12px;">Tất cả thực tập sinh trên Web đều có trong Sheet</div>`;
-  } else {
-    removedContainer.innerHTML = removed.map(item => `
-      <div class="border rounded p-2 bg-white" style="font-size: 12px;">
-        <div class="d-flex align-items-center justify-content-between gap-2" style="min-width: 0;">
-          <div class="d-flex align-items-center gap-2 text-truncate me-2" style="min-width: 0; flex: 1;">
-            <span class="badge bg-secondary font-monospace flex-shrink-0" style="font-size: 10px;">${item.employee_code}</span>
-            <strong class="text-dark flex-shrink-0" style="font-size: 13px;">${item.full_name}</strong>
-            <span class="text-muted text-truncate" style="font-size: 11px;" title="${[item.position, item.project].filter(Boolean).join(' · ')}">
-              ${[item.position, item.project].filter(Boolean).join(' · ') ? '— ' + [item.position, item.project].filter(Boolean).join(' · ') : ''}
-            </span>
-          </div>
-          <div class="choice-button-group d-flex align-items-center gap-1 flex-shrink-0">
-            <input type="radio" class="btn-check" name="rec_removed_${item.id}" id="choice_keep_${item.id}" value="keep" checked>
-            <label class="btn btn-outline-secondary btn-sm px-2 py-0" for="choice_keep_${item.id}" style="font-size: 11px;">Giữ lại</label>
-
-            <input type="radio" class="btn-check" name="rec_removed_${item.id}" id="choice_delete_${item.id}" value="delete">
-            <label class="btn btn-outline-danger btn-sm px-2 py-0" for="choice_delete_${item.id}" style="font-size: 11px;">Xóa đi</label>
-          </div>
-        </div>
-      </div>
-    `).join('');
-  }
-
-  // Set up confirm action button
-  const confirmBtn = document.getElementById('btn-confirm-reconcile');
-  confirmBtn.onclick = () => executeReconcileSync(data);
-
-  bootstrap.Modal.getOrCreateInstance(document.getElementById('modal-import-reconcile')).show();
-}
-
-window.setAllRemovedChoice = function (action) {
-  if (!currentReconcileData || !currentReconcileData.removed) return;
-  currentReconcileData.removed.forEach(item => {
-    const radio = document.getElementById(`choice_${action}_${item.id}`);
-    if (radio) radio.checked = true;
-  });
-};
-
-async function executeReconcileSync(data) {
-  const deleteIds = [];
-  if (data.removed && data.removed.length) {
-    data.removed.forEach(item => {
-      const deleteRadio = document.getElementById(`choice_delete_${item.id}`);
-      if (deleteRadio && deleteRadio.checked) {
-        deleteIds.push(item.id);
+    trackBackgroundImportJob(data.jobId, 'TTS', () => {
+      const cur = window.currentPage || (typeof STATE !== 'undefined' && STATE.currentPage);
+      if (cur === 'manage-users' || !cur || document.getElementById('user-search')) {
+        navigate('manage-users');
       }
     });
-  }
-
-  const payload = {
-    updates: data.updated || [],
-    additions: data.added || [],
-    delete_ids: deleteIds
-  };
-
-  const confirmBtn = document.getElementById('btn-confirm-reconcile');
-  const originalHtml = confirmBtn.innerHTML;
-  confirmBtn.disabled = true;
-  confirmBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Đang cập nhật...`;
-
-  try {
-    const res = await api('POST', '/admin/users/confirm-import-link', payload);
-    toast(res.message, 'success');
-    bootstrap.Modal.getInstance(document.getElementById('modal-import-reconcile')).hide();
-    navigate('manage-users');
   } catch (err) {
-    toast(err.message || 'Lỗi khi cập nhật dữ liệu', 'error');
-  } finally {
-    confirmBtn.disabled = false;
-    confirmBtn.innerHTML = originalHtml;
+    toast(err.message || 'Lỗi khi gửi yêu cầu import', 'error');
   }
 };
 
+
+// ─── Xóa toàn bộ danh sách TTS ──────────────────────────────────────────────
+async function deleteAllUsers() {
+  const confirmed = await showConfirm({
+    title: 'Xóa toàn bộ danh sách TTS',
+    message: 'Bạn có chắc chắn muốn xóa toàn bộ danh sách thực tập sinh? Hành động này không thể hoàn tác. Tất cả dữ liệu liên quan (lịch làm việc, OT, v.v.) cũng sẽ bị xóa.',
+    okText: 'Xóa tất cả',
+    cancelText: 'Hủy bỏ',
+    type: 'danger'
+  });
+  if (!confirmed) return;
+
+  const btn = document.getElementById('btn-delete-all-users');
+  const originalHtml = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span>Đang xóa...`; }
+
+  try {
+    const res = await api('DELETE', '/admin/users/all');
+    toast(res.message || 'Đã xóa toàn bộ danh sách TTS thành công', 'success');
+    navigate('manage-users');
+  } catch (err) {
+    toast(err.message || 'Xóa thất bại', 'error');
+    if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
+  }
+}

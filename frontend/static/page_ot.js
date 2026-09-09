@@ -590,7 +590,7 @@ async function renderRegisterOT(area) {
           is_holiday: isHoliday,
         });
 
-        const allSegs = data.segments || [];
+        const allSegs = Array.isArray(data) ? data : (data.segments || []);
         const segsByDate = {};
         allSegs.forEach(seg => {
           const wDate = (typeof seg.work_date === 'string') ? seg.work_date : (seg.work_date ? seg.work_date.toString() : dStr);
@@ -609,12 +609,12 @@ async function renderRegisterOT(area) {
           const segStr = dateSegs.map(seg => {
             const isNight = (seg.shift_type === 'night' || seg.factor === 2.1 || seg.factor === 2.7 || seg.factor === 3.9);
             if (isNight) {
-              totalNightRaw += seg.raw_hours;
+              totalNightRaw += (seg.raw_hours || 0);
             } else {
-              totalDayRaw += seg.raw_hours;
+              totalDayRaw += (seg.raw_hours || 0);
             }
-            totalRawAll += seg.raw_hours;
-            totalWeightedAll += seg.weighted_hours;
+            totalRawAll += (seg.raw_hours || 0);
+            totalWeightedAll += (seg.weighted_hours || 0);
 
             const shiftBadge = isNight
               ? `<span class="badge" style="background:#1e293b;color:#f8fafc;font-size:0.72rem"><i class="bi bi-moon-stars-fill text-warning me-1"></i>Ban đêm</span>`
@@ -649,13 +649,17 @@ async function renderRegisterOT(area) {
       } catch (err) {
         preview.classList.add('d-none');
       }
-    }, 350);
+    }, 200);
   }
 
   document.getElementById('ot-date').addEventListener('change', updateOTCalcPreview);
+  document.getElementById('ot-date').addEventListener('input', updateOTCalcPreview);
   document.getElementById('ot-end-date')?.addEventListener('change', updateOTCalcPreview);
+  document.getElementById('ot-end-date')?.addEventListener('input', updateOTCalcPreview);
   document.getElementById('ot-start').addEventListener('change', updateOTCalcPreview);
+  document.getElementById('ot-start').addEventListener('input', updateOTCalcPreview);
   document.getElementById('ot-end').addEventListener('change', updateOTCalcPreview);
+  document.getElementById('ot-end').addEventListener('input', updateOTCalcPreview);
   document.getElementById('ot-is-holiday').addEventListener('change', () => {
     const isHoliday = document.getElementById('ot-is-holiday').checked;
     const sElem = document.getElementById('ot-start');

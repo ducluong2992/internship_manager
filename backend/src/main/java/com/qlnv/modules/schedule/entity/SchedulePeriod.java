@@ -7,7 +7,10 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "schedule_period")
+@Table(name = "schedule_period", indexes = {
+    @Index(name = "idx_period_month_year", columnList = "month, year", unique = true),
+    @Index(name = "idx_period_status",     columnList = "status")
+})
 @Getter
 @Setter
 @NoArgsConstructor

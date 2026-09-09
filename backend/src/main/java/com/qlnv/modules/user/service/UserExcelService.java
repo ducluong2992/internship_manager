@@ -152,28 +152,24 @@ public class UserExcelService {
         ImportResultDto result = new ImportResultDto();
         try (InputStream is = file.getInputStream(); Workbook workbook = WorkbookFactory.create(is)) {
             Sheet sheet = workbook.getSheetAt(0);
-            Iterator<Row> rowIterator = sheet.iterator();
-
-            if (!rowIterator.hasNext()) {
-                throw new ApiException("File Excel không có dữ liệu");
+            Row headerRow = findHeaderRow(sheet);
+            if (headerRow == null) {
+                throw new ApiException("File Excel không có dữ liệu tiêu đề");
             }
 
             // Read headers
-            Row headerRow = rowIterator.next();
-            Map<String, Integer> colIndexMap = new HashMap<>();
-            for (Cell cell : headerRow) {
-                String val = getCellString(cell).trim().toLowerCase();
-                colIndexMap.put(val, cell.getColumnIndex());
-            }
+            Map<String, Integer> colIndexMap = buildColIndexMap(headerRow);
 
             int imported = 0;
             int updated = 0;
             int skipped = 0;
-            int rowNum = 1;
+            int startRow = headerRow.getRowNum() + 1;
+            int lastRow = sheet.getLastRowNum();
 
-            while (rowIterator.hasNext()) {
-                Row row = rowIterator.next();
-                rowNum++;
+            for (int r = startRow; r <= lastRow; r++) {
+                Row row = sheet.getRow(r);
+                if (row == null) continue;
+                int rowNum = r + 1;
 
                 String empCode = getCellByColName(row, colIndexMap, "mã", "mã tts", "mã nv", "mã tts (*)", "mã nv (*)");
                 String fullName = getCellByColName(row, colIndexMap, "họ và tên", "họ tên", "họ và tên (*)");
@@ -248,8 +244,13 @@ public class UserExcelService {
                     LocalDate joinDate = parseDate(joinDateStr, row, colIndexMap, "ngày vào");
                     if (joinDate != null) user.setJoinDate(joinDate);
 
-                    String workingStatus = getCellByColName(row, colIndexMap, "trạng thái", "trạng thái làm việc");
-                    if (!workingStatus.isEmpty()) user.setWorkingStatus(workingStatus);
+                    String rawWorkingStatus = getCellByColName(row, colIndexMap,
+                            "trạng thái", "trạng thái làm việc", "trạng thái tts",
+                            "tình trạng", "tình trạng làm việc", "tình trạng tts", "tình trạng hiện tại",
+                            "hiện trạng", "status", "working status", "working_status");
+                    if (!rawWorkingStatus.isEmpty()) {
+                        user.setWorkingStatus(normalizeWorkingStatus(rawWorkingStatus));
+                    }
 
                     if ("employee".equalsIgnoreCase(userType)) {
                         String directManager = getCellByColName(row, colIndexMap, "quản lý trực tiếp", "quản lý");
@@ -295,11 +296,17 @@ public class UserExcelService {
 
                     user = userRepository.save(user);
 
-                    if (isNew && !"intern".equalsIgnoreCase(userType) && !"tts".equalsIgnoreCase(userType) && accountRepository.findByUserId(user.getId()).isEmpty()) {
+                    boolean isTts = "intern".equalsIgnoreCase(userType) || "tts".equalsIgnoreCase(userType)
+                            || "intern".equalsIgnoreCase(user.getUserType()) || "tts".equalsIgnoreCase(user.getUserType())
+                            || (empCode != null && empCode.trim().toUpperCase().startsWith("TTS"));
+                    if (isNew && !isTts && accountRepository.findByUserId(user.getId()).isEmpty()) {
+                        String username = (user.getViettelEmail() != null && !user.getViettelEmail().trim().isEmpty())
+                                ? user.getViettelEmail().trim().toLowerCase()
+                                : empCode;
                         Account acc = Account.builder()
                                 .userId(user.getId())
-                                .username(empCode)
-                                .password(passwordEncoder.encode("User@123"))
+                                .username(username)
+                                .password(passwordEncoder.encode("123456"))
                                 .createdAt(LocalDateTime.now())
                                 .build();
                         accountRepository.save(acc);
@@ -391,18 +398,13 @@ public class UserExcelService {
 
     public ReconcilePreviewDto previewInternImportWorkbook(Workbook workbook) {
         Sheet sheet = workbook.getSheetAt(0);
-        Iterator<Row> rowIterator = sheet.iterator();
+        Row headerRow = findHeaderRow(sheet);
 
-        if (!rowIterator.hasNext()) {
-            throw new ApiException("File hoặc link Google Sheet không có dữ liệu");
+        if (headerRow == null) {
+            throw new ApiException("File hoặc link Google Sheet không có dữ liệu tiêu đề");
         }
 
-        Row headerRow = rowIterator.next();
-        Map<String, Integer> colIndexMap = new HashMap<>();
-        for (Cell cell : headerRow) {
-            String val = getCellString(cell).trim().toLowerCase();
-            colIndexMap.put(val, cell.getColumnIndex());
-        }
+        Map<String, Integer> colIndexMap = buildColIndexMap(headerRow);
 
         List<User> dbInterns = userRepository.findByUserType("intern");
         Map<String, User> dbByCode = new HashMap<>();
@@ -417,11 +419,13 @@ public class UserExcelService {
         Set<Integer> processedDbIds = new HashSet<>();
         List<String> formatWarnings = new ArrayList<>();
         int unchangedCount = 0;
-        int rowNum = 1;
+        int startRow = headerRow.getRowNum() + 1;
+        int lastRow = sheet.getLastRowNum();
 
-        while (rowIterator.hasNext()) {
-            Row row = rowIterator.next();
-            rowNum++;
+        for (int r = startRow; r <= lastRow; r++) {
+            Row row = sheet.getRow(r);
+            if (row == null) continue;
+            int rowNum = r + 1;
 
             String empCode = getCellByColName(row, colIndexMap, "mã", "mã tts", "mã nv", "mã tts (*)", "mã nv (*)");
             String fullName = getCellByColName(row, colIndexMap, "họ và tên", "họ tên", "họ và tên (*)");
@@ -452,7 +456,11 @@ public class UserExcelService {
 
             String allowance = getCellByColName(row, colIndexMap, "trợ cấp", "allowance");
             String employeeType = getCellByColName(row, colIndexMap, "loại tts", "loại nhân sự", "employee_type");
-            String workingStatus = getCellByColName(row, colIndexMap, "trạng thái", "trạng thái làm việc", "working_status");
+            String rawWorkingStatus = getCellByColName(row, colIndexMap,
+                    "trạng thái", "trạng thái làm việc", "trạng thái tts",
+                    "tình trạng", "tình trạng làm việc", "tình trạng tts", "tình trạng hiện tại",
+                    "hiện trạng", "status", "working status", "working_status");
+            String workingStatus = !rawWorkingStatus.isEmpty() ? normalizeWorkingStatus(rawWorkingStatus) : "";
             String employmentType = getCellByColName(row, colIndexMap, "hình thức làm việc", "employment_type");
 
             Map<String, Object> sheetData = new HashMap<>();
@@ -472,7 +480,11 @@ public class UserExcelService {
             if (joinDate != null) sheetData.put("join_date", joinDate.toString());
             if (!allowance.isEmpty()) sheetData.put("allowance", allowance);
             if (!employeeType.isEmpty()) sheetData.put("employee_type", employeeType);
-            if (!workingStatus.isEmpty()) sheetData.put("working_status", workingStatus);
+            if (!workingStatus.isEmpty()) {
+                sheetData.put("working_status", workingStatus);
+            } else {
+                sheetData.put("working_status", "Working");
+            }
             if (!employmentType.isEmpty()) sheetData.put("employment_type", employmentType);
 
             User matched = null;
@@ -501,7 +513,13 @@ public class UserExcelService {
                 checkFieldChange(changes, "Ngày vào", matched.getJoinDate() != null ? matched.getJoinDate().toString() : "", joinDate != null ? joinDate.toString() : "");
                 checkFieldChange(changes, "Trợ cấp", matched.getAllowance(), allowance);
                 checkFieldChange(changes, "Loại nhân sự", matched.getEmployeeType(), employeeType);
-                checkFieldChange(changes, "Trạng thái", matched.getWorkingStatus(), workingStatus);
+                if (!workingStatus.isEmpty()) {
+                    String oldStatusNorm = normalizeWorkingStatus(matched.getWorkingStatus());
+                    String newStatusNorm = workingStatus;
+                    if (!oldStatusNorm.equalsIgnoreCase(newStatusNorm)) {
+                        checkFieldChange(changes, "Trạng thái", formatWorkingStatusDisplay(oldStatusNorm), formatWorkingStatusDisplay(newStatusNorm));
+                    }
+                }
                 checkFieldChange(changes, "Hình thức", matched.getEmploymentType(), employmentType);
 
                 if (!changes.isEmpty()) {
@@ -551,18 +569,13 @@ public class UserExcelService {
 
     public ReconcilePreviewDto previewEmployeeImportWorkbook(Workbook workbook) {
         Sheet sheet = workbook.getSheetAt(0);
-        Iterator<Row> rowIterator = sheet.iterator();
+        Row headerRow = findHeaderRow(sheet);
 
-        if (!rowIterator.hasNext()) {
-            throw new ApiException("File hoặc link Google Sheet không có dữ liệu");
+        if (headerRow == null) {
+            throw new ApiException("File hoặc link Google Sheet không có dữ liệu tiêu đề");
         }
 
-        Row headerRow = rowIterator.next();
-        Map<String, Integer> colIndexMap = new HashMap<>();
-        for (Cell cell : headerRow) {
-            String val = getCellString(cell).trim().toLowerCase();
-            colIndexMap.put(val, cell.getColumnIndex());
-        }
+        Map<String, Integer> colIndexMap = buildColIndexMap(headerRow);
 
         List<User> dbEmployees = userRepository.findByUserType("employee");
         Map<String, User> dbByCode = new HashMap<>();
@@ -577,11 +590,13 @@ public class UserExcelService {
         Set<Integer> processedDbIds = new HashSet<>();
         List<String> formatWarnings = new ArrayList<>();
         int unchangedCount = 0;
-        int rowNum = 1;
+        int startRow = headerRow.getRowNum() + 1;
+        int lastRow = sheet.getLastRowNum();
 
-        while (rowIterator.hasNext()) {
-            Row row = rowIterator.next();
-            rowNum++;
+        for (int r = startRow; r <= lastRow; r++) {
+            Row row = sheet.getRow(r);
+            if (row == null) continue;
+            int rowNum = r + 1;
 
             String empCode = getCellByColName(row, colIndexMap, "mã", "mã nv", "mã nv (*)", "manv", "code");
             String fullName = getCellByColName(row, colIndexMap, "họ và tên", "họ tên", "họ và tên (*)", "full_name");
@@ -589,17 +604,17 @@ public class UserExcelService {
             if (empCode.isEmpty() && fullName.isEmpty()) continue;
 
             String position = getCellByColName(row, colIndexMap, "vị trí", "vị trí / chức danh", "chức danh", "role", "position");
-            String directManager = getCellByColName(row, colIndexMap, "quản lý trực tiếp", "quản lý", "manager", "direct_manager");
+            String directManager = getCellByColName(row, colIndexMap, "quản lý trực tiếp", "quản lí trực tiếp", "quản lý", "quản lí", "manager", "direct_manager");
             String project = getCellByColName(row, colIndexMap, "dự án", "project");
             String email = getCellByColName(row, colIndexMap, "email viettel", "email", "viettel_email");
             String phone = getCellByColName(row, colIndexMap, "số điện thoại", "sđt", "phone");
             String cccd = getCellByColName(row, colIndexMap, "cccd", "số cccd", "cmnd");
             String bankName = getCellByColName(row, colIndexMap, "tên ngân hàng", "ngân hàng", "bank_name");
-            String bankAccount = getCellByColName(row, colIndexMap, "số tài khoản", "stk", "bank_account");
+            String bankAccount = getCellByColName(row, colIndexMap, "số tài khoản", "stk", "bank_account", "số tài khoản viettel money", "viettel money");
             String birthdayStr = getCellByColName(row, colIndexMap, "ngày sinh", "ngày sinh (yyyy-mm-dd)", "birthday");
             LocalDate birthday = parseDate(birthdayStr, row, colIndexMap, "ngày sinh");
             if (birthday == null && !birthdayStr.isEmpty()) {
-                formatWarnings.add("Dòng " + rowNum + " (" + fullName + "): Ngày sinh '" + birthdayStr + "' không đúng định dạng yyyy-MM-dd");
+                formatWarnings.add("Dòng " + rowNum + " (" + fullName + "): Ngày sinh '" + birthdayStr + "' không đúng định dạng ngày tháng");
             }
             String hometown = getCellByColName(row, colIndexMap, "quê quán", "hometown");
             String gender = getCellByColName(row, colIndexMap, "giới tính", "gender");
@@ -607,14 +622,14 @@ public class UserExcelService {
             String joinDateStr = getCellByColName(row, colIndexMap, "ngày vào", "ngày vào (yyyy-mm-dd)", "ngày tham gia", "join_date");
             LocalDate joinDate = parseDate(joinDateStr, row, colIndexMap, "ngày vào");
             if (joinDate == null && !joinDateStr.isEmpty()) {
-                formatWarnings.add("Dòng " + rowNum + " (" + fullName + "): Ngày vào '" + joinDateStr + "' không đúng định dạng yyyy-MM-dd");
+                formatWarnings.add("Dòng " + rowNum + " (" + fullName + "): Ngày vào '" + joinDateStr + "' không đúng định dạng ngày tháng");
             }
             String staffCategory = getCellByColName(row, colIndexMap, "loại nhân sự", "loại ns", "staff_category");
             String employmentStatus = getCellByColName(row, colIndexMap, "tình trạng hđ", "tình trạng hợp đồng", "tình trạng", "employment_status");
             String workingStatus = getCellByColName(row, colIndexMap, "trạng thái", "trạng thái làm việc", "working_status");
             String useCompanyMac = getCellByColName(row, colIndexMap, "dùng mac cty", "dùng mac", "use_company_mac");
             String seatPosition = getCellByColName(row, colIndexMap, "vị trí ngồi", "chỗ ngồi", "seat_position");
-            String computerSerial = getCellByColName(row, colIndexMap, "seri máy tính", "serial máy tính", "computer_serial");
+            String computerSerial = getCellByColName(row, colIndexMap, "seri máy tính", "serial máy tính", "computer_serial", "seri máy tính chính chủ", "serial");
 
             Map<String, Object> sheetData = new HashMap<>();
             sheetData.put("employee_code", empCode);
@@ -761,6 +776,16 @@ public class UserExcelService {
                     User user = opt.get();
                     applyUserDataMap(user, data);
                     userRepository.save(user);
+
+                    if ("employee".equalsIgnoreCase(userType) || "employee".equalsIgnoreCase(user.getUserType())) {
+                        String username = (user.getViettelEmail() != null && !user.getViettelEmail().trim().isEmpty())
+                                ? user.getViettelEmail().trim().toLowerCase()
+                                : user.getEmployeeCode();
+                        accountRepository.findByUserId(user.getId()).ifPresent(acc -> {
+                            acc.setUsername(username);
+                            accountRepository.save(acc);
+                        });
+                    }
                     updatedCount++;
                 }
             }
@@ -794,15 +819,26 @@ public class UserExcelService {
                 applyUserDataMap(user, data);
                 user = userRepository.save(user);
 
-                // For employees, ensure they have an account
-                if ("employee".equalsIgnoreCase(userType) || "employee".equalsIgnoreCase(user.getUserType())) {
-                    if (accountRepository.findByUserId(user.getId()).isEmpty()) {
+                // For employees, ensure they have an account (NEVER for TTS)
+                boolean isTts = "intern".equalsIgnoreCase(userType) || "tts".equalsIgnoreCase(userType)
+                        || "intern".equalsIgnoreCase(user.getUserType()) || "tts".equalsIgnoreCase(user.getUserType())
+                        || (empCode != null && empCode.trim().toUpperCase().startsWith("TTS"));
+                if (!isTts && ("employee".equalsIgnoreCase(userType) || "employee".equalsIgnoreCase(user.getUserType()))) {
+                    String username = (user.getViettelEmail() != null && !user.getViettelEmail().trim().isEmpty())
+                            ? user.getViettelEmail().trim().toLowerCase()
+                            : empCode;
+                    Optional<Account> accOpt = accountRepository.findByUserId(user.getId());
+                    if (accOpt.isEmpty()) {
                         Account acc = Account.builder()
                                 .userId(user.getId())
-                                .username(empCode)
-                                .password(passwordEncoder.encode("User@123"))
+                                .username(username)
+                                .password(passwordEncoder.encode("123456"))
                                 .createdAt(LocalDateTime.now())
                                 .build();
+                        accountRepository.save(acc);
+                    } else {
+                        Account acc = accOpt.get();
+                        acc.setUsername(username);
                         accountRepository.save(acc);
                     }
                 }
@@ -855,7 +891,9 @@ public class UserExcelService {
         }
         if (data.containsKey("allowance") && data.get("allowance") != null) user.setAllowance(data.get("allowance").toString());
         if (data.containsKey("employee_type") && data.get("employee_type") != null) user.setEmployeeType(data.get("employee_type").toString());
-        if (data.containsKey("working_status") && data.get("working_status") != null) user.setWorkingStatus(data.get("working_status").toString());
+        if (data.containsKey("working_status") && data.get("working_status") != null) {
+            user.setWorkingStatus(normalizeWorkingStatus(data.get("working_status").toString()));
+        }
         if (data.containsKey("employment_type") && data.get("employment_type") != null) user.setEmploymentType(data.get("employment_type").toString());
         if (data.containsKey("staff_category") && data.get("staff_category") != null) user.setStaffCategory(data.get("staff_category").toString());
         if (data.containsKey("employment_status") && data.get("employment_status") != null) user.setEmploymentStatus(data.get("employment_status").toString());
@@ -1120,9 +1158,124 @@ public class UserExcelService {
         return getCellString(targetCell, visited);
     }
 
+    private String normalizeHeader(String header) {
+        if (header == null) return "";
+        String s = header.trim().toLowerCase();
+        s = s.replaceAll("\\([^)]*\\)", " ");
+        s = s.replaceAll("\\[[^\\]]*\\]", " ");
+        s = s.replaceAll("[*:\\-_/]", " ");
+        s = s.replace("lí", "lý");
+        return s.replaceAll("\\s+", " ").trim();
+    }
+
+    private Row findHeaderRow(Sheet sheet) {
+        if (sheet == null) return null;
+        for (int r = 0; r <= Math.min(15, sheet.getLastRowNum()); r++) {
+            Row row = sheet.getRow(r);
+            if (row == null) continue;
+            int matchCount = 0;
+            for (Cell cell : row) {
+                String norm = normalizeHeader(getCellString(cell));
+                if (norm.contains("họ và tên") || norm.contains("họ tên")
+                        || norm.contains("mã nv") || norm.contains("mã tts") || norm.equals("mã")
+                        || norm.contains("email") || norm.equals("stt") || norm.contains("vị trí")
+                        || norm.contains("role") || norm.contains("dự án") || norm.contains("tình trạng")
+                        || norm.contains("trạng thái")) {
+                    matchCount++;
+                }
+            }
+            if (matchCount >= 2) {
+                return row;
+            }
+        }
+        for (int r = 0; r <= sheet.getLastRowNum(); r++) {
+            Row row = sheet.getRow(r);
+            if (row != null) {
+                for (Cell cell : row) {
+                    if (!getCellString(cell).trim().isEmpty()) {
+                        return row;
+                    }
+                }
+            }
+        }
+        return sheet.getRow(0);
+    }
+
+    public static String normalizeWorkingStatus(String val) {
+        if (val == null) return "Working";
+        String s = val.trim().toLowerCase();
+        if (s.isEmpty()) return "Working";
+
+        if (s.contains("nghỉ") || s.contains("nghi") || s.contains("dừng") || s.contains("dung")
+                || s.contains("resigned") || s.contains("inactive") || s.contains("thôi")
+                || s.contains("kết thúc") || s.contains("ket thuc")) {
+            return "Resigned";
+        }
+        if (s.contains("chính thức") || s.contains("chinh thuc")) {
+            return "Lên chính thức";
+        }
+        if (s.contains("chuyển") || s.contains("chuyen")) {
+            return "Chuyển trung tâm";
+        }
+        if (s.contains("đang") || s.contains("dang") || s.contains("làm") || s.contains("lam")
+                || s.contains("working") || s.contains("active") || s.contains("thực tập") || s.contains("thuc tap")) {
+            return "Working";
+        }
+        if ("resigned".equalsIgnoreCase(s)) return "Resigned";
+        return "Working";
+    }
+
+    public static String formatWorkingStatusDisplay(String status) {
+        if (status == null) return "Đang làm";
+        String s = status.trim().toLowerCase();
+        if (s.equals("resigned") || s.contains("nghỉ") || s.contains("nghi")) return "Đã nghỉ";
+        if (s.contains("chính thức") || s.contains("chinh thuc")) return "Lên chính thức";
+        if (s.contains("chuyển") || s.contains("chuyen")) return "Chuyển TT";
+        return "Đang làm";
+    }
+
+    private Map<String, Integer> buildColIndexMap(Row headerRow) {
+        Map<String, Integer> map = new LinkedHashMap<>();
+        if (headerRow == null) return map;
+        for (Cell cell : headerRow) {
+            String raw = getCellString(cell).trim().toLowerCase();
+            if (raw.isEmpty()) continue;
+            map.put(raw, cell.getColumnIndex());
+            String norm = normalizeHeader(raw);
+            if (!norm.isEmpty()) {
+                map.putIfAbsent(norm, cell.getColumnIndex());
+            }
+        }
+        return map;
+    }
+
     private String getCellByColName(Row row, Map<String, Integer> colIndexMap, String... colNames) {
+        if (row == null || colIndexMap == null) return "";
         for (String name : colNames) {
-            Integer idx = colIndexMap.get(name.toLowerCase());
+            String target = name.trim().toLowerCase();
+            String normTarget = normalizeHeader(target);
+
+            Integer idx = colIndexMap.get(target);
+            if (idx == null) {
+                idx = colIndexMap.get(normTarget);
+            }
+
+            if (idx == null) {
+                for (Map.Entry<String, Integer> entry : colIndexMap.entrySet()) {
+                    String colKey = entry.getKey();
+                    String normKey = normalizeHeader(colKey);
+
+                    if (normKey.equals(normTarget)
+                            || normKey.startsWith(normTarget)
+                            || normTarget.startsWith(normKey)
+                            || (normTarget.length() >= 4 && normKey.contains(normTarget))
+                            || (normKey.length() >= 4 && normTarget.contains(normKey))) {
+                        idx = entry.getValue();
+                        break;
+                    }
+                }
+            }
+
             if (idx != null) {
                 Cell cell = row.getCell(idx);
                 String val = getCellString(cell);
@@ -1134,13 +1287,18 @@ public class UserExcelService {
 
     private LocalDate parseDate(String val, Row row, Map<String, Integer> colIndexMap, String colName) {
         if (val == null || val.trim().isEmpty()) {
-            Integer idx = colIndexMap.get(colName.toLowerCase());
-            if (idx != null) {
-                Cell cell = row.getCell(idx);
-                if (cell != null && DateUtil.isCellDateFormatted(cell)) {
-                    Date d = cell.getDateCellValue();
-                    if (d != null) {
-                        return d.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+            if (colIndexMap != null && row != null) {
+                Integer idx = colIndexMap.get(colName.toLowerCase());
+                if (idx == null) {
+                    idx = colIndexMap.get(normalizeHeader(colName));
+                }
+                if (idx != null) {
+                    Cell cell = row.getCell(idx);
+                    if (cell != null && DateUtil.isCellDateFormatted(cell)) {
+                        Date d = cell.getDateCellValue();
+                        if (d != null) {
+                            return d.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+                        }
                     }
                 }
             }
@@ -1148,7 +1306,10 @@ public class UserExcelService {
         }
 
         val = val.trim();
-        List<String> patterns = List.of("yyyy-MM-dd", "dd/MM/yyyy", "d/M/yyyy", "yyyy/MM/dd", "dd-MM-yyyy");
+        List<String> patterns = List.of(
+                "yyyy-MM-dd", "dd/MM/yyyy", "d/M/yyyy", "yyyy/MM/dd", "dd-MM-yyyy", "d-M-yyyy",
+                "dd.MM.yyyy", "d.M.yyyy", "dd/MM/yy", "d/M/yy"
+        );
         for (String p : patterns) {
             try {
                 return LocalDate.parse(val, DateTimeFormatter.ofPattern(p));
