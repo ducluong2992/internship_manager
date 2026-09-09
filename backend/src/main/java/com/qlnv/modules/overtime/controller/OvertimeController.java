@@ -163,6 +163,72 @@ public class OvertimeController {
         return ResponseEntity.ok(overtimeService.approveAllPending(principal.getId(), month, year, project));
     }
 
+    @GetMapping("/admin/export-pl02")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<byte[]> exportOvertimePL02(
+            @RequestParam(value = "status", required = false) String status,
+            @RequestParam(value = "project", required = false) String project,
+            @RequestParam(value = "month", required = false) Integer month,
+            @RequestParam(value = "year", required = false) Integer year,
+            @RequestParam(required = false, name = "from_date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+            @RequestParam(required = false, name = "to_date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
+            @RequestParam(value = "keyword", required = false) String keyword,
+            @RequestParam(required = false, name = "employee_name") String employeeName) {
+        String effectiveKeyword = (keyword != null && !keyword.trim().isEmpty()) ? keyword : employeeName;
+        byte[] data = overtimeExportService.exportPhuLuc02Summary(status, project, month, year, fromDate, toDate, effectiveKeyword);
+        int targetMonth = (month != null) ? month : (fromDate != null ? fromDate.getMonthValue() : LocalDate.now().getMonthValue());
+        int targetYear = (year != null) ? year : (fromDate != null ? fromDate.getYear() : LocalDate.now().getYear());
+        String fileName = String.format("Phu_Luc_02_Bang_Tong_Hop_Cong_OT_T%02d_%d.xlsx", targetMonth, targetYear);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + fileName)
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(data);
+    }
+
+    @GetMapping("/admin/export-pl03")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<byte[]> exportOvertimePL03(
+            @RequestParam(value = "status", required = false) String status,
+            @RequestParam(value = "project", required = false) String project,
+            @RequestParam(value = "month", required = false) Integer month,
+            @RequestParam(value = "year", required = false) Integer year,
+            @RequestParam(required = false, name = "from_date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+            @RequestParam(required = false, name = "to_date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
+            @RequestParam(value = "keyword", required = false) String keyword,
+            @RequestParam(required = false, name = "employee_name") String employeeName) {
+        String effectiveKeyword = (keyword != null && !keyword.trim().isEmpty()) ? keyword : employeeName;
+        byte[] data = overtimeExportService.exportPhuLuc03DetailByProject(status, project, month, year, fromDate, toDate, effectiveKeyword);
+        int targetMonth = (month != null) ? month : (fromDate != null ? fromDate.getMonthValue() : LocalDate.now().getMonthValue());
+        int targetYear = (year != null) ? year : (fromDate != null ? fromDate.getYear() : LocalDate.now().getYear());
+        String fileName = String.format("Phu_Luc_03_Thoi_Gian_Lam_Them_Gio_CBNV_T%02d_%d.xlsx", targetMonth, targetYear);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + fileName)
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(data);
+    }
+
+    @GetMapping("/admin/export-zip")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<byte[]> exportOvertimeZip(
+            @RequestParam(value = "status", required = false) String status,
+            @RequestParam(value = "project", required = false) String project,
+            @RequestParam(value = "month", required = false) Integer month,
+            @RequestParam(value = "year", required = false) Integer year,
+            @RequestParam(required = false, name = "from_date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+            @RequestParam(required = false, name = "to_date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
+            @RequestParam(value = "keyword", required = false) String keyword,
+            @RequestParam(required = false, name = "employee_name") String employeeName) {
+        String effectiveKeyword = (keyword != null && !keyword.trim().isEmpty()) ? keyword : employeeName;
+        byte[] data = overtimeExportService.exportZipBundle(status, project, month, year, fromDate, toDate, effectiveKeyword);
+        int targetMonth = (month != null) ? month : (fromDate != null ? fromDate.getMonthValue() : LocalDate.now().getMonthValue());
+        int targetYear = (year != null) ? year : (fromDate != null ? fromDate.getYear() : LocalDate.now().getYear());
+        String fileName = String.format("Bao_Cao_OT_PL02_PL03_T%02d_%d.zip", targetMonth, targetYear);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + fileName)
+                .contentType(MediaType.parseMediaType("application/zip"))
+                .body(data);
+    }
+
     @GetMapping("/admin/export")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<byte[]> exportOvertime(
@@ -174,11 +240,7 @@ public class OvertimeController {
             @RequestParam(required = false, name = "to_date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
             @RequestParam(value = "keyword", required = false) String keyword,
             @RequestParam(required = false, name = "employee_name") String employeeName) {
-        String effectiveKeyword = (keyword != null && !keyword.trim().isEmpty()) ? keyword : employeeName;
-        byte[] data = overtimeExportService.exportOvertimeReport(status, project, month, year, fromDate, toDate, effectiveKeyword);
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=Phu_Luc_03_Tong_Hop_OT.xlsx")
-                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
-                .body(data);
+        return exportOvertimePL03(status, project, month, year, fromDate, toDate, keyword, employeeName);
     }
 }
+

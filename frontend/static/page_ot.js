@@ -814,9 +814,47 @@ async function renderManageOT(area) {
           <button class="btn btn-outline-secondary btn-sm px-3 text-nowrap" id="ot-reset-filter-btn" title="Khôi phục bộ lọc">
             <i class="bi bi-arrow-counterclockwise me-1"></i>Khôi phục bộ lọc
           </button>
-          <button class="btn btn-outline-danger btn-sm px-3 text-nowrap" id="ot-export-btn" title="Xuất Excel">
-            <i class="bi bi-file-earmark-excel-fill me-1"></i>Xuất Excel
-          </button>
+          <div class="dropdown">
+            <button class="btn btn-danger btn-sm dropdown-toggle px-3 text-nowrap shadow-sm fw-semibold" type="button" data-bs-toggle="dropdown" aria-expanded="false" id="ot-export-dropdown-btn">
+              <i class="bi bi-file-earmark-excel-fill me-1"></i>Xuất Excel OT
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end shadow border-0" style="font-size: 13px; border-radius: 8px; min-width: 280px;">
+              <li>
+                <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="javascript:void(0)" onclick="exportOTReport('pl02')">
+                  <i class="bi bi-file-earmark-spreadsheet text-success fs-5"></i>
+                  <div>
+                    <div class="fw-bold text-dark">Phụ lục 02: Bảng tổng hợp công OT</div>
+                    <small class="text-muted" style="font-size: 11px;">Tổng hợp theo ma trận ngày & loại giờ làm thêm</small>
+                  </div>
+                </a>
+              </li>
+              <li>
+                <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="javascript:void(0)" onclick="exportOTReport('pl03')">
+                  <i class="bi bi-file-earmark-text text-primary fs-5"></i>
+                  <div>
+                    <div class="fw-bold text-dark">Phụ lục 03: Chi tiết OT theo dự án</div>
+                    <small class="text-muted" style="font-size: 11px;">Chi tiết các ca OT gom theo từng dự án riêng</small>
+                  </div>
+                </a>
+              </li>
+              <li><hr class="dropdown-divider my-1"></li>
+              <li>
+                <a class="dropdown-item py-2 d-flex align-items-center gap-2 text-danger fw-semibold" href="javascript:void(0)" onclick="exportOTReport('both_zip')">
+                  <i class="bi bi-file-earmark-zip-fill text-danger fs-5"></i>
+                  <div>
+                    <div class="fw-bold">Tải trọn bộ 2 phụ lục (.zip)</div>
+                    <small class="text-muted fw-normal" style="font-size: 11px;">Gói cả Phụ lục 02 & 03 trong 1 file nén</small>
+                  </div>
+                </a>
+              </li>
+              <li>
+                <a class="dropdown-item py-2 d-flex align-items-center gap-2 text-secondary" href="javascript:void(0)" onclick="exportOTReport('both_files')">
+                  <i class="bi bi-download text-secondary fs-6"></i>
+                  <div style="font-size: 12px;">Tải lần lượt cả 2 file (.xlsx)</div>
+                </a>
+              </li>
+            </ul>
+          </div>
         </div>
       </div>
     </div>`;
@@ -1131,34 +1169,67 @@ async function renderManageOT(area) {
     };
   }
 
-  document.getElementById('ot-export-btn').onclick = async () => {
+  window.exportOTReport = async function(type) {
     const params = new URLSearchParams({
-      month: filterMonth, year: filterYear,
+      month: filterMonth,
+      year: filterYear,
       token: STATE.token,
       ...(filterProject ? { project: filterProject } : {}),
+      ...(filterName ? { employee_name: filterName } : {}),
+      ...(filterStatus ? { status: filterStatus } : {})
     });
-    try {
-      const res = await fetch(`${API}/overtime/admin/export?${params}`, {
+
+    const downloadFile = async (endpoint, defaultName, label) => {
+      toast(`Đang xuất ${label}...`, 'info');
+      const res = await fetch(`${API}${endpoint}?${params}`, {
         headers: { 'Authorization': 'Bearer ' + STATE.token }
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || 'Không thể xuất file Excel.');
+        throw new Error(err.detail || err.message || `Không thể xuất ${label}.`);
+      }
+      const cd = res.headers.get('content-disposition');
+      let filename = defaultName;
+      if (cd && cd.includes('filename=')) {
+        const m = cd.match(/filename=["']?([^"';]+)["']?/);
+        if (m && m[1]) filename = m[1].trim();
       }
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `OT_T${String(filterMonth).padStart(2, '0')}_${filterYear}.xlsx`;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       a.remove();
-      window.URL.revokeObjectURL(url);
-      toast('Xuất báo cáo Excel thành công!', 'success');
+      setTimeout(() => {
+        try { window.URL.revokeObjectURL(url); } catch (_) {}
+      }, 15000);
+      toast(`Xuất thành công ${filename}!`, 'success');
+    };
+
+    try {
+      if (type === 'pl02') {
+        await downloadFile('/overtime/admin/export-pl02', `Phu_Luc_02_Bang_Tong_Hop_Cong_OT_T${String(filterMonth).padStart(2, '0')}_${filterYear}.xlsx`, 'Phụ lục 02 (Tổng hợp công OT)');
+      } else if (type === 'pl03') {
+        await downloadFile('/overtime/admin/export-pl03', `Phu_Luc_03_Thoi_Gian_Lam_Them_Gio_CBNV_T${String(filterMonth).padStart(2, '0')}_${filterYear}.xlsx`, 'Phụ lục 03 (Chi tiết OT theo dự án)');
+      } else if (type === 'both_zip' || type === 'both') {
+        await downloadFile('/overtime/admin/export-zip', `Bao_Cao_OT_PL02_PL03_T${String(filterMonth).padStart(2, '0')}_${filterYear}.zip`, 'Trọn bộ 2 phụ lục (.zip)');
+      } else if (type === 'both_files') {
+        await downloadFile('/overtime/admin/export-pl02', `Phu_Luc_02_Bang_Tong_Hop_Cong_OT_T${String(filterMonth).padStart(2, '0')}_${filterYear}.xlsx`, 'Phụ lục 02 (Tổng hợp công OT)');
+        setTimeout(async () => {
+          try {
+            await downloadFile('/overtime/admin/export-pl03', `Phu_Luc_03_Thoi_Gian_Lam_Them_Gio_CBNV_T${String(filterMonth).padStart(2, '0')}_${filterYear}.xlsx`, 'Phụ lục 03 (Chi tiết OT theo dự án)');
+          } catch (e2) {
+            toast(e2.message, 'error');
+          }
+        }, 1200);
+      }
     } catch (e) {
-      toast(e.message, 'error');
+      toast(e.message || 'Lỗi khi xuất file', 'error');
     }
   };
+
 
   // ── Global actions ──
   window.adminApproveOT = async (id) => {
